@@ -1,0 +1,11 @@
+{
+  "extends": "@howells/typescript-config/bundler-no-dom-app",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "rootDir": "src",
+    "outDir": "dist",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,177 @@
+import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+interface PackFile {
+  path: string;
+}
+
+interface PackResult {
+  files: PackFile[];
+  name: string;
+}
+
+interface RunResult {
+  code: number;
+  stderr: string;
+  stdout: string;
+}
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+function runCommand(
+  command: string,
+  args: string[],
+  cwd: string,
+): Promise<RunResult> {
+  const child = spawn(command, args, {
+    cwd,
+    env: {
+      ...process.env,
+      CI: "1",
+      FAL_KEY: "",
+      NO_COLOR: "1",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+
+  return new Promise((resolveResult, reject) => {
+    child.on("error", reject);
+    child.on("close", (code) => {
+      resolveResult({ code: code ?? 0, stderr, stdout });
+    });
+  });
+}
+
+async function npmPackDryRun(packagePath: string): Promise<PackResult> {
+  const result = await runCommand(
+    "npm",
+    ["pack", "--dry-run", "--json", "--ignore-scripts"],
+    packagePath,
+  );
+  expect(result.code, result.stderr).toBe(0);
+  return JSON.parse(result.stdout)[0] as PackResult;
+}
+
+function expectPublicPackage(pack: PackResult, expectedFiles: string[]) {
+  const files = pack.files.map((file) => file.path).sort();
+  expect(files).toEqual(expectedFiles.sort());
+  expect(files.some((file) => file.includes("apps/web"))).toBe(false);
+  expect(files.some((file) => file.includes(".env"))).toBe(false);
+  expect(files.some((file) => file.includes("src/"))).toBe(false);
+  expect(
+    files.every(
+      (file) =>
+        file === "package.json" ||
+        file.startsWith("dist/") ||
+        file.startsWith("bin/"),
+    ),
+  ).toBe(true);
+}
+
+describe("package smoke", () => {
+  it("imports the public SDK", async () => {
+    const sdk = await import("@howells/motif-sdk");
+
+    expect(sdk.MotifServer).toBeTypeOf("function");
+    expect(sdk.FAL_TOOLS["sam3-image"].endpoint).toBe("fal-ai/sam-3/image");
+  });
+
+  it("runs the built CLI binary without a Fal key", async () => {
+    const cliBin = resolve(repoRoot, "apps/cli/bin/motif");
+    expect(existsSync(resolve(repoRoot, "apps/cli/dist/index.js"))).toBe(true);
+
+    const help = await runCommand(
+      process.execPath,
+      [cliBin, "--help"],
+      repoRoot,
+    );
+    expect(help.code).toBe(0);
+    expect(help.stdout).toContain("Usage:");
+    expect(help.stdout).toContain("motif studio");
+
+    const dryRun = await runCommand(
+      process.execPath,
+      [
+        cliBin,
+        "studio portrait",
+        "--model",
+        "gpt",
+        "--aspect",
+        "16:9",
+        "--background",
+        "transparent",
+        "--quality",
+        "medium",
+        "--dry-run",
+        "--format",
+        "json",
+      ],
+      repoRoot,
+    );
+    expect(dryRun.code).toBe(0);
+    const payload = JSON.parse(dryRun.stdout) as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      endpoint: "fal-ai/gpt-image-1.5",
+      valid: true,
+    });
+    expect(payload.body).toMatchObject({
+      image_size: "1536x1024",
+      background: "transparent",
+      quality: "medium",
+    });
+  });
+
+  it("keeps public package tarballs limited to allowlisted files", async () => {
+    const sdkPack = await npmPackDryRun(
+      resolve(repoRoot, "packages/motif-sdk"),
+    );
+    expectPublicPackage(sdkPack, [
+      "dist/index.cjs",
+      "dist/index.d.cts",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "package.json",
+    ]);
+
+    const cliPack = await npmPackDryRun(resolve(repoRoot, "apps/cli"));
+    expectPublicPackage(cliPack, [
+      "bin/motif",
+      "dist/index.js",
+      "package.json",
+    ]);
+
+    const mcpPack = await npmPackDryRun(
+      resolve(repoRoot, "packages/motif-mcp"),
+    );
+    expectPublicPackage(mcpPack, [
+      "bin/motif-mcp",
+      "dist/index.js",
+      "package.json",
+    ]);
+
+    const serverPack = await npmPackDryRun(
+      resolve(repoRoot, "packages/motif-server"),
+    );
+    expectPublicPackage(serverPack, [
+      "dist/index.cjs",
+      "dist/index.d.cts",
+      "dist/index.d.ts",
+      "dist/index.js",
+      "package.json",
+    ]);
+  }, 30_000);
+});

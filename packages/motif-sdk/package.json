@@ -1,0 +1,65 @@
+{
+  "name": "@howells/motif-sdk",
+  "version": "0.1.0",
+  "description": "Public Node SDK for Motif fal.ai generation, editing, utility tools, and model metadata.",
+  "license": "MIT",
+  "author": "Daniel Howells",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/howells/motif.git",
+    "directory": "packages/motif-sdk"
+  },
+  "keywords": [
+    "motif",
+    "fal",
+    "fal.ai",
+    "image-generation",
+    "video-generation",
+    "segmentation",
+    "sdk"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "howells-lint",
+    "format": "howells-format",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@howells/envy": "^0.3.7",
+    "neverthrow": "^8.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@howells/lint": "^0.1.6",
+    "@howells/typescript-config": "^0.1.2",
+    "@types/node": "^25.6.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "tsup": "^8.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

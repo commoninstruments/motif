@@ -1,0 +1,51 @@
+{
+  "name": "@howells/motif-mcp",
+  "version": "0.0.1",
+  "description": "MCP server for Motif AI image generation and fal.ai utility tools.",
+  "license": "MIT",
+  "author": "Daniel Howells",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/howells/motif.git",
+    "directory": "packages/motif-mcp"
+  },
+  "type": "module",
+  "bin": {
+    "motif-mcp": "./bin/motif-mcp"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --target node22",
+    "dev": "tsx src/index.ts",
+    "lint": "howells-lint",
+    "format": "howells-format",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@howells/motif-sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@howells/lint": "^0.1.6",
+    "@howells/typescript-config": "^0.1.2",
+    "@types/node": "^25.6.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

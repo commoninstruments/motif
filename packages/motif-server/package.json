@@ -1,0 +1,58 @@
+{
+  "name": "@howells/motif-server",
+  "version": "0.0.2",
+  "description": "Deprecated compatibility wrapper for @howells/motif-sdk.",
+  "license": "MIT",
+  "author": "Daniel Howells",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/howells/motif.git",
+    "directory": "packages/motif-server"
+  },
+  "keywords": [
+    "motif",
+    "fal",
+    "fal.ai",
+    "sdk"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "howells-lint",
+    "format": "howells-format",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@howells/motif-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@howells/lint": "^0.1.6",
+    "@howells/typescript-config": "^0.1.2",
+    "@types/node": "^25.6.0",
+    "tsup": "^8.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

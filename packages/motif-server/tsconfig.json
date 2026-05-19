@@ -1,0 +1,10 @@
+{
+  "extends": "@howells/typescript-config/bundler-dom-library-monorepo",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "ignoreDeprecations": "6.0",
+    "types": ["node"]
+  },
+  "include": ["src"]
+}
