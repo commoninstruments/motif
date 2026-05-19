@@ -14,7 +14,7 @@ most tests do not require an API key.
 
 ```text
 apps/
-  cli/          @howells/motif command package
+  cli/          @howells/motif-cli command package
 packages/
   motif-sdk/    canonical public Node SDK
   motif-server/ deprecated compatibility wrapper
@@ -33,7 +33,7 @@ pnpm check
 Before publishing, inspect package contents:
 
 ```bash
-pnpm --filter @motif/cli pack --dry-run
+pnpm --filter @howells/motif-cli pack --dry-run
 pnpm --filter @howells/motif-sdk pack --dry-run
 pnpm --filter @howells/motif-mcp pack --dry-run
 ```

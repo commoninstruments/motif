@@ -5,7 +5,7 @@ and utility endpoints.
 
 ## Packages
 
-- `apps/cli` — `@howells/motif`, the `motif` command.
+- `apps/cli` — `@howells/motif-cli`, the `motif` command.
 - `packages/motif-sdk` — `@howells/motif-sdk`, the canonical Node SDK.
 - `packages/motif-server` — deprecated compatibility wrapper that re-exports the SDK.
 - `packages/motif-mcp` — `@howells/motif-mcp`, MCP tools backed by the SDK.
@@ -24,7 +24,7 @@ Focused package checks:
 
 ```bash
 pnpm --filter @howells/motif-sdk test
-pnpm --filter @motif/cli test
+pnpm --filter @howells/motif-cli test
 pnpm --filter @howells/motif-mcp test
 ```
 

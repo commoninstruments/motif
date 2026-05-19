@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/howells/motif-cli/main/logo.png" width="128" alt="Motif">
+  <img src="https://raw.githubusercontent.com/howells/motif/main/logo.png" width="128" alt="Motif">
 </p>
 <h1 align="center">Motif</h1>
 
 <p align="center">
   Agent-first image, video, editing, and series CLI for <a href="https://fal.ai">fal.ai</a><br>
-  <code>npm install -g @howells/motif</code>
+  <code>npm install -g @howells/motif-cli</code>
 </p>
 
 Motif is a terminal-first creative tool for fal.ai. It generates images, edits from reference images, upscales, removes backgrounds, creates image-to-video clips, keeps local history and cost totals, and exposes structured JSON output for agents and scripts.
@@ -34,20 +34,20 @@ Run `motif` with no arguments to launch the interactive terminal studio.
 ## Install
 
 ```bash
-npm install -g @howells/motif
+npm install -g @howells/motif-cli
 ```
 
 Or run without installing:
 
 ```bash
-npx @howells/motif "your prompt"
+npx @howells/motif-cli "your prompt"
 ```
 
 For local development:
 
 ```bash
-git clone https://github.com/howells/motif-cli.git
-cd motif-cli
+git clone https://github.com/howells/motif.git
+cd motif
 pnpm install
 pnpm build
 pnpm link --global

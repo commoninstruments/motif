@@ -2,8 +2,8 @@
   "name": "motif",
   "private": true,
   "scripts": {
-    "dev": "turbo run dev --filter=@howells/motif",
-    "dev:cli": "turbo run dev --filter=@howells/motif",
+    "dev": "turbo run dev --filter=@howells/motif-cli",
+    "dev:cli": "turbo run dev --filter=@howells/motif-cli",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

@@ -1,5 +1,5 @@
 {
-  "name": "@howells/motif",
+  "name": "@howells/motif-cli",
   "version": "1.1.9",
   "description": "Agent-first fal.ai image generation CLI with structured output, dry runs, history, series, and terminal studio mode.",
   "type": "module",
