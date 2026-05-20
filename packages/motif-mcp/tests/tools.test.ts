@@ -260,7 +260,11 @@ describe("generate tool", () => {
   it("omits optional dimensions when fal does not return them", async () => {
     const motif = makeMockMotif();
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
-      makeOk({ images: [{ url: "https://fal.media/no-dims.png" }] }),
+      makeOk({
+        images: [
+          { url: "https://fal.media/no-dims.png", width: null, height: null },
+        ],
+      }),
     );
     const client = await makeClient(motif);
 
@@ -418,7 +422,11 @@ describe("vary tool", () => {
   it("returns image variation URLs when fal omits dimensions", async () => {
     const motif = makeMockMotif();
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
-      makeOk({ images: [{ url: "https://fal.media/variation.png" }] }),
+      makeOk({
+        images: [
+          { url: "https://fal.media/variation.png", width: null, height: null },
+        ],
+      }),
     );
     const client = await makeClient(motif);
 

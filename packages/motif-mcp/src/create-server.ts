@@ -200,11 +200,15 @@ function toolError(
   };
 }
 
-function imageContent(image: { height?: number; url: string; width?: number }) {
+function imageContent(image: {
+  height?: null | number;
+  url: string;
+  width?: null | number;
+}) {
   return {
     url: image.url,
-    ...(image.width !== undefined && { width: image.width }),
-    ...(image.height !== undefined && { height: image.height }),
+    ...(typeof image.width === "number" && { width: image.width }),
+    ...(typeof image.height === "number" && { height: image.height }),
   };
 }
 
