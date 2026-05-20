@@ -135,6 +135,8 @@ export interface GenerateOptions {
   /** GPT background mode where supported */
   background?: BackgroundMode;
   editImageUrls?: string[];
+  /** Ask fal not to store IO payloads, and expose request ids for deletion. */
+  ephemeral?: boolean;
   /** Google-search alias for fal models that expose enable_google_search */
   enableGoogleSearch?: boolean;
   /** fal safety checker toggle where supported */
@@ -262,6 +264,7 @@ export interface MotifImage {
 export interface MotifResponse {
   images: MotifImage[];
   prompt?: string;
+  requestId?: string;
   seed?: number;
 }
 

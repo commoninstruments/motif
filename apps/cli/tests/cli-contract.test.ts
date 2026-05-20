@@ -136,6 +136,32 @@ describe("CLI contract", () => {
     expect(dryRun).toHaveProperty("estimatedCost");
   });
 
+  it("marks ephemeral dry-run generations as local-only after download", async () => {
+    const result = await runMotif([
+      "a cat on a windowsill",
+      "--dry-run",
+      "--ephemeral",
+      "--format",
+      "json",
+      "--model",
+      "banana",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const dryRun = parseJsonLine(result.stdout);
+    expect(dryRun).toMatchObject({
+      command: "generate",
+      dryRun: true,
+      ephemeral: true,
+      historyRecorded: false,
+      model: "banana",
+      storeIo: false,
+      valid: true,
+    });
+  });
+
   it("normalizes current fal generation fields in dry-run output", async () => {
     const result = await runMotif([
       "studio portrait",

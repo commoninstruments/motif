@@ -65,6 +65,33 @@ describe("MotifServer fetch integration", () => {
     });
   });
 
+  it("sends no-store headers for ephemeral sync generations and preserves request ids", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          images: [{ url: "https://example.com/out.png" }],
+          request_id: "req_ephemeral_123",
+        }),
+      ),
+    );
+
+    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const result = await motif.generate({
+      model: "banana",
+      prompt: "local-only image",
+      ephemeral: true,
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.requestId).toBe("req_ephemeral_123");
+    }
+
+    const request = requestAt(0);
+    expect(request.headers["X-Fal-Store-IO"]).toBe("0");
+  });
+
   it("submits queued generation with the same normalized request body", async () => {
     vi.stubGlobal(
       "fetch",
@@ -108,6 +135,25 @@ describe("MotifServer fetch integration", () => {
       image_urls: ["https://example.com/interior.png"],
       mask_image_url: "https://example.com/wall-mask.png",
     });
+  });
+
+  it("deletes fal request payloads by request id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+    );
+
+    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const result = await motif.deletePayloads("req_ephemeral_123");
+
+    expect(result.isOk()).toBe(true);
+
+    const request = requestAt(0);
+    expect(request.url).toBe(
+      "https://api.fal.ai/v1/models/requests/req_ephemeral_123/payloads",
+    );
+    expect(request.method).toBe("DELETE");
+    expect(request.headers.Authorization).toBe("Key test-key");
   });
 
   it("sends normalized fal utility tool requests", async () => {

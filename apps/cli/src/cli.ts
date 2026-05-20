@@ -24,6 +24,7 @@ import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
 import {
+  deletePayloads,
   generate,
   removeBackground,
   submitVideo,
@@ -175,6 +176,7 @@ interface CliOptions {
   edit?: string[];
   enableWebSearch?: boolean;
   enhancePrompt?: boolean;
+  ephemeral?: boolean;
   expandPrompt?: boolean;
   feed?: boolean;
   fields?: string;
@@ -258,6 +260,7 @@ interface StdinPayload {
   enableGoogleSearch?: boolean;
   enableSafetyChecker?: boolean;
   enhancePrompt?: boolean;
+  ephemeral?: boolean;
   expandPrompt?: boolean;
   generateAudio?: boolean;
   guidanceScale?: number;
@@ -441,10 +444,12 @@ async function saveGeneratedImages(
   config: Awaited<ReturnType<typeof loadConfig>>,
   emitOpts: EmitOptions,
   noOpen?: boolean,
+  historyRecorded = true,
 ): Promise<{
   id: string;
   images: SavedImage[];
   cost: number;
+  historyRecorded: boolean;
   timestamp: string;
 }> {
   // Build paths for each image
@@ -500,14 +505,15 @@ async function saveGeneratedImages(
     });
   }
 
-  // Single batch write to history
-  await addGenerations(generations);
+  if (historyRecorded) {
+    await addGenerations(generations);
+  }
 
   const totalCost = generations.reduce((sum, g) => sum + g.cost, 0);
   // biome-ignore lint/style/noNonNullAssertion: generations is non-empty since images is non-empty
   const lastGen = generations.at(-1)!;
 
-  if (!isStructured(emitOpts.format)) {
+  if (historyRecorded && !isStructured(emitOpts.format)) {
     const history = await loadHistory();
     console.log(
       chalk.dim(
@@ -526,6 +532,7 @@ async function saveGeneratedImages(
     id: lastGen.id,
     images: savedImages,
     cost: totalCost,
+    historyRecorded,
     timestamp: lastGen.timestamp,
   };
 }
@@ -716,6 +723,7 @@ async function generateImage(
       : undefined,
   );
   const expandPrompt = options.expandPrompt ?? stdinData?.expandPrompt;
+  const ephemeral = options.ephemeral || stdinData?.ephemeral;
   const dryRunGenerateOptions: GenerateOptions = {
     prompt,
     model: modelId,
@@ -723,6 +731,7 @@ async function generateImage(
     resolution,
     numImages,
     editImageUrls: editPaths,
+    ephemeral,
     transparent: options.transparent || stdinData?.transparent,
     inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
     seed,
@@ -769,6 +778,9 @@ async function generateImage(
       inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
       endpoint: requestPreview.endpoint,
       body: requestPreview.body,
+      ephemeral,
+      historyRecorded: !ephemeral,
+      storeIo: !ephemeral,
       // New fields — only include when set
       ...(seed !== undefined && { seed }),
       ...(background && { background }),
@@ -803,6 +815,9 @@ async function generateImage(
       console.log(`  Images: ${numImages}`);
       console.log(`  Output: ${chalk.dim(outputPath)}`);
       console.log(`  Cost:   ${chalk.yellow(`~$${cost.toFixed(3)}`)}`);
+      if (ephemeral) {
+        console.log("  Fal IO: not retained after local download");
+      }
       if (editPaths) {
         console.log(`  Edit:   ${chalk.dim(editPaths.join(", "))}`);
       }
@@ -822,6 +837,9 @@ async function generateImage(
       `Prompt: ${chalk.dim(prompt.slice(0, 80))}${prompt.length > 80 ? "..." : ""}`,
     );
     console.log(`Est. cost: ${chalk.yellow(`$${cost.toFixed(3)}`)}`);
+    if (ephemeral) {
+      console.log("Fal IO: not retained after local download");
+    }
     if (editPaths) {
       console.log(`References: ${chalk.dim(editPaths.join(", "))}`);
     }
@@ -839,6 +857,7 @@ async function generateImage(
       resolution,
       numImages,
       editImages: editPaths,
+      ephemeral,
       transparent: options.transparent || stdinData?.transparent,
       inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
       seed,
@@ -875,13 +894,44 @@ async function generateImage(
       config,
       emitOpts,
       options.noOpen || stdinData?.noOpen,
+      !ephemeral,
     );
+
+    let payloadsDeleted = false;
+    let payloadDeleteError: string | undefined;
+    if (ephemeral) {
+      if (result.requestId) {
+        try {
+          await deletePayloads(result.requestId);
+          payloadsDeleted = true;
+        } catch (error) {
+          payloadDeleteError =
+            error instanceof Error ? error.message : String(error);
+          if (!isStructured(emitOpts.format)) {
+            console.warn(
+              chalk.yellow(
+                `Warning: saved locally, but fal payload deletion failed: ${payloadDeleteError}`,
+              ),
+            );
+          }
+        }
+      } else {
+        payloadDeleteError = "fal response did not include a request_id";
+      }
+    }
 
     if (isStructured(emitOpts.format)) {
       emit(
         {
           command: "generate",
           ...saved,
+          ephemeral,
+          ...(ephemeral && {
+            payloadsDeleted,
+            requestId: result.requestId,
+            storeIo: false,
+          }),
+          ...(payloadDeleteError && { payloadDeleteError }),
           prompt,
           model: modelId,
           modelName: modelConfig.name,
@@ -1496,6 +1546,10 @@ export async function runCli(
       "Comma-separated fields to include in output (e.g. --fields id,cost,path)",
     )
     .option("--dry-run", "Validate inputs without making API calls")
+    .option(
+      "--ephemeral",
+      "Save output locally, then delete fal request IO payloads when possible",
+    )
     // Model & generation
     .option(
       "-m, --model <model>",
@@ -1808,6 +1862,7 @@ ${chalk.bold("Agent-First Flags:")}
   --format <json|human|ndjson>  Output format (auto-detects TTY)
   --fields <f1,f2,...>          Select output fields
   --dry-run                     Validate without API calls
+  --ephemeral                   Save locally, then delete fal IO payloads
   --describe [command]          Show CLI schema as JSON
   --history                     Generation history with pagination
   --limit <n>                   History entries per page (default 10)
@@ -1826,6 +1881,7 @@ ${chalk.bold("Options:")}
   -o, --output <file>      Output filename
   -n, --num <count>        Number of images (1-4)
   --transparent            Transparent background PNG (GPT only)
+  --ephemeral              Save locally, skip history, delete fal IO payloads
   --no-open                Don't auto-open image after generation
 
 ${chalk.bold("Post-processing:")}

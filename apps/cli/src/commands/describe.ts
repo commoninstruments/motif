@@ -153,6 +153,12 @@ function generateSchema() {
           description:
             "Ask fal to return media as data URI and omit it from request history where supported",
         },
+        ephemeral: {
+          type: "boolean",
+          default: false,
+          description:
+            "Save output locally, send X-Fal-Store-IO: 0, skip Motif history, then delete fal request IO payloads when fal returns a request id",
+        },
         maskImageUrl: {
           type: "string",
           description: "Mask image URL for supported edit/inpainting models",
@@ -222,6 +228,19 @@ function generateSchema() {
           },
         },
         cost: { type: "number", description: "Estimated cost in USD" },
+        historyRecorded: {
+          type: "boolean",
+          description: "False for ephemeral generations",
+        },
+        payloadsDeleted: {
+          type: "boolean",
+          description:
+            "Whether Motif deleted fal request IO payloads after local download",
+        },
+        requestId: {
+          type: "string",
+          description: "fal request id, included when fal returns one",
+        },
         timestamp: { type: "string", format: "date-time" },
       },
     },
@@ -629,6 +648,8 @@ function fullSchema() {
         "Comma-separated field names to include in output. Omit for all fields.",
       "--dry-run":
         "Validate inputs and show what would happen without making API calls.",
+      "--ephemeral":
+        "Save output locally, disable fal IO storage where supported, skip Motif history, and delete fal request payloads after download.",
       "--no-open": "Don't open image in viewer after generation.",
     },
     input_modes: {

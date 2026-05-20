@@ -22,6 +22,7 @@ function buildProgram(): Command {
       // Existing options (subset relevant to tests)
       .option("-m, --model <model>", "Model")
       .option("--dry-run", "Dry run")
+      .option("--ephemeral", "Do not retain fal IO payloads after download")
       .option("--transparent", "Transparent")
       .option("--loose", "Loose fidelity")
       .option("-n, --num <count>", "Number of images")
@@ -57,6 +58,13 @@ describe("CLI advanced generation options parsing", () => {
     program.parse(["node", "motif", "a cat", "--seed", "42"], { from: "node" });
     const opts = program.opts();
     expect(opts.seed).toBe("42");
+  });
+
+  it("parses --ephemeral as boolean", () => {
+    const program = buildProgram();
+    program.parse(["node", "motif", "a cat", "--ephemeral"], { from: "node" });
+    const opts = program.opts();
+    expect(opts.ephemeral).toBe(true);
   });
 
   it("parses --negative as string", () => {

@@ -102,6 +102,11 @@ export async function generate(
   return unwrap(await getMotif().generate({ ...rest, editImageUrls }));
 }
 
+/** Delete fal's stored request payloads after local download. */
+export async function deletePayloads(requestId: string): Promise<void> {
+  unwrap(await getMotif().deletePayloads(requestId));
+}
+
 /** Upscale an image */
 export async function upscale(options: UpscaleOptions): Promise<MotifResponse> {
   return unwrap(await getMotif().upscale(options));

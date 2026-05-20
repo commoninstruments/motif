@@ -21,6 +21,7 @@ import type {
 
 const FAL_BASE_URL = "https://fal.run";
 const FAL_QUEUE_URL = "https://queue.fal.run";
+const FAL_API_URL = "https://api.fal.ai";
 const FAL_REST_URL = "https://rest.alpha.fal.ai";
 
 function endpointFromQueueUrl(
@@ -93,6 +94,7 @@ export class MotifServer {
     const response = await this.request(`${FAL_BASE_URL}/${endpoint}`, {
       method: "POST",
       body: JSON.stringify(body),
+      headers: this.ephemeralHeaders(options),
     });
     if (response.isErr()) {
       return err(response.error);
@@ -149,6 +151,7 @@ export class MotifServer {
     const response = await this.request(`${FAL_QUEUE_URL}/${endpoint}`, {
       method: "POST",
       body: JSON.stringify(body),
+      headers: this.ephemeralHeaders(options),
     });
     if (response.isErr()) {
       return err(response.error);
@@ -226,7 +229,7 @@ export class MotifServer {
     }
 
     const data = await response.value.json();
-    return this.normalizeResponse(data);
+    return this.normalizeResponse(data, requestId);
   }
 
   /** ─── Processing ──────────────────────────────────────────── */
@@ -505,6 +508,24 @@ export class MotifServer {
     return ok((await response.value.json()) as ToolResponse);
   }
 
+  /**
+   * Delete fal's stored IO payloads for a completed request.
+   *
+   * This removes request input/output payload files exposed by fal's payloads
+   * API. It does not remove billing/account metadata or input files separately
+   * uploaded to fal storage before a request.
+   */
+  async deletePayloads(requestId: string): Promise<Result<void, MotifError>> {
+    const response = await this.request(
+      `${FAL_API_URL}/v1/models/requests/${encodeURIComponent(requestId)}/payloads`,
+      { method: "DELETE" },
+    );
+    if (response.isErr()) {
+      return err(response.error);
+    }
+    return ok(undefined);
+  }
+
   /** Estimate cost for a generation (no API call). */
   estimateCost(
     model: string,
@@ -612,12 +633,23 @@ export class MotifServer {
     return err(lastError ?? new MotifError("Request failed after retries", 0));
   }
 
+  private ephemeralHeaders(options: { ephemeral?: boolean }): HeadersInit {
+    return options.ephemeral ? { "X-Fal-Store-IO": "0" } : {};
+  }
+
   /**
    * Normalize fal.ai responses.
    * Some APIs return `{ image: {...} }` instead of `{ images: [...] }`.
    */
-  private normalizeResponse(data: unknown): Result<MotifResponse, MotifError> {
+  private normalizeResponse(
+    data: unknown,
+    fallbackRequestId?: string,
+  ): Result<MotifResponse, MotifError> {
     const obj = data as Record<string, unknown>;
+    const requestId =
+      (obj.request_id as string | undefined) ??
+      (obj.requestId as string | undefined) ??
+      fallbackRequestId;
 
     if ("detail" in obj) {
       return err(
@@ -630,10 +662,14 @@ export class MotifServer {
         images: [obj.image as MotifImage],
         seed: obj.seed as number | undefined,
         prompt: obj.prompt as string | undefined,
+        requestId,
       });
     }
 
-    return ok(obj as unknown as MotifResponse);
+    return ok({
+      ...(obj as unknown as MotifResponse),
+      requestId,
+    });
   }
 }
 
