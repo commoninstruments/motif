@@ -1,0 +1,33 @@
+# Motif
+
+> Public SDK, CLI, and MCP server for fal.ai image, video, editing, and utility endpoints, built for agent-readable dry runs, schema introspection, and local automation.
+
+## Start Here
+
+- [README](./README.md) - User-facing overview, install commands, model registry, CLI examples, and options reference.
+- [Agent instructions](./AGENTS.md) - Cross-tool commands, package map, permission boundaries, and verification expectations.
+- [Security notes](./docs/security.md) - FAL_KEY handling, MCP trust boundary, local history exposure, and ephemeral generation limits.
+- [Surface scorecard](./docs/surface/scorecard.md) - Current agent-readiness score and dimension summary.
+
+## Packages
+
+- [CLI package](./apps/cli) - `@howells/motif-cli`, the `motif` binary, terminal Studio, CLI tests, and package-specific agent guide.
+- [SDK package](./packages/motif-sdk) - `@howells/motif-sdk`, model metadata, fal request normalization, SDK types, and mocked fetch tests.
+- [MCP package](./packages/motif-mcp) - `@howells/motif-mcp`, stdio MCP tools, read-only resources, and InMemoryTransport tests.
+- [Compatibility package](./packages/motif-server) - Deprecated wrapper that re-exports the SDK.
+
+## Agent Interfaces
+
+- [CLI describe command](./apps/cli/src/commands/describe.ts) - Runtime schema for commands, models, tools, leaderboards, errors, and enums.
+- [CLI structured output](./apps/cli/src/utils/output.ts) - JSON, NDJSON, field masks, and structured error emission.
+- [CLI input hardening](./apps/cli/src/utils/input.ts) - Prompt sanitization, path sandboxing, and option validation.
+- [MCP server](./packages/motif-mcp/src/create-server.ts) - Tool and resource definitions for MCP clients.
+- [SDK server](./packages/motif-sdk/src/server.ts) - Result-returning fal client, queue polling, upload support, and payload deletion.
+
+## Tests
+
+- [CLI contract tests](./apps/cli/tests/cli-contract.test.ts) - Help, dry-run, stdin JSON, structured errors, tool commands, and fal body previews.
+- [SDK request tests](./packages/motif-sdk/tests/server-fetch.test.ts) - Mocked fal fetch behavior, no-store headers, and request payload deletion.
+- [MCP tests](./packages/motif-mcp/tests/tools.test.ts) - MCP client/server protocol tests using InMemoryTransport.
+- [CI workflow](./.github/workflows/ci.yml) - Typecheck, lint, and tests on push and pull request.
+

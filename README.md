@@ -29,7 +29,7 @@ motif "turn this into a watercolor poster" --edit photo.png --model banana
 motif "futuristic city map" --model ideogram --style DESIGN --dry-run --format json
 ```
 
-Run `motif` with no arguments to launch the interactive terminal studio.
+Run `motif` with no arguments to show help. Use `motif studio` to launch the interactive terminal studio.
 
 ## Install
 
@@ -64,6 +64,14 @@ pnpm link --global
 - Agent-oriented `--format json`, `--format ndjson`, `--fields`, `--dry-run`, stdin JSON, and `--describe` schema introspection.
 - CWD-sandboxed output paths and validated inputs.
 - Interactive Studio with a concise model selector; detailed benchmark metadata stays in JSON introspection instead of crowding the TUI.
+
+## Agent Entry Points
+
+- `AGENTS.md` - repo commands, package map, architecture boundaries, and permission rules.
+- `llms.txt` - compact agent-readable index of docs, package surfaces, tests, and source entrypoints.
+- `docs/security.md` - `FAL_KEY`, MCP trust boundaries, local history exposure, and `--ephemeral` caveats.
+- `docs/surface/scorecard.md` - current agent-readiness scorecard.
+- `motif --describe --format json` - live CLI schema for commands, models, tools, leaderboards, and errors.
 
 ## Models
 
@@ -403,6 +411,7 @@ Global:
   --format <json|human|ndjson>  Output format, auto-detected by default
   --fields <fields>             Comma-separated output field mask
   --dry-run                     Validate inputs and estimate cost without API calls
+  --ephemeral                   Save locally, skip Motif history, delete fal IO payloads
   --describe [command]          Emit command schema as JSON
   --no-open                     Do not open generated media after saving
 
@@ -415,6 +424,7 @@ Generation:
   -o, --output <file>           Output path within the current working directory
   -n, --num <count>             Number of images, 1-4
   --transparent                 Transparent PNG for GPT models
+  --ephemeral                   Local-only generation after download when fal returns a request id
   --seed <n>                    Reproducible generation seed
   --output-format <format>      jpeg, png, or webp
 

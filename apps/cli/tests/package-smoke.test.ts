@@ -76,6 +76,7 @@ function expectPublicPackage(pack: PackResult, expectedFiles: string[]) {
     files.every(
       (file) =>
         file === "package.json" ||
+        file === "README.md" ||
         file.startsWith("dist/") ||
         file.startsWith("bin/"),
     ),
@@ -140,6 +141,7 @@ describe("package smoke", () => {
       resolve(repoRoot, "packages/motif-sdk"),
     );
     expectPublicPackage(sdkPack, [
+      "README.md",
       "dist/index.cjs",
       "dist/index.d.cts",
       "dist/index.d.ts",
@@ -149,6 +151,7 @@ describe("package smoke", () => {
 
     const cliPack = await npmPackDryRun(resolve(repoRoot, "apps/cli"));
     expectPublicPackage(cliPack, [
+      "README.md",
       "bin/motif",
       "dist/index.js",
       "package.json",
@@ -158,6 +161,7 @@ describe("package smoke", () => {
       resolve(repoRoot, "packages/motif-mcp"),
     );
     expectPublicPackage(mcpPack, [
+      "README.md",
       "bin/motif-mcp",
       "dist/index.js",
       "package.json",
@@ -167,6 +171,7 @@ describe("package smoke", () => {
       resolve(repoRoot, "packages/motif-server"),
     );
     expectPublicPackage(serverPack, [
+      "README.md",
       "dist/index.cjs",
       "dist/index.d.cts",
       "dist/index.d.ts",

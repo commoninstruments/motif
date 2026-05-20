@@ -6,12 +6,22 @@
  */
 
 import type { MotifServer } from "@howells/motif-sdk";
+import {
+  FAL_TOOLS,
+  IMAGE_EDITING_TOP_20,
+  IMAGE_TEXT_TO_IMAGE_TOP_20,
+  MODELS,
+  VIDEO_IMAGE_TO_VIDEO_TOP_15,
+  VIDEO_TEXT_TO_VIDEO_TOP_15,
+} from "@howells/motif-sdk";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
+  ListResourcesRequestSchema,
   ListToolsRequestSchema,
   McpError,
+  ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readHistory } from "./history.js";
 
@@ -65,13 +75,138 @@ const IMAGES_ARRAY_SCHEMA = {
   description: "Generated images",
 };
 
+const HISTORY_SCHEMA = {
+  type: "object",
+  properties: {
+    costs: {
+      type: "object",
+      properties: {
+        allTime: { type: "number" },
+        session: { type: "number" },
+        today: { type: "number" },
+      },
+      required: ["allTime", "session", "today"],
+    },
+    generations: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          aspect: { type: "string" },
+          cost: { type: "number" },
+          editedFrom: { type: "string" },
+          filePath: { type: "string" },
+          id: { type: "string" },
+          model: { type: "string" },
+          prompt: { type: "string" },
+          resolution: { type: "string" },
+          timestamp: { type: "string" },
+        },
+        required: [
+          "aspect",
+          "cost",
+          "filePath",
+          "id",
+          "model",
+          "prompt",
+          "resolution",
+          "timestamp",
+        ],
+      },
+    },
+    hasMore: { type: "boolean" },
+    limit: { type: "number" },
+    offset: { type: "number" },
+    total: { type: "number" },
+  },
+  required: ["costs", "generations", "hasMore", "limit", "offset", "total"],
+};
+
+const RESOURCES = [
+  {
+    uri: "motif://models",
+    name: "models",
+    title: "Motif Model Registry",
+    description:
+      "Read-only registry of Motif model aliases, fal endpoints, pricing, and capabilities.",
+    mimeType: "application/json",
+  },
+  {
+    uri: "motif://tools",
+    name: "tools",
+    title: "Motif Fal Utility Tool Registry",
+    description:
+      "Read-only registry of normalized fal utility tools exposed by the SDK.",
+    mimeType: "application/json",
+  },
+  {
+    uri: "motif://leaderboards",
+    name: "leaderboards",
+    title: "Motif Leaderboard Snapshots",
+    description:
+      "Read-only Artificial Analysis leaderboard snapshots bundled with Motif metadata.",
+    mimeType: "application/json",
+  },
+  {
+    uri: "motif://history/schema",
+    name: "history_schema",
+    title: "Motif Local History Schema",
+    description:
+      "JSON schema for local generation history. This resource does not expose user history values.",
+    mimeType: "application/json",
+  },
+];
+
+function resourcePayload(uri: string): unknown {
+  switch (uri) {
+    case "motif://models":
+      return MODELS;
+    case "motif://tools":
+      return FAL_TOOLS;
+    case "motif://leaderboards":
+      return {
+        image_text_to_image_top_20: IMAGE_TEXT_TO_IMAGE_TOP_20,
+        image_editing_top_20: IMAGE_EDITING_TOP_20,
+        video_text_to_video_top_15: VIDEO_TEXT_TO_VIDEO_TOP_15,
+        video_image_to_video_top_15: VIDEO_IMAGE_TO_VIDEO_TOP_15,
+      };
+    case "motif://history/schema":
+      return HISTORY_SCHEMA;
+    default:
+      return null;
+  }
+}
+
+function toolError(
+  code: string,
+  message: string,
+  options: {
+    isRetriable?: boolean;
+    suggestions?: string[];
+  } = {},
+) {
+  const structured = {
+    error: true,
+    code,
+    message,
+    is_retriable: options.isRetriable ?? false,
+    suggestions: options.suggestions ?? [],
+  };
+
+  return {
+    isError: true,
+    content: [{ type: "text" as const, text: JSON.stringify(structured) }],
+    structuredContent: structured,
+  };
+}
+
 // ─── Tool definitions ────────────────────────────────────────────────
 
 const TOOLS = [
   {
     name: "generate",
     description:
-      "Generate images using AI. Returns an array of image URLs. Supports 9 models with different capabilities and price points.",
+      "Generate images from a prompt using Motif's normalized fal model registry. Use when the user explicitly asks to create new image media and has accepted fal credit spend. Do not use for inspecting available models or past generations; read motif://models or call history instead. This calls fal.ai and returns remote image URLs.",
     annotations: {
       title: "Generate Images",
       readOnlyHint: false,
@@ -166,7 +301,7 @@ const TOOLS = [
   {
     name: "upscale",
     description:
-      "Upscale an image to higher resolution. clarity model is faster, crystal model adds AI detail enhancement.",
+      "Upscale an existing image URL to higher resolution. Use when the user already has a remote image URL and wants enhancement or enlargement. Do not use for local file paths unless another tool has uploaded them first. This calls fal.ai and returns remote image URLs.",
     annotations: {
       title: "Upscale Image",
       readOnlyHint: false,
@@ -205,7 +340,7 @@ const TOOLS = [
   {
     name: "remove_background",
     description:
-      "Remove the background from an image, returning a PNG with transparency.",
+      "Remove the background from an existing image URL and return a transparent PNG. Use for product cutouts, masks, and compositing inputs. Do not use for prompt-based generation or local file paths unless another tool has uploaded them first. This calls fal.ai.",
     annotations: {
       title: "Remove Background",
       readOnlyHint: false,
@@ -254,7 +389,7 @@ const TOOLS = [
   {
     name: "vary",
     description:
-      "Generate variations of an existing image. Provide reference image URLs and a prompt describing changes.",
+      "Generate prompt-guided variations or edits from one or more reference image URLs. Use when the user wants an existing image transformed while preserving some visual context. Do not use for pure text-to-image generation; use generate instead. This calls fal.ai and returns remote image URLs.",
     annotations: {
       title: "Generate Variation",
       readOnlyHint: false,
@@ -303,7 +438,7 @@ const TOOLS = [
   {
     name: "history",
     description:
-      "List recent image generations from the local CLI history (~/.motif/history.json). Returns prompts, models, costs, and file paths for previously generated images.",
+      "List recent image generations from the local CLI history (~/.motif/history.json). Use only when the user wants local Motif history, costs, prompts, or file paths exposed to this MCP client. Do not call for model metadata; read motif://models instead.",
     annotations: {
       title: "Generation History",
       readOnlyHint: true,
@@ -416,7 +551,7 @@ const TOOLS = [
 export function createMotifMcpServer(motif: MotifServer): Server {
   const server = new Server(
     { name: "motif", version: "1.0.0" },
-    { capabilities: { tools: {} } },
+    { capabilities: { resources: {}, tools: {} } },
   );
 
   // ── List tools ────────────────────────────────────────────────────
@@ -425,13 +560,44 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     return { tools: TOOLS };
   });
 
+  // ── List resources ────────────────────────────────────────────────
+
+  server.setRequestHandler(ListResourcesRequestSchema, () => {
+    return { resources: RESOURCES };
+  });
+
+  // ── Read resource ─────────────────────────────────────────────────
+
+  server.setRequestHandler(ReadResourceRequestSchema, (request) => {
+    const { uri } = request.params;
+    const payload = resourcePayload(uri);
+
+    if (payload === null) {
+      throw new McpError(ErrorCode.InvalidRequest, `Unknown resource: ${uri}`);
+    }
+
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "application/json",
+          text: JSON.stringify(payload),
+        },
+      ],
+    };
+  });
+
   // ── Call tool ─────────────────────────────────────────────────────
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
 
     if (!args) {
-      throw new McpError(ErrorCode.InvalidParams, "No arguments provided");
+      return toolError("INVALID_PARAMS", "No arguments provided", {
+        suggestions: [
+          "Pass an arguments object matching the tool input schema.",
+        ],
+      });
     }
 
     // ── generate ──────────────────────────────────────────────────
@@ -467,7 +633,13 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       });
 
       if (result.isErr()) {
-        throw new McpError(ErrorCode.InternalError, result.error.message);
+        return toolError("GENERATION_FAILED", result.error.message, {
+          isRetriable: true,
+          suggestions: [
+            "Check that FAL_KEY is valid.",
+            "Try a cheaper or simpler model if fal rejects the request.",
+          ],
+        });
       }
 
       const costEstimate = motif.estimateCost(model, undefined, numImages);
@@ -499,7 +671,10 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       const result = await motif.upscale({ imageUrl, model });
 
       if (result.isErr()) {
-        throw new McpError(ErrorCode.InternalError, result.error.message);
+        return toolError("UPSCALE_FAILED", result.error.message, {
+          isRetriable: true,
+          suggestions: ["Check the input image URL and retry."],
+        });
       }
 
       const structured = {
@@ -527,7 +702,10 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       const result = await motif.removeBackground({ imageUrl, model });
 
       if (result.isErr()) {
-        throw new McpError(ErrorCode.InternalError, result.error.message);
+        return toolError("REMOVE_BACKGROUND_FAILED", result.error.message, {
+          isRetriable: true,
+          suggestions: ["Check the input image URL and retry."],
+        });
       }
 
       const structured = {
@@ -563,7 +741,13 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       });
 
       if (result.isErr()) {
-        throw new McpError(ErrorCode.InternalError, result.error.message);
+        return toolError("VARIATION_FAILED", result.error.message, {
+          isRetriable: true,
+          suggestions: [
+            "Check that each reference URL is reachable.",
+            "Try a model that supports image editing.",
+          ],
+        });
       }
 
       const costEstimate = motif.estimateCost(model, undefined, 1);

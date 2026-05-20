@@ -173,6 +173,49 @@ describe("ListTools", () => {
   });
 });
 
+// ─── Resources ───────────────────────────────────────────────────────
+
+describe("Resources", () => {
+  it("exposes read-only registry resources", async () => {
+    const client = await makeClient(makeMockMotif());
+    const { resources } = await client.listResources();
+    const uris = resources.map((resource) => resource.uri);
+
+    expect(uris).toContain("motif://models");
+    expect(uris).toContain("motif://tools");
+    expect(uris).toContain("motif://leaderboards");
+    expect(uris).toContain("motif://history/schema");
+  });
+
+  it("reads model registry resource as JSON", async () => {
+    const client = await makeClient(makeMockMotif());
+    const result = await client.readResource({ uri: "motif://models" });
+
+    const content = result.contents[0];
+    expect(content?.mimeType).toBe("application/json");
+    if (!content || !("text" in content)) {
+      throw new Error("Expected text resource content");
+    }
+    const parsed = JSON.parse(content.text);
+    expect(parsed.gpt).toMatchObject({
+      endpoint: "fal-ai/gpt-image-1.5",
+    });
+  });
+
+  it("reads history schema without exposing local history values", async () => {
+    const client = await makeClient(makeMockMotif());
+    const result = await client.readResource({ uri: "motif://history/schema" });
+
+    const content = result.contents[0];
+    if (!content || !("text" in content)) {
+      throw new Error("Expected text resource content");
+    }
+    const parsed = JSON.parse(content.text);
+    expect(parsed.required).toContain("generations");
+    expect(JSON.stringify(parsed)).not.toContain("a red fox");
+  });
+});
+
 // ─── generate tool ───────────────────────────────────────────────────
 
 describe("generate tool", () => {
@@ -228,16 +271,26 @@ describe("generate tool", () => {
     );
   });
 
-  it("throws InternalError when generate fails", async () => {
+  it("returns structured tool errors when generate fails", async () => {
     const motif = makeMockMotif();
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeErr("fal.ai 502"),
     );
     const client = await makeClient(motif);
 
-    await expect(
-      client.callTool({ name: "generate", arguments: { prompt: "a fox" } }),
-    ).rejects.toThrow();
+    const result = await client.callTool({
+      name: "generate",
+      arguments: { prompt: "a fox" },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed).toMatchObject({
+      code: "GENERATION_FAILED",
+      error: true,
+      is_retriable: true,
+      message: "fal.ai 502",
+    });
   });
 });
 

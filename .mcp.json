@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "motif": {
+      "command": "npx",
+      "args": ["-y", "@howells/motif-mcp"],
+      "env": {
+        "FAL_KEY": "${FAL_KEY}"
+      }
+    }
+  }
+}
