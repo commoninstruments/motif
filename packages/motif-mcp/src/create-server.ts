@@ -200,6 +200,14 @@ function toolError(
   };
 }
 
+function imageContent(image: { height?: number; url: string; width?: number }) {
+  return {
+    url: image.url,
+    ...(image.width !== undefined && { width: image.width }),
+    ...(image.height !== undefined && { height: image.height }),
+  };
+}
+
 // ─── Tool definitions ────────────────────────────────────────────────
 
 const TOOLS = [
@@ -645,11 +653,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       const costEstimate = motif.estimateCost(model, undefined, numImages);
 
       const structured = {
-        images: result.value.images.map((img) => ({
-          url: img.url,
-          width: img.width,
-          height: img.height,
-        })),
+        images: result.value.images.map(imageContent),
         seed: result.value.seed,
         cost_estimate: costEstimate,
       };
@@ -678,11 +682,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       }
 
       const structured = {
-        images: result.value.images.map((img) => ({
-          url: img.url,
-          width: img.width,
-          height: img.height,
-        })),
+        images: result.value.images.map(imageContent),
       };
 
       return {
@@ -753,11 +753,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
       const costEstimate = motif.estimateCost(model, undefined, 1);
 
       const structured = {
-        images: result.value.images.map((img) => ({
-          url: img.url,
-          width: img.width,
-          height: img.height,
-        })),
+        images: result.value.images.map(imageContent),
         cost_estimate: costEstimate,
       };
 

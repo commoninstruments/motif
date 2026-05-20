@@ -257,6 +257,22 @@ describe("generate tool", () => {
     expect(typeof parsed.cost_estimate).toBe("number");
   });
 
+  it("omits optional dimensions when fal does not return them", async () => {
+    const motif = makeMockMotif();
+    (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
+      makeOk({ images: [{ url: "https://fal.media/no-dims.png" }] }),
+    );
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "generate",
+      arguments: { prompt: "a fox" },
+    });
+
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.images[0]).toEqual({ url: "https://fal.media/no-dims.png" });
+  });
+
   it("resolves preset to aspect ratio", async () => {
     const motif = makeMockMotif();
     const client = await makeClient(motif);
@@ -397,6 +413,27 @@ describe("vary tool", () => {
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({ inputFidelity: "high" }),
     );
+  });
+
+  it("returns image variation URLs when fal omits dimensions", async () => {
+    const motif = makeMockMotif();
+    (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
+      makeOk({ images: [{ url: "https://fal.media/variation.png" }] }),
+    );
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "vary",
+      arguments: {
+        prompt: "variation",
+        imageUrls: ["https://example.com/ref.png"],
+      },
+    });
+
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.images[0]).toEqual({
+      url: "https://fal.media/variation.png",
+    });
   });
 });
 
