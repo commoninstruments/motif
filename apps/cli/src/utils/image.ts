@@ -4,7 +4,9 @@ import { existsSync, statSync, unlinkSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const DIMENSION_REGEX = /(\d+)\s*x\s*(\d+)/;
+const DIMENSION_REGEX = /(\d+)\s*x\s*(\d+)/g;
+const SIPS_HEIGHT_REGEX = /pixelHeight:\s*(\d+)/;
+const SIPS_WIDTH_REGEX = /pixelWidth:\s*(\d+)/;
 
 /** Minimal environment for child processes — excludes secrets like FAL_KEY */
 const SAFE_ENV = { PATH: process.env.PATH ?? "" };
@@ -102,8 +104,30 @@ export async function getImageDimensions(
   imagePath: string,
 ): Promise<{ width: number; height: number } | null> {
   try {
+    const result = await exec("sips", [
+      "-g",
+      "pixelWidth",
+      "-g",
+      "pixelHeight",
+      imagePath,
+    ]);
+    const width = result.stdout.match(SIPS_WIDTH_REGEX)?.[1];
+    const height = result.stdout.match(SIPS_HEIGHT_REGEX)?.[1];
+
+    if (result.exitCode === 0 && width && height) {
+      return {
+        width: Number.parseInt(width, 10),
+        height: Number.parseInt(height, 10),
+      };
+    }
+  } catch {
+    // sips not available, fall back to file
+  }
+
+  try {
     const result = await exec("file", [imagePath]);
-    const match = result.stdout.match(DIMENSION_REGEX);
+    const matches = [...result.stdout.matchAll(DIMENSION_REGEX)];
+    const match = matches.at(-1);
 
     if (match?.[1] && match[2]) {
       return {
