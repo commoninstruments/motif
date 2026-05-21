@@ -36,13 +36,60 @@ The dry-run payload should show the original prompt, creative options, and enric
 
 Use a shared taxonomy plus deterministic prompt enrichment function.
 
-1. Add a creative taxonomy module with stable option ids and short prompt phrases.
-2. Add `enrichPrompt(input)` that accepts a base prompt and optional creative direction fields.
-3. Wire the function into the normal generate command first.
-4. Expose the new options through `motif --describe generate --format json`.
-5. Extend Series and MCP in later slices by calling the same function.
+1. Add SDK-owned creative taxonomy and enrichment modules in `packages/motif-sdk`.
+2. Export stable creative option ids, metadata, TypeScript types, schema descriptors, and `enrichPrompt(input)` from `@howells/motif-sdk`.
+3. Wire the function into the normal generate command first by mapping CLI flags and stdin JSON into the shared `creative` object.
+4. Expose the new options through `motif --describe generate --format json` using SDK-exported schema metadata.
+5. Extend Series and MCP in later slices by calling the same SDK function and rendering the same SDK schema metadata.
 
 This keeps the feature explainable, testable, and cheap. It also lets agents inspect the exact enriched prompt during dry runs.
+
+## SDK Contract
+
+The SDK owns the creative direction contract so CLI, MCP, and future SDK consumers cannot drift.
+
+Initial public exports:
+
+```ts
+export type CreativeField =
+  | "recipe"
+  | "shot"
+  | "lighting"
+  | "genre"
+  | "camera"
+  | "color"
+  | "material"
+  | "motion";
+
+export interface CreativeOption {
+  id: string;
+  label: string;
+  description: string;
+  clause: string;
+}
+
+export type CreativeDirection = Partial<Record<CreativeField, string>>;
+
+export interface CreativePromptResult {
+  basePrompt: string;
+  creative: {
+    selected: CreativeDirection;
+    clauses: string[];
+  };
+  prompt: string;
+}
+
+export interface CreativeOptionError {
+  code: "INVALID_OPTION";
+  field: CreativeField;
+  value: string;
+  availableIds: string[];
+}
+```
+
+The taxonomy should be typed with `satisfies` so option ids are inferred as literal unions without broad casts. The canonical field order is `recipe`, `shot`, `lighting`, `genre`, `camera`, `color`, `material`, `motion`.
+
+`GenerateOptions` should use `creative?: CreativeDirection` as Motif-only metadata. The fal request body must only receive the final enriched prompt, not the `creative` object itself. If implementation keeps `buildGenerateBody` as the public request builder, it must either consume `creative` before building the body or be paired with a small `prepareGenerateOptions` helper that returns `{ options, creativeResult? }`.
 
 ## Creative Options
 
@@ -63,7 +110,7 @@ Each option id maps to a concise phrase. For example, `lighting=rim` can add `ri
 
 The enrichment function should:
 
-- Sanitize the base prompt using the existing prompt sanitation path before enrichment.
+- Sanitize the base prompt using SDK-owned prompt sanitation before enrichment. CLI can delegate to the SDK sanitizer rather than duplicating prompt cleanup logic.
 - Return the original sanitized prompt unchanged when no creative options are provided.
 - Append creative direction as concise comma-separated clauses.
 - Avoid duplicate clauses when the same option is supplied more than once through different inputs.
@@ -97,21 +144,42 @@ Generation should accept the shared creative options directly:
 motif "prompt" --recipe cinematic --shot close-up --lighting rim --dry-run
 ```
 
+The canonical structured shape is:
+
+```json
+{
+  "prompt": "luxury watch on black marble",
+  "creative": {
+    "recipe": "cinematic",
+    "shot": "close-up",
+    "lighting": "rim"
+  }
+}
+```
+
+CLI flags such as `--recipe cinematic` map into this same object. If both flags and stdin JSON provide a value for the same creative field, explicit CLI flags take precedence, matching existing CLI option behavior.
+
 Dry-run JSON should include:
 
 - `prompt`: the final enriched prompt used for request validation.
 - `basePrompt`: the sanitized user prompt before enrichment.
-- `creative`: selected option ids and generated clauses.
+- `creative`: selected option ids and generated clauses, emitted only when creative options are present.
 - Existing dry-run fields such as model, endpoint, request body, and estimated cost.
 
+When creative options are present, `prompt` and `body.prompt` must both contain the enriched prompt. `basePrompt` contains the sanitized original. With no creative options, dry-run output should remain backward compatible and omit `basePrompt` and `creative`.
+
+Successful structured generate output should also include `basePrompt` and `creative` whenever creative options were used, so agents can connect saved outputs back to the user-supplied prompt and deterministic enrichment.
+
 Text output should stay concise and only show creative direction when options are present.
+
+`motif --describe generate --format json` should expose each creative field as an enum derived from the SDK taxonomy. The schema metadata should include ids, labels, descriptions, and clause previews so agents can choose valid options without scraping prose.
 
 ## Series Integration
 
 Series should reuse the same creative direction layer, but not own it.
 
-- `series gen` enriches its single scene prompt before applying the series style prefix.
-- `series run` can enrich each generated scene prompt with the same selected direction.
+- `series gen` enriches its single `baseScenePrompt` into an `enrichedScenePrompt`, then applies the Series style prefix to produce `finalPromptWithSeriesStyle`.
+- `series run` can enrich each generated `baseScenePrompt` with the same selected direction before final Series prompt assembly.
 - Existing Series terms remain unchanged: Theme, Scene Prompt, Series Run, Reference.
 
 This should be a later slice after the generate command proves the API shape.
@@ -125,9 +193,22 @@ MCP tools should expose the same creative fields for compatible tools:
 
 The MCP schema should describe creative options as deterministic prompt enrichment, not as model-specific parameters.
 
+MCP schemas should be rendered from the SDK-exported taxonomy metadata rather than duplicating option ids locally.
+
 ## Error Handling
 
-Unknown creative option ids should produce a structured `INVALID_OPTION` error with available ids for that field.
+Unknown creative option ids should produce a typed structured error that carries:
+
+```json
+{
+  "code": "INVALID_OPTION",
+  "field": "lighting",
+  "value": "rim-light",
+  "availableIds": ["rim", "rembrandt", "softbox"]
+}
+```
+
+CLI and MCP should adapt that typed error into their existing structured error formats and error catalog entries.
 
 Empty prompts should continue using existing prompt validation behavior.
 
@@ -143,8 +224,13 @@ Initial tests:
 - `enrichPrompt` appends expected clauses in stable order.
 - Unknown option ids fail with a helpful error.
 - Generate dry-run JSON includes `basePrompt`, `creative`, and the enriched `prompt`.
+- Generate dry-run JSON has `prompt` and `body.prompt` set to the enriched prompt when creative options are present.
+- Generate stdin JSON accepts the canonical `creative` object.
+- CLI creative flags override matching stdin JSON creative fields.
 - Existing generate dry-run behavior remains unchanged when no creative options are supplied.
-- `--describe generate --format json` lists the creative options.
+- Successful structured generate output includes `basePrompt` and `creative` when creative options are present.
+- `--describe generate --format json` lists creative options as SDK-derived enums with metadata.
+- SDK package exports include the creative taxonomy, types, sanitizer, schema metadata, and enrichment function.
 
 Later tests:
 
@@ -154,7 +240,7 @@ Later tests:
 
 ## Rollout
 
-Slice 1: taxonomy module, `enrichPrompt`, generate CLI options, describe schema, focused tests.
+Slice 1: SDK taxonomy module, exported creative types/schema metadata, SDK sanitizer, `enrichPrompt`, generate CLI flags and stdin JSON support, describe schema, focused tests.
 
 Slice 2: Series command support.
 
