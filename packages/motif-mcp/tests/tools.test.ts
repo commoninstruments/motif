@@ -180,12 +180,43 @@ describe("ListTools", () => {
     expect(properties.resolution?.enum).toContain("0.5K");
   });
 
+  it("generate schema advertises creative direction options", async () => {
+    const client = await makeClient(makeMockMotif());
+    const { tools } = await client.listTools();
+    const generate = tools.find((t) => t.name === "generate");
+    const properties = generate?.inputSchema.properties as Record<
+      string,
+      { properties?: Record<string, { enum?: string[] }> }
+    >;
+
+    expect(properties.creative?.properties?.recipe?.enum).toContain(
+      "cinematic",
+    );
+    expect(properties.creative?.properties?.lighting?.enum).toContain("rim");
+    expect(properties.creative?.properties?.material?.enum).toContain(
+      "reflective",
+    );
+  });
+
   it("vary tool requires prompt and imageUrls", async () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
     const vary = tools.find((t) => t.name === "vary");
     expect(vary?.inputSchema.required).toContain("prompt");
     expect(vary?.inputSchema.required).toContain("imageUrls");
+  });
+
+  it("vary schema advertises creative direction options", async () => {
+    const client = await makeClient(makeMockMotif());
+    const { tools } = await client.listTools();
+    const vary = tools.find((t) => t.name === "vary");
+    const properties = vary?.inputSchema.properties as Record<
+      string,
+      { properties?: Record<string, { enum?: string[] }> }
+    >;
+
+    expect(properties.creative?.properties?.shot?.enum).toContain("close-up");
+    expect(properties.creative?.properties?.genre?.enum).toContain("film-noir");
   });
 });
 
@@ -339,6 +370,26 @@ describe("generate tool", () => {
     );
   });
 
+  it("passes creative direction through to motif.generate", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    await client.callTool({
+      name: "generate",
+      arguments: {
+        prompt: "a fox",
+        creative: { lighting: "rim", material: "reflective" },
+      },
+    });
+
+    expect(motif.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creative: { lighting: "rim", material: "reflective" },
+        prompt: "a fox",
+      }),
+    );
+  });
+
   it("returns structured tool errors when generate fails", async () => {
     const motif = makeMockMotif();
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -464,6 +515,28 @@ describe("vary tool", () => {
 
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({ inputFidelity: "high" }),
+    );
+  });
+
+  it("passes creative direction through to motif.generate", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    await client.callTool({
+      name: "vary",
+      arguments: {
+        prompt: "variation",
+        imageUrls: ["https://example.com/ref.png"],
+        creative: { genre: "film-noir", shot: "close-up" },
+      },
+    });
+
+    expect(motif.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creative: { genre: "film-noir", shot: "close-up" },
+        editImageUrls: ["https://example.com/ref.png"],
+        prompt: "variation",
+      }),
     );
   });
 

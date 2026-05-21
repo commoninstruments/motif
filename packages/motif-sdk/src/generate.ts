@@ -1,4 +1,5 @@
 import { aspectToFalImageSize, aspectToGptSize } from "./aspects";
+import { enrichPrompt } from "./creative";
 import { MODELS } from "./models";
 import type {
   GenerateOptions,
@@ -225,6 +226,7 @@ export function buildGenerateBody(options: GenerateOptions): {
   const {
     prompt,
     model,
+    creative,
     aspect = "1:1",
     resolution = "2K",
     numImages = 1,
@@ -261,7 +263,10 @@ export function buildGenerateBody(options: GenerateOptions): {
   }
 
   let endpoint = config.endpoint;
-  const body: Record<string, unknown> = { prompt };
+  const enrichedPrompt = creative
+    ? enrichPrompt({ prompt, creative }).prompt
+    : prompt;
+  const body: Record<string, unknown> = { prompt: enrichedPrompt };
   const hasEditImages = Boolean(editImageUrls?.length);
   const editImages = editImageUrls ?? [];
   const explicitAspect = options.aspect !== undefined;

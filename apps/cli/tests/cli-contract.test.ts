@@ -18,7 +18,11 @@ function tempHome(): string {
   return dir;
 }
 
-function runMotif(args: string[], stdin = ""): Promise<CliResult> {
+function runMotif(
+  args: string[],
+  stdin = "",
+  home = tempHome(),
+): Promise<CliResult> {
   const child = spawn(
     process.execPath,
     ["--import", "tsx", "src/index.ts", ...args],
@@ -28,7 +32,7 @@ function runMotif(args: string[], stdin = ""): Promise<CliResult> {
         ...process.env,
         CI: "1",
         FAL_KEY: "",
-        HOME: tempHome(),
+        HOME: home,
         NO_COLOR: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
@@ -116,6 +120,64 @@ describe("CLI contract", () => {
     expect(series.subcommands).toContain("run");
   });
 
+  it("describes creative direction options as generate enums", async () => {
+    const result = await runMotif([
+      "--describe",
+      "generate",
+      "--format",
+      "json",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const generate = parseJsonLine(result.stdout);
+    const properties = (
+      generate.input as {
+        properties: Record<
+          string,
+          {
+            enum?: string[];
+            enumDescriptions?: Record<string, unknown>;
+            type?: string;
+          }
+        >;
+      }
+    ).properties;
+    expect(properties.recipe).toMatchObject({
+      enum: ["cinematic"],
+      type: "string",
+    });
+    expect(properties.recipe?.enumDescriptions.cinematic).toMatchObject({
+      clause: "cinematic scene",
+      label: "Cinematic",
+    });
+    expect(properties.lighting).toMatchObject({
+      enum: ["rim"],
+      type: "string",
+    });
+    expect(properties.genre).toMatchObject({
+      enum: ["film-noir"],
+      type: "string",
+    });
+    expect(properties.camera).toMatchObject({
+      enum: ["macro-product"],
+      type: "string",
+    });
+    expect(properties.color).toMatchObject({
+      enum: ["monochrome"],
+      type: "string",
+    });
+    expect(properties.material).toMatchObject({
+      enum: ["reflective"],
+      type: "string",
+    });
+    expect(properties.motion).toMatchObject({
+      enum: ["still"],
+      type: "string",
+    });
+  });
+
   it("dry-runs a themed series run without FAL_KEY", async () => {
     const result = await runMotif([
       "series",
@@ -145,6 +207,114 @@ describe("CLI contract", () => {
     expect(payload).toHaveProperty("estimatedCost");
     expect(payload.scenes).toHaveLength(6);
     expect(result.stdout).not.toContain("[FILTERED]");
+  });
+
+  it("applies creative direction to series run dry-run scene prompts", async () => {
+    const result = await runMotif([
+      "series",
+      "run",
+      "luxury watch campaign",
+      "--count",
+      "2",
+      "--dry-run",
+      "--format",
+      "json",
+      "--model",
+      "banana",
+      "--recipe",
+      "cinematic",
+      "--lighting",
+      "rim",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const payload = parseJsonLine(result.stdout);
+    expect(payload).toMatchObject({
+      command: "series-run",
+      creative: {
+        clauses: [
+          "cinematic scene",
+          "rim lighting with defined edge highlights",
+        ],
+        selected: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+      },
+    });
+    const firstScene = (payload.scenes as Record<string, unknown>[])[0];
+    expect(firstScene).toMatchObject({
+      baseScenePrompt:
+        "Image 1 of 2 in a cohesive visual series about luxury watch campaign; wide establishing composition; shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set; no text, no watermark",
+      enrichedScenePrompt:
+        "Image 1 of 2 in a cohesive visual series about luxury watch campaign; wide establishing composition; shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set; no text, no watermark, cinematic scene, rim lighting with defined edge highlights",
+    });
+    expect(String(firstScene?.prompt)).toContain(
+      "cinematic scene, rim lighting with defined edge highlights",
+    );
+  });
+
+  it("applies creative direction to series gen dry-run prompts", async () => {
+    const home = tempHome();
+    const created = await runMotif(
+      [
+        "series",
+        "create",
+        "Studio Campaign",
+        "--style",
+        "editorial product language",
+        "--model",
+        "banana",
+        "--format",
+        "json",
+      ],
+      "",
+      home,
+    );
+    expect(created.code).toBe(0);
+    const series = parseJsonLine(created.stdout);
+
+    const result = await runMotif(
+      [
+        "series",
+        "gen",
+        String(series.slug),
+        "hero watch on steel table",
+        "--dry-run",
+        "--format",
+        "json",
+        "--recipe",
+        "cinematic",
+        "--lighting",
+        "rim",
+      ],
+      "",
+      home,
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const payload = parseJsonLine(result.stdout);
+    expect(payload).toMatchObject({
+      command: "series-generate",
+      creative: {
+        clauses: [
+          "cinematic scene",
+          "rim lighting with defined edge highlights",
+        ],
+        selected: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+      },
+      scenePrompt: "hero watch on steel table",
+    });
+    expect(payload.prompt).toBe(
+      "editorial product language. hero watch on steel table, cinematic scene, rim lighting with defined edge highlights",
+    );
   });
 
   it("accepts themed series runs through stdin JSON", async () => {
@@ -212,6 +382,140 @@ describe("CLI contract", () => {
       valid: true,
     });
     expect(dryRun).toHaveProperty("estimatedCost");
+  });
+
+  it("emits creative metadata and enriched prompt during dry-run generation", async () => {
+    const result = await runMotif([
+      "luxury watch on black marble",
+      "--dry-run",
+      "--format",
+      "json",
+      "--model",
+      "banana",
+      "--recipe",
+      "cinematic",
+      "--lighting",
+      "rim",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const dryRun = parseJsonLine(result.stdout);
+    expect(dryRun).toMatchObject({
+      basePrompt: "luxury watch on black marble",
+      command: "generate",
+      creative: {
+        clauses: [
+          "cinematic scene",
+          "rim lighting with defined edge highlights",
+        ],
+        selected: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+      },
+      dryRun: true,
+      prompt:
+        "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
+      valid: true,
+    });
+    expect((dryRun.body as Record<string, unknown>).prompt).toBe(
+      "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
+    );
+  });
+
+  it("accepts creative direction through stdin JSON dry-run payloads", async () => {
+    const result = await runMotif(
+      ["--format", "json"],
+      JSON.stringify({
+        command: "generate",
+        creative: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+        dryRun: true,
+        model: "banana",
+        prompt: "luxury watch on black marble",
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const dryRun = parseJsonLine(result.stdout);
+    expect(dryRun).toMatchObject({
+      basePrompt: "luxury watch on black marble",
+      creative: {
+        selected: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+      },
+      prompt:
+        "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
+    });
+  });
+
+  it("lets creative CLI flags override matching stdin JSON fields", async () => {
+    const result = await runMotif(
+      ["--format", "json", "--recipe", "cinematic", "--lighting", "rim"],
+      JSON.stringify({
+        command: "generate",
+        creative: {
+          lighting: "missing",
+        },
+        dryRun: true,
+        model: "banana",
+        prompt: "luxury watch on black marble",
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const dryRun = parseJsonLine(result.stdout);
+    expect(dryRun).toMatchObject({
+      creative: {
+        selected: {
+          lighting: "rim",
+          recipe: "cinematic",
+        },
+      },
+    });
+  });
+
+  it("emits field-specific details for invalid creative options", async () => {
+    const result = await runMotif([
+      "studio portrait",
+      "--dry-run",
+      "--format",
+      "json",
+      "--model",
+      "banana",
+      "--lighting",
+      "rim-light",
+    ]);
+
+    expect(result.code).toBe(1);
+    const error = JSON.parse(result.stderr.trim()) as {
+      code: string;
+      details: {
+        availableIds: string[];
+        field: string;
+        value: string;
+      };
+      error: boolean;
+    };
+    expect(error).toMatchObject({
+      code: "INVALID_OPTION",
+      error: true,
+      details: {
+        availableIds: ["rim"],
+        field: "lighting",
+        value: "rim-light",
+      },
+    });
   });
 
   it("marks ephemeral dry-run generations as local-only after download", async () => {

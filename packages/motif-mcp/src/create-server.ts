@@ -9,6 +9,9 @@ import type { MotifServer } from "@howells/motif-sdk";
 import {
   ASPECT_RATIOS,
   type AspectRatio,
+  CREATIVE_FIELDS,
+  CREATIVE_TAXONOMY,
+  type CreativeDirection,
   FAL_TOOLS,
   GENERATION_MODELS,
   IMAGE_EDITING_TOP_20,
@@ -206,6 +209,25 @@ function imageContent(image: {
   };
 }
 
+function creativeInputSchema() {
+  return {
+    type: "object",
+    description:
+      "Optional creative direction choices that enrich the prompt before generation.",
+    additionalProperties: false,
+    properties: Object.fromEntries(
+      CREATIVE_FIELDS.map((field) => [
+        field,
+        {
+          type: "string",
+          enum: CREATIVE_TAXONOMY[field].map((option) => option.id),
+          description: `Creative ${field} direction`,
+        },
+      ]),
+    ),
+  };
+}
+
 // ─── Tool definitions ────────────────────────────────────────────────
 
 const TOOLS = [
@@ -239,6 +261,7 @@ const TOOLS = [
           type: "string",
           description: "Description of the image to generate",
         },
+        creative: creativeInputSchema(),
         model: {
           type: "string",
           enum: GENERATION_MODELS,
@@ -420,6 +443,7 @@ const TOOLS = [
           description:
             "Prompt describing the desired changes or new image based on the reference(s)",
         },
+        creative: creativeInputSchema(),
         imageUrls: {
           type: "array",
           items: { type: "string" },
@@ -637,8 +661,10 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         seed,
         enableWebSearch,
         enableGoogleSearch,
+        creative,
       } = args as {
         prompt: string;
+        creative?: CreativeDirection;
         model?: string;
         aspect?: string;
         resolution?: Resolution;
@@ -667,6 +693,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         seed,
         enableWebSearch,
         enableGoogleSearch,
+        creative,
       });
 
       if (result.isErr()) {
@@ -755,8 +782,10 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         imageUrls,
         model = "gpt",
         inputFidelity,
+        creative,
       } = args as {
         prompt: string;
+        creative?: CreativeDirection;
         imageUrls: string[];
         model?: string;
         inputFidelity?: "low" | "high";
@@ -767,6 +796,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         model,
         editImageUrls: imageUrls,
         inputFidelity,
+        creative,
       });
 
       if (result.isErr()) {

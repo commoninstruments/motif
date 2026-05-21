@@ -10,6 +10,8 @@
 
 import {
   ASPECT_RATIOS,
+  CREATIVE_FIELDS,
+  CREATIVE_TAXONOMY,
   FAL_TOOL_IDS,
   FAL_TOOLS,
   FAL_TOOLS_CHECKED_AT,
@@ -26,6 +28,29 @@ import {
 import { ERROR_CATALOG } from "../utils/error-catalog";
 import { type EmitOptions, emit } from "../utils/output";
 import { PACKAGE_VERSION } from "../version";
+
+function creativeSchemaProperties(): Record<string, object> {
+  return Object.fromEntries(
+    CREATIVE_FIELDS.map((field) => [
+      field,
+      {
+        type: "string",
+        enum: CREATIVE_TAXONOMY[field].map((option) => option.id),
+        description: `Creative direction ${field} id`,
+        enumDescriptions: Object.fromEntries(
+          CREATIVE_TAXONOMY[field].map((option) => [
+            option.id,
+            {
+              label: option.label,
+              description: option.description,
+              clause: option.clause,
+            },
+          ]),
+        ),
+      },
+    ]),
+  );
+}
 
 /** JSON Schema for the generate command's input */
 function generateSchema() {
@@ -202,6 +227,7 @@ function generateSchema() {
           default: false,
           description: "Don't open image in viewer after generation",
         },
+        ...creativeSchemaProperties(),
       },
     },
     output: {

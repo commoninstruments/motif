@@ -12,6 +12,8 @@
 import { basename, resolve } from "node:path";
 import {
   ASPECT_RATIOS,
+  type CreativeDirection,
+  enrichPrompt,
   estimateCost,
   GENERATION_MODELS,
   MODELS,
@@ -111,6 +113,31 @@ function splitRefTags(refs: string | undefined): string[] | undefined {
     ?.split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function resolveCreativeDirection(options: {
+  camera?: string;
+  color?: string;
+  creative?: CreativeDirection;
+  genre?: string;
+  lighting?: string;
+  material?: string;
+  motion?: string;
+  recipe?: string;
+  shot?: string;
+}): CreativeDirection | undefined {
+  const creative: CreativeDirection = {
+    camera: options.camera ?? options.creative?.camera,
+    color: options.color ?? options.creative?.color,
+    genre: options.genre ?? options.creative?.genre,
+    lighting: options.lighting ?? options.creative?.lighting,
+    material: options.material ?? options.creative?.material,
+    motion: options.motion ?? options.creative?.motion,
+    recipe: options.recipe ?? options.creative?.recipe,
+    shot: options.shot ?? options.creative?.shot,
+  };
+
+  return Object.values(creative).some(Boolean) ? creative : undefined;
 }
 
 function buildSeriesRunStylePrompt(theme: string, style?: string): string {
@@ -378,14 +405,23 @@ async function cmdGenerate(
   slug: string,
   prompt: string,
   opts: {
-    refs?: string;
     aspect?: string;
-    resolution?: string;
-    model?: string;
-    output?: string;
-    num?: string;
-    noOpen?: boolean;
+    camera?: string;
+    color?: string;
+    creative?: CreativeDirection;
     dryRun?: boolean;
+    genre?: string;
+    lighting?: string;
+    material?: string;
+    model?: string;
+    motion?: string;
+    noOpen?: boolean;
+    num?: string;
+    output?: string;
+    recipe?: string;
+    refs?: string;
+    resolution?: string;
+    shot?: string;
   },
   emitOpts: EmitOptions,
 ): Promise<void> {
@@ -402,8 +438,16 @@ async function cmdGenerate(
       process.exit(1);
     }
 
+    const creative = resolveCreativeDirection(opts);
+    const creativeResult = creative
+      ? validateSeriesOption(emitOpts, () =>
+          enrichPrompt({ prompt: sanitized, creative }),
+        )
+      : undefined;
+    const requestPrompt = creativeResult?.prompt ?? sanitized;
+
     // Build the full prompt with style prefix
-    const fullPrompt = buildSeriesPrompt(config, sanitized);
+    const fullPrompt = buildSeriesPrompt(config, requestPrompt);
 
     // Resolve which reference images to include
     const refTags = opts.refs?.split(",").map((t) => t.trim());
@@ -463,6 +507,7 @@ async function cmdGenerate(
         series: slug,
         prompt: fullPrompt,
         scenePrompt: sanitized,
+        enrichedScenePrompt: requestPrompt,
         stylePrompt: config.stylePrompt,
         model: modelId,
         modelName: modelConfig.name,
@@ -472,6 +517,9 @@ async function cmdGenerate(
         refs: refPaths,
         refTags: refTags ?? config.refs.map((r) => r.tag),
         estimatedCost: cost,
+        ...(creativeResult && {
+          creative: creativeResult.creative,
+        }),
         valid: true,
       };
       emit(dryResult, emitOpts);
@@ -601,12 +649,16 @@ async function cmdGenerate(
           series: slug,
           prompt: fullPrompt,
           scenePrompt: sanitized,
+          enrichedScenePrompt: requestPrompt,
           model: modelId,
           modelName: modelConfig.name,
           aspect,
           resolution,
           images: savedImages,
           cost,
+          ...(creativeResult && {
+            creative: creativeResult.creative,
+          }),
           outputIndex: config.outputs.length + 1,
         },
         emitOpts,
@@ -625,13 +677,22 @@ async function cmdRun(
   theme: string,
   opts: {
     aspect?: string;
+    camera?: string;
+    color?: string;
     count?: string;
+    creative?: CreativeDirection;
     dryRun?: boolean;
+    genre?: string;
+    lighting?: string;
+    material?: string;
     model?: string;
+    motion?: string;
     noOpen?: boolean;
+    recipe?: string;
     refs?: string;
     resolution?: string;
     series?: string;
+    shot?: string;
     style?: string;
   },
   emitOpts: EmitOptions,
@@ -700,7 +761,19 @@ async function cmdRun(
       process.exit(1);
     }
 
-    const scenePrompts = buildSeriesRunScenes(sanitizedTheme, count);
+    const creative = resolveCreativeDirection(opts);
+    const baseScenePrompts = buildSeriesRunScenes(sanitizedTheme, count);
+    const enrichedScenes = baseScenePrompts.map((baseScenePrompt) =>
+      creative
+        ? validateSeriesOption(emitOpts, () =>
+            enrichPrompt({ prompt: baseScenePrompt, creative }),
+          )
+        : undefined,
+    );
+    const scenePrompts = baseScenePrompts.map(
+      (baseScenePrompt, index) =>
+        enrichedScenes[index]?.prompt ?? baseScenePrompt,
+    );
     const fullPrompts = scenePrompts.map((scenePrompt) =>
       stylePrompt ? `${stylePrompt}. ${scenePrompt}` : scenePrompt,
     );
@@ -725,7 +798,15 @@ async function cmdRun(
           refTags: refTags ?? existingSeries?.refs.map((ref) => ref.tag) ?? [],
           refs: refPaths,
           usesAnchorReference: canUseAnchorReference,
+          ...(creative && {
+            creative: {
+              clauses: enrichedScenes.find(Boolean)?.creative.clauses ?? [],
+              selected: creative,
+            },
+          }),
           scenes: scenePrompts.map((scenePrompt, index) => ({
+            baseScenePrompt: baseScenePrompts[index],
+            enrichedScenePrompt: scenePrompt,
             index: index + 1,
             scenePrompt,
             prompt: fullPrompts[index],
@@ -955,6 +1036,7 @@ interface SeriesStdinPayload {
     | "series-history";
   description?: string;
   count?: number;
+  creative?: CreativeDirection;
   dryRun?: boolean;
   filename?: string;
   from?: string;
@@ -1080,6 +1162,14 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("-m, --model <model>", "Model (overrides series default)")
     .option("-o, --output <file>", "Output filename")
     .option("-n, --num <count>", "Number of images 1-4")
+    .option("--recipe <id>", "Creative recipe id, e.g. cinematic")
+    .option("--shot <id>", "Shot/framing id, e.g. close-up")
+    .option("--lighting <id>", "Lighting id, e.g. rim")
+    .option("--genre <id>", "Genre id")
+    .option("--camera <id>", "Camera/lens language id")
+    .option("--color <id>", "Color treatment id")
+    .option("--material <id>", "Material or texture id")
+    .option("--motion <id>", "Motion treatment id")
     .option("--no-open", "Don't open after generation")
     .option("--dry-run", "Validate without API call")
     .action(async (slug: string, prompt: string, opts) => {
@@ -1099,6 +1189,14 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("-a, --aspect <ratio>", "Aspect ratio")
     .option("-r, --resolution <res>", "Resolution")
     .option("-m, --model <model>", "Model")
+    .option("--recipe <id>", "Creative recipe id, e.g. cinematic")
+    .option("--shot <id>", "Shot/framing id, e.g. close-up")
+    .option("--lighting <id>", "Lighting id, e.g. rim")
+    .option("--genre <id>", "Genre id")
+    .option("--camera <id>", "Camera/lens language id")
+    .option("--color <id>", "Color treatment id")
+    .option("--material <id>", "Material or texture id")
+    .option("--motion <id>", "Motion treatment id")
     .option("--no-open", "Don't open after generation")
     .option("--dry-run", "Validate and plan without API call")
     .action(async (theme: string, opts) => {
@@ -1193,6 +1291,7 @@ async function handleStdinCommand(
           num: data.numImages ? String(data.numImages) : undefined,
           noOpen: data.noOpen,
           dryRun: data.dryRun,
+          creative: data.creative,
         },
         emitOpts,
       );
@@ -1215,6 +1314,7 @@ async function handleStdinCommand(
               : undefined,
           noOpen: data.noOpen,
           dryRun: data.dryRun,
+          creative: data.creative,
           series: data.series,
           style: data.stylePrompt,
         },

@@ -11,6 +11,8 @@ import {
   ASPECT_RATIOS,
   type AspectRatio,
   buildGenerateBody,
+  type CreativeDirection,
+  enrichPrompt,
   estimateCost,
   estimateVideoCost,
   GENERATION_MODELS,
@@ -162,12 +164,32 @@ function parseImageSizeOption(
   return { height, width };
 }
 
+function resolveCreativeDirection(
+  options: CliOptions,
+  stdinData: StdinPayload | null,
+): CreativeDirection | undefined {
+  const creative: CreativeDirection = {
+    camera: options.camera ?? stdinData?.creative?.camera,
+    color: options.color ?? stdinData?.creative?.color,
+    genre: options.genre ?? stdinData?.creative?.genre,
+    lighting: options.lighting ?? stdinData?.creative?.lighting,
+    material: options.material ?? stdinData?.creative?.material,
+    motion: options.motion ?? stdinData?.creative?.motion,
+    recipe: options.recipe ?? stdinData?.creative?.recipe,
+    shot: options.shot ?? stdinData?.creative?.shot,
+  };
+
+  return Object.values(creative).some(Boolean) ? creative : undefined;
+}
+
 // -- Types --
 
 interface CliOptions {
   aspect?: string;
   background?: string;
+  camera?: string;
   cfgScale?: string;
+  color?: string;
   cover?: boolean;
   describe?: string | boolean;
   disableLimitGenerations?: boolean;
@@ -188,11 +210,14 @@ interface CliOptions {
   imageSize?: string;
   landscape?: boolean;
   last?: boolean;
+  lighting?: string;
   limit?: string;
   limitGenerations?: boolean;
   loose?: boolean;
   mask?: string;
+  material?: string;
   model?: string;
+  motion?: string;
   negative?: string;
   negativePrompt?: string;
   noOpen?: boolean;
@@ -204,6 +229,7 @@ interface CliOptions {
   outputFormat?: string;
   portrait?: boolean;
   quality?: string;
+  recipe?: string;
   raw?: boolean;
   reel?: boolean;
   renderingSpeed?: string;
@@ -213,6 +239,8 @@ interface CliOptions {
   safetyChecker?: boolean;
   scale?: string;
   seed?: string;
+  genre?: string;
+  shot?: string;
   square?: boolean;
   steps?: string;
   story?: boolean;
@@ -252,6 +280,7 @@ interface StdinPayload {
     | "tool-describe"
     | "tool-run";
   dryRun?: boolean;
+  creative?: CreativeDirection;
   // Video options
   duration?: number;
   editImages?: string[];
@@ -666,6 +695,11 @@ async function generateImage(
     ? false
     : (options.safetyChecker ?? stdinData?.enableSafetyChecker);
   const syncMode = options.syncMode || stdinData?.syncMode;
+  const creative = resolveCreativeDirection(options, stdinData);
+  const creativeResult = creative
+    ? validateOption(emitOpts.format, () => enrichPrompt({ prompt, creative }))
+    : undefined;
+  const requestPrompt = creativeResult?.prompt ?? prompt;
   const imageSize = validateOption(emitOpts.format, () =>
     parseImageSizeOption(options.imageSize ?? stdinData?.imageSize),
   );
@@ -727,6 +761,7 @@ async function generateImage(
   const dryRunGenerateOptions: GenerateOptions = {
     prompt,
     model: modelId,
+    creative,
     aspect,
     resolution,
     numImages,
@@ -766,7 +801,11 @@ async function generateImage(
     const dryResult = {
       dryRun: true,
       command: "generate",
-      prompt,
+      prompt: requestPrompt,
+      ...(creativeResult && {
+        basePrompt: creativeResult.basePrompt,
+        creative: creativeResult.creative,
+      }),
       model: modelId,
       modelName: modelConfig.name,
       aspect,
@@ -834,7 +873,7 @@ async function generateImage(
       );
     }
     console.log(
-      `Prompt: ${chalk.dim(prompt.slice(0, 80))}${prompt.length > 80 ? "..." : ""}`,
+      `Prompt: ${chalk.dim(requestPrompt.slice(0, 80))}${requestPrompt.length > 80 ? "..." : ""}`,
     );
     console.log(`Est. cost: ${chalk.yellow(`$${cost.toFixed(3)}`)}`);
     if (ephemeral) {
@@ -852,6 +891,7 @@ async function generateImage(
   try {
     const result = await generate({
       prompt,
+      creative,
       model: modelId,
       aspect,
       resolution,
@@ -890,7 +930,7 @@ async function generateImage(
       result.images,
       outputPath,
       numImages,
-      { prompt, model: modelId, aspect, resolution, editPaths },
+      { prompt: requestPrompt, model: modelId, aspect, resolution, editPaths },
       config,
       emitOpts,
       options.noOpen || stdinData?.noOpen,
@@ -932,7 +972,11 @@ async function generateImage(
             storeIo: false,
           }),
           ...(payloadDeleteError && { payloadDeleteError }),
-          prompt,
+          prompt: requestPrompt,
+          ...(creativeResult && {
+            basePrompt: creativeResult.basePrompt,
+            creative: creativeResult.creative,
+          }),
           model: modelId,
           modelName: modelConfig.name,
           aspect,
@@ -1668,6 +1712,15 @@ export async function runCli(
       "--no-expand-prompt",
       "Disable MagicPrompt prompt expansion (ideogram)",
     )
+    // Creative direction
+    .option("--recipe <id>", "Creative recipe id, e.g. cinematic")
+    .option("--shot <id>", "Shot/framing id, e.g. close-up")
+    .option("--lighting <id>", "Lighting id, e.g. rim")
+    .option("--genre <id>", "Genre id")
+    .option("--camera <id>", "Camera/lens language id")
+    .option("--color <id>", "Color treatment id")
+    .option("--material <id>", "Material or texture id")
+    .option("--motion <id>", "Motion treatment id")
     // Video advanced
     .option("--video-negative <text>", "Negative prompt for video generation")
     .option(

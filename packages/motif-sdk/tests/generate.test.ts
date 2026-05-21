@@ -6,6 +6,22 @@ import {
 } from "../src/index";
 
 describe("buildGenerateBody", () => {
+  it("enriches creative direction before building the fal request body", () => {
+    const { body } = buildGenerateBody({
+      model: "banana",
+      prompt: "luxury watch on black marble",
+      creative: {
+        lighting: "rim",
+        recipe: "cinematic",
+      },
+    });
+
+    expect(body.prompt).toBe(
+      "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
+    );
+    expect(body).not.toHaveProperty("creative");
+  });
+
   it("normalizes GPT Image 1.5 text generation controls", () => {
     const { endpoint, body } = buildGenerateBody({
       model: "gpt",

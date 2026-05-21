@@ -1,3 +1,5 @@
+import type { CreativeDirection } from "./creative";
+
 /** ─── Model Types ─────────────────────────────────────────────── */
 
 export type AspectRatio =
@@ -134,6 +136,8 @@ export interface GenerateOptions {
   aspect?: AspectRatio;
   /** GPT background mode where supported */
   background?: BackgroundMode;
+  /** Motif prompt enrichment options, consumed before fal request construction */
+  creative?: CreativeDirection;
   editImageUrls?: string[];
   /** Ask fal not to store IO payloads, and expose request ids for deletion. */
   ephemeral?: boolean;

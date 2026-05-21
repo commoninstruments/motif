@@ -34,6 +34,19 @@ export {
 } from "./aspects";
 export { estimateCost, estimateVideoCost } from "./cost";
 export {
+  CREATIVE_FIELDS,
+  CREATIVE_TAXONOMY,
+  type CreativeDirection,
+  type CreativeField,
+  type CreativeOption,
+  CreativeOptionError,
+  type CreativeOptionErrorDetails,
+  type CreativePromptResult,
+  type EnrichPromptOptions,
+  enrichPrompt,
+  sanitizePrompt,
+} from "./creative";
+export {
   getFalKeyFromEnv,
   type MotifEnv,
   motifEnvSchema,
