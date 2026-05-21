@@ -4,13 +4,38 @@
 <h1 align="center">Motif</h1>
 
 <p align="center">
-  Agent-first image, video, editing, and series CLI for <a href="https://fal.ai">fal.ai</a><br>
-  <code>npm install -g @howells/motif-cli</code>
+  Public SDK, CLI, and MCP server for <a href="https://fal.ai">fal.ai</a> image, video, editing, and utility endpoints<br>
+  <code>npm install @howells/motif-sdk</code> · <code>npm install -g @howells/motif-cli</code> · <code>npm install -g @howells/motif-mcp</code>
 </p>
 
-Motif is a terminal-first creative tool for fal.ai. It generates images, edits from reference images, upscales, removes backgrounds, creates image-to-video clips, keeps local history and cost totals, and exposes structured JSON output for agents and scripts.
+Motif is a public TypeScript toolkit for fal.ai. It provides a Node SDK, an agent-friendly CLI, and a local MCP server over the same model registry, request normalization, cost estimates, utility tools, and benchmark metadata.
 
 ## Quick Start
+
+### SDK
+
+```bash
+npm install @howells/motif-sdk
+```
+
+```ts
+import { MotifServer, buildGenerateBody } from "@howells/motif-sdk";
+
+const options = {
+  model: "banana2",
+  prompt: "editorial product photo of a ceramic desk lamp",
+  resolution: "2K",
+  enableGoogleSearch: true,
+} as const;
+
+const dryRun = buildGenerateBody(options);
+const motif = new MotifServer(process.env.FAL_KEY!);
+const result = await motif.generate(options);
+
+console.log(dryRun.endpoint, result.isOk() ? result.value.images : result.error);
+```
+
+### CLI
 
 ```bash
 # Set your fal.ai API key
@@ -31,7 +56,35 @@ motif "futuristic city map" --model ideogram --style DESIGN --dry-run --format j
 
 Run `motif` with no arguments to show help. Use `motif studio` to launch the interactive terminal studio.
 
+### MCP
+
+```bash
+npm install -g @howells/motif-mcp
+```
+
+```json
+{
+  "mcpServers": {
+    "motif": {
+      "command": "npx",
+      "args": ["-y", "@howells/motif-mcp"],
+      "env": {
+        "FAL_KEY": "${FAL_KEY}"
+      }
+    }
+  }
+}
+```
+
 ## Install
+
+SDK:
+
+```bash
+npm install @howells/motif-sdk
+```
+
+CLI:
 
 ```bash
 npm install -g @howells/motif-cli
@@ -41,6 +94,12 @@ Or run without installing:
 
 ```bash
 npx @howells/motif-cli "your prompt"
+```
+
+MCP:
+
+```bash
+npm install -g @howells/motif-mcp
 ```
 
 For local development:
@@ -55,15 +114,11 @@ pnpm link --global
 
 ## What Motif Does
 
-- Text-to-image generation across OpenAI, Gemini, FLUX, Recraft, Ideogram, and Nano Banana models.
-- Reference-image editing with model-specific reference limits.
-- Image post-processing with upscaling and background removal.
-- Image-to-video generation through Kling v3 Pro.
-- Local generation history with IDs, output paths, cost totals, and `--last` / `--history` lookup.
-- Series management for consistent characters, styles, and projects across multiple generations.
-- Agent-oriented `--format json`, `--format ndjson`, `--fields`, `--dry-run`, stdin JSON, and `--describe` schema introspection.
-- CWD-sandboxed output paths and validated inputs.
-- Interactive Studio with a concise model selector; detailed benchmark metadata stays in JSON introspection instead of crowding the TUI.
+- SDK: `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimates, fal CDN upload, queue polling, utility tools, video jobs, and payload cleanup.
+- CLI: text-to-image, reference-image editing, upscaling, background removal, image-to-video, local history and costs, series management, terminal Studio, CWD-sandboxed output paths, and validated inputs.
+- MCP: local stdio tools for `generate`, `upscale`, `remove_background`, `vary`, and `history`, plus read-only `motif://models`, `motif://tools`, `motif://leaderboards`, and `motif://history/schema` resources.
+- Agent interfaces: `--format json`, `--format ndjson`, `--fields`, `--dry-run`, stdin JSON, `--describe`, structured errors, and MCP structured content.
+- Model coverage: OpenAI, Gemini, FLUX, Recraft, Ideogram, Nano Banana, Seedream, Grok, Qwen, Kling video, and fal utility endpoints.
 
 ## Agent Entry Points
 
@@ -73,7 +128,7 @@ pnpm link --global
 - `docs/surface/scorecard.md` - current agent-readiness scorecard.
 - `motif --describe --format json` - live CLI schema for commands, models, tools, leaderboards, and errors.
 
-## SDK and MCP
+## SDK
 
 Install the Node SDK when you want Motif's fal normalization and metadata inside another app:
 
@@ -97,6 +152,8 @@ const result = await motif.generate(options);
 ```
 
 The SDK exports `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimators, `FAL_KEY` parsing, public option/response types, and `neverthrow` `Result` helpers. `MotifServer` covers sync and queued generation, upscaling, background removal, Kling video queue jobs, fal CDN upload, utility tools, and fal request payload deletion.
+
+## MCP
 
 Install the MCP server when you want local MCP clients to call Motif:
 
