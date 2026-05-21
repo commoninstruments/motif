@@ -73,6 +73,39 @@ pnpm link --global
 - `docs/surface/scorecard.md` - current agent-readiness scorecard.
 - `motif --describe --format json` - live CLI schema for commands, models, tools, leaderboards, and errors.
 
+## SDK and MCP
+
+Install the Node SDK when you want Motif's fal normalization and metadata inside another app:
+
+```bash
+npm install @howells/motif-sdk
+```
+
+```ts
+import { MotifServer, buildGenerateBody } from "@howells/motif-sdk";
+
+const options = {
+  model: "banana2",
+  prompt: "editorial product photo",
+  resolution: "2K",
+  enableGoogleSearch: true,
+} as const;
+
+const preview = buildGenerateBody(options);
+const motif = new MotifServer(process.env.FAL_KEY!);
+const result = await motif.generate(options);
+```
+
+The SDK exports `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimators, `FAL_KEY` parsing, public option/response types, and `neverthrow` `Result` helpers. `MotifServer` covers sync and queued generation, upscaling, background removal, Kling video queue jobs, fal CDN upload, utility tools, and fal request payload deletion.
+
+Install the MCP server when you want local MCP clients to call Motif:
+
+```bash
+npm install -g @howells/motif-mcp
+```
+
+It exposes mutating tools for `generate`, `upscale`, `remove_background`, and `vary`, plus a read-only `history` tool. Read-only MCP resources expose `motif://models`, `motif://tools`, `motif://leaderboards`, and `motif://history/schema`.
+
 ## Models
 
 Motif keeps two model views:
@@ -265,6 +298,10 @@ motif "minimal app icon, white fox" --model gpt2 --square --transparent
 # Reproducible generation
 motif "brutalist gallery interior" --seed 42
 
+# Direct fal sizing / GPT controls
+motif "clean app screenshot, transparent background" --model gpt --background transparent --quality high
+motif "wide installation art, empty gallery" --model gpt2 --image-size 1536x1024
+
 # Model-specific controls
 motif "editorial fashion portrait" --model flux --raw --enhance-prompt --safety 3
 motif "pixel art ramen shop logo" --model recraft --style digital_illustration/pixel_art
@@ -272,6 +309,7 @@ motif "poster for a jazz night" --model ideogram --style DESIGN --rendering-spee
 
 # Use web search context where supported
 motif "current F1 champion as a magazine cover" --model gemini3 --web-search
+motif "compare current product packaging trends" --model banana2 --google-search
 ```
 
 ## Post-Processing
@@ -312,7 +350,7 @@ motif tool marigold-depth image.png --num-inference-steps 10 --output depth.png
 motif tool nsfw --inputs frame1.png frame2.png --format json
 ```
 
-Shared normalized flags include `--prompt`, `--output-format`, `--scale`, `--model`, `--apply-mask`, `--max-masks`, `--detection-threshold`, `--operating-resolution`, `--num-inference-steps`, and `--ensemble-size`. Provider-specific fields can be passed with `--json '{"field":true}'` or repeatable `--option key=value`.
+Shared normalized flags include `--prompt`, `--output-format`, `--scale`, `--model`, `--apply-mask`, `--crop-to-bbox`, `--mask-only`, `--return-multiple-masks`, `--include-scores`, `--include-boxes`, `--max-masks`, `--detection-threshold`, `--operating-resolution`, `--points-per-side`, `--pred-iou-thresh`, `--stability-score-thresh`, `--min-mask-region-area`, `--num-inference-steps`, `--ensemble-size`, `--background-color`, `--codec`, `--preserve-audio`, `--target-fps`, `--h264`, and `--video-output-type`. Provider-specific fields can be passed with `--json '{"field":true}'` or repeatable `--option key=value`.
 
 Utility tool inputs are validated before API calls where constraints are known. For example, `marigold-depth --ensemble-size` must be at least `2`.
 
@@ -346,9 +384,9 @@ Motif stores the queue endpoint returned by fal and validates the output path be
 | `--wide` | `21:9` | Default | Cinematic wide images |
 | `--ultra` | `21:9` | `2K` | Ultra-wide banners |
 
-Supported aspect ratios: `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, `4:5`, `5:4`, `21:9`.
+Supported aspect ratios: `auto`, `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, `4:5`, `5:4`, `21:9`, `4:1`, `1:4`, `8:1`, `1:8`.
 
-Supported resolutions: `1K`, `2K`, `4K`. Not every model accepts resolution; unsupported controls are ignored by the model adapter.
+Supported resolutions: `0.5K`, `1K`, `2K`, `4K`. Not every model accepts resolution; unsupported controls are ignored by the model adapter.
 
 ## Agent and Script Mode
 
@@ -429,10 +467,15 @@ Generation:
   -e, --edit <files...>         Reference image paths for editing
   --loose                       Lower input fidelity for GPT reference edits
   -a, --aspect <ratio>          Aspect ratio
-  -r, --resolution <res>        Resolution: 1K, 2K, 4K
+  -r, --resolution <res>        Resolution: 0.5K, 1K, 2K, 4K
   -o, --output <file>           Output path within the current working directory
   -n, --num <count>             Number of images, 1-4
   --transparent                 Transparent PNG for GPT models
+  --background <mode>           GPT background mode: auto, transparent, opaque
+  --quality <quality>           Image quality: auto, low, medium, high
+  --image-size <size>           Direct fal image_size override, such as auto, square_hd, 1536x1024
+  --sync-mode                   Ask fal to return media as a data URI where supported
+  --mask <url>                  Mask image URL for supported edit/inpainting models
   --ephemeral                   Local-only generation after download when fal returns a request id
   --seed <n>                    Reproducible generation seed
   --output-format <format>      jpeg, png, or webp
@@ -442,6 +485,13 @@ Model-specific:
   --style <style>               Recraft style or ideogram AUTO/GENERAL/REALISTIC/DESIGN
   --safety <level>              Safety tolerance 1-6, supported by selected Gemini/FLUX models
   --web-search                  Web search context, banana2/banana/gemini3
+  --google-search               Enable fal enable_google_search alias where supported
+  --limit-generations           Limit model-internal generation rounds where supported
+  --disable-limit-generations   Disable model-internal generation limiting where supported
+  --thinking <level>            Thinking level where supported: minimal, high
+  --safety-checker              Enable fal safety checker where supported
+  --disable-safety-checker      Disable fal safety checker where supported
+  --image-prompt-strength <n>   Reference image strength where supported, 0-1
   --guidance-scale <n>          CFG guidance, supported by FLUX controllable models
   --steps <n>                   Inference steps, supported by FLUX controllable models
   --raw                         Less processed output, flux

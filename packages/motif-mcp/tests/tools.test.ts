@@ -164,6 +164,22 @@ describe("ListTools", () => {
     expect(generate?.inputSchema.required).toContain("prompt");
   });
 
+  it("generate schema advertises current model, aspect, and resolution enums", async () => {
+    const client = await makeClient(makeMockMotif());
+    const { tools } = await client.listTools();
+    const generate = tools.find((t) => t.name === "generate");
+    const properties = generate?.inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+
+    expect(properties.model?.enum).toContain("banana2");
+    expect(properties.model?.enum).toContain("qwen");
+    expect(properties.aspect?.enum).toContain("auto");
+    expect(properties.aspect?.enum).toContain("8:1");
+    expect(properties.resolution?.enum).toContain("0.5K");
+  });
+
   it("vary tool requires prompt and imageUrls", async () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
@@ -288,6 +304,38 @@ describe("generate tool", () => {
 
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({ aspect: "16:9" }),
+    );
+  });
+
+  it("passes current generation controls through to motif.generate", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    await client.callTool({
+      name: "generate",
+      arguments: {
+        prompt: "a fox",
+        model: "banana2",
+        aspect: "auto",
+        resolution: "0.5K",
+        outputFormat: "png",
+        seed: 42,
+        enableWebSearch: true,
+        enableGoogleSearch: true,
+      },
+    });
+
+    expect(motif.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: "a fox",
+        model: "banana2",
+        aspect: "auto",
+        resolution: "0.5K",
+        outputFormat: "png",
+        seed: 42,
+        enableWebSearch: true,
+        enableGoogleSearch: true,
+      }),
     );
   });
 

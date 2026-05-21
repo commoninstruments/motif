@@ -7,10 +7,16 @@
 
 import type { MotifServer } from "@howells/motif-sdk";
 import {
+  ASPECT_RATIOS,
+  type AspectRatio,
   FAL_TOOLS,
+  GENERATION_MODELS,
   IMAGE_EDITING_TOP_20,
   IMAGE_TEXT_TO_IMAGE_TOP_20,
+  type ImageOutputFormat,
   MODELS,
+  RESOLUTIONS,
+  type Resolution,
   VIDEO_IMAGE_TO_VIDEO_TOP_15,
   VIDEO_TEXT_TO_VIDEO_TOP_15,
 } from "@howells/motif-sdk";
@@ -26,18 +32,6 @@ import {
 import { readHistory } from "./history.js";
 
 // ─── Preset → aspect resolution ─────────────────────────────────────
-
-type AspectRatio =
-  | "1:1"
-  | "16:9"
-  | "9:16"
-  | "2:3"
-  | "3:2"
-  | "4:3"
-  | "3:4"
-  | "4:5"
-  | "5:4"
-  | "21:9";
 
 const PRESET_MAP: Record<string, AspectRatio> = {
   cover: "2:3",
@@ -247,35 +241,19 @@ const TOOLS = [
         },
         model: {
           type: "string",
-          enum: [
-            "gpt2",
-            "gpt",
-            "banana",
-            "gemini",
-            "gemini3",
-            "flux",
-            "flux-fast",
-            "recraft",
-            "ideogram",
-          ],
+          enum: GENERATION_MODELS,
           description:
-            "Model to use. gpt2=GPT Image 2 ($0.22), gpt=GPT Image 1.5 ($0.13), banana=Nano Banana Pro ($0.15), gemini=Gemini 2.5 Flash ($0.04), gemini3=Gemini 3 Pro ($0.15), flux=FLUX Pro Ultra ($0.06), flux-fast=FLUX Schnell ($0.003), recraft=Recraft V3 ($0.04), ideogram=Ideogram V3 ($0.06). Default: gpt",
+            "Motif generation model alias. Read motif://models for current pricing, endpoints, and capabilities. Default: gpt",
         },
         aspect: {
           type: "string",
-          enum: [
-            "1:1",
-            "16:9",
-            "9:16",
-            "2:3",
-            "3:2",
-            "4:3",
-            "3:4",
-            "4:5",
-            "5:4",
-            "21:9",
-          ],
+          enum: ASPECT_RATIOS,
           description: "Aspect ratio for the output image",
+        },
+        resolution: {
+          type: "string",
+          enum: RESOLUTIONS,
+          description: "Output resolution where supported",
         },
         preset: {
           type: "string",
@@ -305,6 +283,23 @@ const TOOLS = [
           type: "boolean",
           description:
             "Generate with transparent background (PNG output, GPT models only)",
+        },
+        outputFormat: {
+          type: "string",
+          enum: ["jpeg", "png", "webp"],
+          description: "Output image format where supported",
+        },
+        seed: {
+          type: "number",
+          description: "Reproducible generation seed where supported",
+        },
+        enableWebSearch: {
+          type: "boolean",
+          description: "Enable web search context where supported",
+        },
+        enableGoogleSearch: {
+          type: "boolean",
+          description: "Enable fal enable_google_search where supported",
         },
       },
       required: ["prompt"],
@@ -433,9 +428,24 @@ const TOOLS = [
         },
         model: {
           type: "string",
-          enum: ["gpt2", "gpt", "banana", "gemini3"],
+          enum: [
+            "gpt2",
+            "gpt",
+            "banana2",
+            "banana",
+            "gemini",
+            "gemini3",
+            "seedream4",
+            "seedream45",
+            "flux2-max",
+            "flux2-pro",
+            "flux2-flex",
+            "flux2-dev",
+            "flux",
+            "grok-image",
+          ],
           description:
-            "Model to use for variation. Must support image editing. gpt2=GPT Image 2, gpt=GPT Image 1.5, banana=Nano Banana Pro, gemini3=Gemini 3 Pro. Default: gpt",
+            "Model to use for variation. Must support image editing. Read motif://models for current reference limits and capabilities. Default: gpt",
         },
         inputFidelity: {
           type: "string",
@@ -619,16 +629,26 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         prompt,
         model = "gpt",
         aspect,
+        resolution,
         preset,
         numImages = 1,
         transparent,
+        outputFormat,
+        seed,
+        enableWebSearch,
+        enableGoogleSearch,
       } = args as {
         prompt: string;
         model?: string;
         aspect?: string;
+        resolution?: Resolution;
         preset?: string;
         numImages?: number;
         transparent?: boolean;
+        outputFormat?: ImageOutputFormat;
+        seed?: number;
+        enableWebSearch?: boolean;
+        enableGoogleSearch?: boolean;
       };
 
       const resolvedAspect =
@@ -640,8 +660,13 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         prompt,
         model,
         aspect: resolvedAspect,
+        resolution,
         numImages,
         transparent,
+        outputFormat,
+        seed,
+        enableWebSearch,
+        enableGoogleSearch,
       });
 
       if (result.isErr()) {
