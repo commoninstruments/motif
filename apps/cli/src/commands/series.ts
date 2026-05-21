@@ -9,7 +9,7 @@
  * motif series history "my-series"
  */
 
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
   ASPECT_RATIOS,
   estimateCost,
@@ -68,6 +68,18 @@ import {
 
 // -- Helpers --
 
+const SERIES_RUN_MAX_COUNT = 24;
+const SERIES_RUN_SCENE_FOCI = [
+  "wide establishing composition",
+  "hero subject composition",
+  "close material and texture study",
+  "human-scale environmental view",
+  "low-angle perspective",
+  "quiet atmospheric detail",
+  "symmetrical frontal composition",
+  "oblique side-light composition",
+] as const;
+
 function seriesAsJson(config: SeriesConfig): Record<string, unknown> {
   return {
     id: config.id,
@@ -91,6 +103,66 @@ function validateSeriesOption<T>(emitOpts: EmitOptions, fn: () => T): T {
     return fn();
   } catch (err) {
     handleError(err, "INVALID_OPTION", emitOpts.format);
+  }
+}
+
+function splitRefTags(refs: string | undefined): string[] | undefined {
+  return refs
+    ?.split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function buildSeriesRunStylePrompt(theme: string, style?: string): string {
+  const base = style?.trim();
+  if (base) {
+    return base;
+  }
+  return [
+    `Cohesive visual series about ${theme}`,
+    "consistent tone, style, color palette, lighting, lens language, framing discipline, material treatment, and post-processing across every image",
+  ].join(": ");
+}
+
+function buildSeriesRunScenes(theme: string, count: number): string[] {
+  return Array.from({ length: count }, (_, index) => {
+    const focus = SERIES_RUN_SCENE_FOCI[index % SERIES_RUN_SCENE_FOCI.length];
+    return [
+      `Image ${index + 1} of ${count} in a cohesive visual series about ${theme}`,
+      focus,
+      "shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set",
+      "no text, no watermark",
+    ].join("; ");
+  });
+}
+
+async function loadOrCreateRunSeries(options: {
+  aspect: (typeof ASPECT_RATIOS)[number];
+  model: string;
+  resolution: (typeof RESOLUTIONS)[number];
+  series?: string;
+  stylePrompt: string;
+  theme: string;
+}): Promise<SeriesConfig> {
+  if (options.series) {
+    return loadSeries(options.series);
+  }
+
+  const name = options.theme;
+  const slug = slugify(name);
+  try {
+    return await createSeries({
+      name,
+      stylePrompt: options.stylePrompt,
+      model: options.model,
+      defaultAspect: options.aspect,
+      defaultResolution: options.resolution,
+    });
+  } catch (err) {
+    if (String((err as Error).message).includes("already exists")) {
+      return loadSeries(slug);
+    }
+    throw err;
   }
 }
 
@@ -321,9 +393,6 @@ async function cmdGenerate(
     const config = await loadSeries(slug);
     const appConfig = await loadConfig();
 
-    // Validate API key
-    getApiKey(appConfig);
-
     const sanitized = sanitizePrompt(prompt);
     if (!sanitized) {
       emitError(
@@ -418,6 +487,9 @@ async function cmdGenerate(
       return;
     }
 
+    // Validate API key only after dry-run exits.
+    getApiKey(appConfig);
+
     // -- Generate --
     const outputDir = seriesOutputsDir(slug);
     const outputNum = String(config.outputs.length + 1).padStart(3, "0");
@@ -456,7 +528,7 @@ async function cmdGenerate(
     const paths = result.images.map((_, i) =>
       numImages > 1 ? outputPath.replace(".png", `-${i + 1}.png`) : outputPath,
     );
-    await Promise.all(
+    const actualPaths = await Promise.all(
       result.images.map((image, i) =>
         // biome-ignore lint/style/noNonNullAssertion: index guaranteed within map bounds
         downloadImage(image.url, paths[i]!),
@@ -475,7 +547,7 @@ async function cmdGenerate(
 
     for (let i = 0; i < result.images.length; i++) {
       // biome-ignore lint/style/noNonNullAssertion: index guaranteed within loop bounds
-      const path = paths[i]!;
+      const path = actualPaths[i]!;
       const dims = await getImageDimensions(path);
       const size = getFileSize(path);
 
@@ -512,7 +584,7 @@ async function cmdGenerate(
 
     // Record in series history
     await recordOutput(slug, {
-      filename: outputFilename,
+      filename: basename(actualPaths[0] ?? outputFilename),
       prompt: fullPrompt,
       refsUsed: refTags ?? config.refs.map((r) => r.tag),
       model: modelId,
@@ -536,6 +608,248 @@ async function cmdGenerate(
           images: savedImages,
           cost,
           outputIndex: config.outputs.length + 1,
+        },
+        emitOpts,
+      );
+    }
+
+    if (appConfig.openAfterGenerate && !opts.noOpen && savedImages[0]) {
+      openImage(savedImages[0].path);
+    }
+  } catch (err) {
+    handleError(err, "SERIES_GENERATE_FAILED", emitOpts.format);
+  }
+}
+
+async function cmdRun(
+  theme: string,
+  opts: {
+    aspect?: string;
+    count?: string;
+    dryRun?: boolean;
+    model?: string;
+    noOpen?: boolean;
+    refs?: string;
+    resolution?: string;
+    series?: string;
+    style?: string;
+  },
+  emitOpts: EmitOptions,
+): Promise<void> {
+  try {
+    const sanitizedTheme = sanitizePrompt(theme);
+    if (!sanitizedTheme) {
+      emitError(
+        { code: "EMPTY_PROMPT", message: "Theme is empty after sanitization" },
+        emitOpts.format,
+      );
+      process.exit(1);
+    }
+
+    const existingSeries = opts.series ? await loadSeries(opts.series) : null;
+
+    if (opts.model) {
+      validateResourceId(opts.model, "model");
+    }
+    const modelId = opts.model ?? existingSeries?.model ?? "banana";
+    const modelConfig = MODELS[modelId];
+    if (!modelConfig) {
+      emitError(
+        {
+          code: "UNKNOWN_MODEL",
+          message: `Unknown model: ${modelId}`,
+          details: { available: GENERATION_MODELS },
+        },
+        emitOpts.format,
+      );
+      process.exit(1);
+    }
+
+    const count = validateSeriesOption(emitOpts, () =>
+      parseIntegerOption(opts.count ?? "4", "series run count", {
+        min: 1,
+        max: SERIES_RUN_MAX_COUNT,
+      }),
+    );
+    const aspect = opts.aspect
+      ? validateSeriesOption(emitOpts, () =>
+          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect"),
+        )
+      : (existingSeries?.defaultAspect ?? "1:1");
+    const resolution = opts.resolution
+      ? validateSeriesOption(emitOpts, () =>
+          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution"),
+        )
+      : (existingSeries?.defaultResolution ?? "2K");
+    const stylePrompt =
+      opts.style ??
+      existingSeries?.stylePrompt ??
+      buildSeriesRunStylePrompt(sanitizedTheme);
+    const refTags = splitRefTags(opts.refs);
+    const refPaths = existingSeries ? resolveRefs(existingSeries, refTags) : [];
+    const maxRefs = modelConfig.maxReferenceImages ?? 0;
+
+    if (refPaths.length > maxRefs) {
+      emitError(
+        {
+          code: "TOO_MANY_REFERENCES",
+          message: `${modelConfig.name} supports ${maxRefs} references, series run selected ${refPaths.length}. Use --refs to select fewer tags.`,
+        },
+        emitOpts.format,
+      );
+      process.exit(1);
+    }
+
+    const scenePrompts = buildSeriesRunScenes(sanitizedTheme, count);
+    const fullPrompts = scenePrompts.map((scenePrompt) =>
+      stylePrompt ? `${stylePrompt}. ${scenePrompt}` : scenePrompt,
+    );
+    const estimatedCost = estimateCost(modelId, resolution, count);
+    const canUseAnchorReference =
+      Boolean(modelConfig.supportsEdit) && refPaths.length < maxRefs;
+
+    if (opts.dryRun) {
+      emit(
+        {
+          command: "series-run",
+          count,
+          dryRun: true,
+          estimatedCost,
+          model: modelId,
+          modelName: modelConfig.name,
+          aspect,
+          resolution,
+          series: existingSeries?.slug ?? null,
+          stylePrompt,
+          theme: sanitizedTheme,
+          refTags: refTags ?? existingSeries?.refs.map((ref) => ref.tag) ?? [],
+          refs: refPaths,
+          usesAnchorReference: canUseAnchorReference,
+          scenes: scenePrompts.map((scenePrompt, index) => ({
+            index: index + 1,
+            scenePrompt,
+            prompt: fullPrompts[index],
+          })),
+          valid: true,
+        },
+        emitOpts,
+      );
+      if (!isStructured(emitOpts.format)) {
+        console.log(chalk.bold(`\n🔍 Dry run — series run\n`));
+        console.log(`  Theme:  ${chalk.dim(sanitizedTheme)}`);
+        console.log(`  Count:  ${count}`);
+        console.log(`  Model:  ${chalk.green(modelConfig.name)}`);
+        console.log(
+          `  Cost:   ${chalk.yellow(`~$${estimatedCost.toFixed(3)}`)}`,
+        );
+      }
+      return;
+    }
+
+    const appConfig = await loadConfig();
+    getApiKey(appConfig);
+
+    const config = await loadOrCreateRunSeries({
+      aspect,
+      model: modelId,
+      resolution,
+      series: opts.series,
+      stylePrompt,
+      theme: sanitizedTheme,
+    });
+    const outputDir = seriesOutputsDir(config.slug);
+    const spinner = isStructured(emitOpts.format)
+      ? null
+      : ora(`Generating ${count} image series...`).start();
+    const savedImages: Array<{
+      path: string;
+      scenePrompt: string;
+      width?: number;
+      height?: number;
+      size: string;
+    }> = [];
+    const generations: Generation[] = [];
+    const now = new Date().toISOString();
+    let anchorPath: string | undefined;
+
+    for (let i = 0; i < count; i++) {
+      const outputNum = String(config.outputs.length + i + 1).padStart(3, "0");
+      const filename = `${outputNum}-${slugify(sanitizedTheme.slice(0, 40))}-${String(i + 1).padStart(2, "0")}.png`;
+      const outputPath = `${outputDir}/${filename}`;
+      const editImages =
+        anchorPath && canUseAnchorReference
+          ? [...refPaths, anchorPath]
+          : refPaths.length > 0
+            ? refPaths
+            : undefined;
+      const result = await generate({
+        prompt: fullPrompts[i] ?? sanitizedTheme,
+        model: modelId,
+        aspect,
+        resolution,
+        numImages: 1,
+        editImages,
+      });
+      const image = result.images[0];
+      if (!image) {
+        throw new Error("Series run returned no images");
+      }
+      const actualOutputPath = await downloadImage(image.url, outputPath);
+      if (!anchorPath) {
+        anchorPath = actualOutputPath;
+      }
+      const dims = await getImageDimensions(actualOutputPath);
+      const size = getFileSize(actualOutputPath);
+      savedImages.push({
+        path: resolve(actualOutputPath),
+        scenePrompt: scenePrompts[i] ?? sanitizedTheme,
+        width: dims?.width,
+        height: dims?.height,
+        size,
+      });
+      generations.push({
+        id: generateId(),
+        prompt: fullPrompts[i] ?? sanitizedTheme,
+        model: modelId,
+        aspect,
+        resolution,
+        output: resolve(actualOutputPath),
+        cost: estimateCost(modelId, resolution, 1),
+        timestamp: now,
+      });
+      await recordOutput(config.slug, {
+        filename: basename(actualOutputPath),
+        prompt: fullPrompts[i] ?? sanitizedTheme,
+        refsUsed: [
+          ...(refTags ?? config.refs.map((ref) => ref.tag)),
+          ...(anchorPath && i > 0 ? ["series-anchor"] : []),
+        ],
+        model: modelId,
+        aspect,
+        resolution,
+        cost: estimateCost(modelId, resolution, 1),
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    await addGenerations(generations);
+    spinner?.succeed("Generated series run");
+
+    if (isStructured(emitOpts.format)) {
+      emit(
+        {
+          command: "series-run",
+          count,
+          dryRun: false,
+          series: config.slug,
+          theme: sanitizedTheme,
+          stylePrompt,
+          model: modelId,
+          modelName: modelConfig.name,
+          aspect,
+          resolution,
+          images: savedImages,
+          cost: estimatedCost,
         },
         emitOpts,
       );
@@ -637,8 +951,10 @@ interface SeriesStdinPayload {
     | "series-ref-add"
     | "series-ref-remove"
     | "series-generate"
+    | "series-run"
     | "series-history";
   description?: string;
+  count?: number;
   dryRun?: boolean;
   filename?: string;
   from?: string;
@@ -661,6 +977,7 @@ interface SeriesStdinPayload {
   series?: string;
   stylePrompt?: string;
   tag?: string;
+  theme?: string;
 }
 
 // -- Router --
@@ -770,6 +1087,25 @@ export async function runSeries(args: string[]): Promise<void> {
     });
 
   program
+    .command("run <theme>")
+    .description("Plan and generate a themed multi-image series run")
+    .option("-c, --count <n>", "Number of images to generate", "4")
+    .option("--series <slug>", "Existing series to run inside")
+    .option("--style <prompt>", "Shared style prompt for the run")
+    .option(
+      "--refs <tags>",
+      "Comma-separated ref tags to include from an existing series",
+    )
+    .option("-a, --aspect <ratio>", "Aspect ratio")
+    .option("-r, --resolution <res>", "Resolution")
+    .option("-m, --model <model>", "Model")
+    .option("--no-open", "Don't open after generation")
+    .option("--dry-run", "Validate and plan without API call")
+    .action(async (theme: string, opts) => {
+      await cmdRun(theme, opts, emitOpts);
+    });
+
+  program
     .command("history <slug>")
     .description("Show generation history for a series")
     .option("--limit <n>", "Entries per page", "10")
@@ -857,6 +1193,30 @@ async function handleStdinCommand(
           num: data.numImages ? String(data.numImages) : undefined,
           noOpen: data.noOpen,
           dryRun: data.dryRun,
+        },
+        emitOpts,
+      );
+      break;
+    case "series-run":
+      if (!(data.theme || data.prompt)) {
+        throw new Error("theme is required");
+      }
+      await cmdRun(
+        data.theme ?? data.prompt ?? "",
+        {
+          refs: data.refs,
+          model: data.model,
+          aspect: data.aspect,
+          resolution: data.resolution,
+          count: data.count
+            ? String(data.count)
+            : data.numImages
+              ? String(data.numImages)
+              : undefined,
+          noOpen: data.noOpen,
+          dryRun: data.dryRun,
+          series: data.series,
+          style: data.stylePrompt,
         },
         emitOpts,
       );

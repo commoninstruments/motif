@@ -458,7 +458,7 @@ async function saveGeneratedImages(
   );
 
   // Download all images in parallel
-  await Promise.all(
+  const actualPaths = await Promise.all(
     images.map((image, i) =>
       // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed within bounds by the map
       downloadImage(image.url, paths[i]!),
@@ -472,7 +472,7 @@ async function saveGeneratedImages(
 
   for (let i = 0; i < images.length; i++) {
     // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed within bounds by the loop condition
-    const path = paths[i]!;
+    const path = actualPaths[i]!;
     const dims = await getImageDimensions(path);
     const size = getFileSize(path);
 
@@ -1106,14 +1106,14 @@ async function upscaleLast(
 
     // biome-ignore lint/style/noNonNullAssertion: API always returns at least one image
     const image = result.images[0]!;
-    await downloadImage(image.url, outputPath);
+    const actualOutputPath = await downloadImage(image.url, outputPath);
 
-    const dims = await getImageDimensions(outputPath);
-    const size = await getFileSize(outputPath);
+    const dims = await getImageDimensions(actualOutputPath);
+    const size = await getFileSize(actualOutputPath);
 
     if (!isStructured(emitOpts.format)) {
       console.log(
-        chalk.green(`✓ Saved: ${outputPath}`) +
+        chalk.green(`✓ Saved: ${actualOutputPath}`) +
           chalk.dim(
             ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
           ),
@@ -1126,7 +1126,7 @@ async function upscaleLast(
       model: config.upscaler,
       aspect: sourceAspect,
       resolution: sourceResolution,
-      output: resolve(outputPath),
+      output: resolve(actualOutputPath),
       cost: 0.02,
       timestamp: new Date().toISOString(),
       editedFrom: sourceImagePath,
@@ -1136,7 +1136,7 @@ async function upscaleLast(
       emit(
         {
           command: "upscale",
-          path: resolve(outputPath),
+          path: resolve(actualOutputPath),
           source: sourceImagePath,
           scale: scaleFactor,
           model: config.upscaler,
@@ -1150,7 +1150,7 @@ async function upscaleLast(
     }
 
     if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
-      await openImage(outputPath);
+      await openImage(actualOutputPath);
     }
   } catch (err) {
     spinner?.fail("Upscale failed");
@@ -1246,14 +1246,14 @@ async function removeBackgroundLast(
 
     // biome-ignore lint/style/noNonNullAssertion: API always returns at least one image
     const image = result.images[0]!;
-    await downloadImage(image.url, outputPath);
+    const actualOutputPath = await downloadImage(image.url, outputPath);
 
-    const dims = await getImageDimensions(outputPath);
-    const size = await getFileSize(outputPath);
+    const dims = await getImageDimensions(actualOutputPath);
+    const size = await getFileSize(actualOutputPath);
 
     if (!isStructured(emitOpts.format)) {
       console.log(
-        chalk.green(`✓ Saved: ${outputPath}`) +
+        chalk.green(`✓ Saved: ${actualOutputPath}`) +
           chalk.dim(
             ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
           ),
@@ -1266,7 +1266,7 @@ async function removeBackgroundLast(
       model: config.backgroundRemover,
       aspect: last.aspect,
       resolution: last.resolution,
-      output: resolve(outputPath),
+      output: resolve(actualOutputPath),
       cost: 0.02,
       timestamp: new Date().toISOString(),
       editedFrom: last.output,
@@ -1276,7 +1276,7 @@ async function removeBackgroundLast(
       emit(
         {
           command: "rmbg",
-          path: resolve(outputPath),
+          path: resolve(actualOutputPath),
           source: last.output,
           model: config.backgroundRemover,
           width: dims?.width,
@@ -1289,7 +1289,7 @@ async function removeBackgroundLast(
     }
 
     if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
-      await openImage(outputPath);
+      await openImage(actualOutputPath);
     }
   } catch (err) {
     spinner?.fail("Background removal failed");
@@ -1437,13 +1437,13 @@ async function generateVideo(
     spinner?.succeed("Video generated!");
 
     // Download the video
-    await downloadImage(video.url, outputPath);
+    const actualOutputPath = await downloadImage(video.url, outputPath);
 
-    const fileSize = getFileSize(outputPath);
+    const fileSize = getFileSize(actualOutputPath);
 
     if (!isStructured(emitOpts.format)) {
       console.log(
-        chalk.green(`✓ Saved: ${outputPath}`) +
+        chalk.green(`✓ Saved: ${actualOutputPath}`) +
           chalk.dim(` (${duration}s, ${fileSize})`),
       );
     }
@@ -1455,7 +1455,7 @@ async function generateVideo(
       model: "kling",
       aspect: "1:1",
       resolution: "1K",
-      output: resolve(outputPath),
+      output: resolve(actualOutputPath),
       cost,
       timestamp: new Date().toISOString(),
       editedFrom: sourceImagePath,
@@ -1465,7 +1465,7 @@ async function generateVideo(
       emit(
         {
           command: "video",
-          path: resolve(outputPath),
+          path: resolve(actualOutputPath),
           source: sourceImagePath,
           prompt,
           duration,

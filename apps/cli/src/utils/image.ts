@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, statSync, unlinkSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 
 const DIMENSION_REGEX = /(\d+)\s*x\s*(\d+)/g;
 const SIPS_HEIGHT_REGEX = /pixelHeight:\s*(\d+)/;
@@ -26,11 +26,83 @@ function exec(
   });
 }
 
+function detectImageExtension(
+  buffer: Buffer,
+  contentType: string | null,
+): ".gif" | ".jpg" | ".png" | ".webp" | null {
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+    return ".jpg";
+  }
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return ".png";
+  }
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return ".webp";
+  }
+  if (
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38
+  ) {
+    return ".gif";
+  }
+
+  const normalized = contentType?.split(";")[0]?.trim().toLowerCase();
+  if (normalized === "image/jpeg" || normalized === "image/jpg") {
+    return ".jpg";
+  }
+  if (normalized === "image/png") {
+    return ".png";
+  }
+  if (normalized === "image/webp") {
+    return ".webp";
+  }
+  if (normalized === "image/gif") {
+    return ".gif";
+  }
+
+  return null;
+}
+
+function withDetectedExtension(outputPath: string, extension: string | null) {
+  if (!extension) {
+    return outputPath;
+  }
+
+  const currentExtension = extname(outputPath).toLowerCase();
+  if (
+    currentExtension === extension ||
+    (currentExtension === ".jpeg" && extension === ".jpg")
+  ) {
+    return outputPath;
+  }
+
+  if (!currentExtension) {
+    return `${outputPath}${extension}`;
+  }
+  return `${outputPath.slice(0, -currentExtension.length)}${extension}`;
+}
+
 /** Download an image from a URL and save it to a file */
 export async function downloadImage(
   url: string,
   outputPath: string,
-): Promise<void> {
+): Promise<string> {
   if (!url.startsWith("https://")) {
     throw new Error(`Refusing to download from non-HTTPS URL: ${url}`);
   }
@@ -40,8 +112,13 @@ export async function downloadImage(
     throw new Error(`Failed to download image: ${response.statusText}`);
   }
 
-  const buffer = await response.arrayBuffer();
-  await writeFile(outputPath, Buffer.from(buffer));
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const actualPath = withDetectedExtension(
+    outputPath,
+    detectImageExtension(buffer, response.headers.get("content-type")),
+  );
+  await writeFile(actualPath, buffer);
+  return actualPath;
 }
 
 /** Convert a local image file to a base64 data URL */

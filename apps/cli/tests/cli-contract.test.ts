@@ -94,6 +94,84 @@ describe("CLI contract", () => {
     expect(schema).toHaveProperty("errors");
   });
 
+  it("advertises series commands in the primary schema", async () => {
+    const result = await runMotif(["--describe", "--format", "json"]);
+
+    expect(result.code).toBe(0);
+
+    const schema = parseJsonLine(result.stdout);
+    const commands = schema.commands as Record<string, Record<string, unknown>>;
+    const describe = commands.describe as {
+      input: { properties: { command: { enum: string[] } } };
+    };
+    const series = commands.series as {
+      subcommands: string[];
+    };
+
+    expect(describe.input.properties.command.enum).toContain("series");
+    expect(series).toMatchObject({
+      command: "series",
+      supports_dry_run: true,
+    });
+    expect(series.subcommands).toContain("run");
+  });
+
+  it("dry-runs a themed series run without FAL_KEY", async () => {
+    const result = await runMotif([
+      "series",
+      "run",
+      "brutalist architecture",
+      "--count",
+      "6",
+      "--dry-run",
+      "--format",
+      "json",
+      "--model",
+      "banana",
+    ]);
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const payload = parseJsonLine(result.stdout);
+    expect(payload).toMatchObject({
+      command: "series-run",
+      count: 6,
+      dryRun: true,
+      model: "banana",
+      theme: "brutalist architecture",
+      valid: true,
+    });
+    expect(payload).toHaveProperty("estimatedCost");
+    expect(payload.scenes).toHaveLength(6);
+    expect(result.stdout).not.toContain("[FILTERED]");
+  });
+
+  it("accepts themed series runs through stdin JSON", async () => {
+    const result = await runMotif(
+      ["series", "--format", "json"],
+      JSON.stringify({
+        command: "series-run",
+        count: 3,
+        dryRun: true,
+        theme: "modular exhibition booths",
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const payload = parseJsonLine(result.stdout);
+    expect(payload).toMatchObject({
+      command: "series-run",
+      count: 3,
+      dryRun: true,
+      theme: "modular exhibition booths",
+      valid: true,
+    });
+    expect(payload.scenes).toHaveLength(3);
+  });
+
   it("describes local error metadata without a web dependency", async () => {
     const result = await runMotif(["--describe", "errors", "--format", "json"]);
 

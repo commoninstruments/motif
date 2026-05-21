@@ -337,7 +337,7 @@ export function EditScreen({
 
         outputPath = generateFilename("motif-edit");
         // biome-ignore lint/style/noNonNullAssertion: images[0] guaranteed by API response
-        await downloadImage(result.images[0]!.url, outputPath);
+        outputPath = await downloadImage(result.images[0]!.url, outputPath);
         cost = estimateCost(editModel);
         promptLabel = prompt;
       } else if (mode === "variations") {
@@ -352,7 +352,7 @@ export function EditScreen({
 
         outputPath = generateFilename("motif-edit");
         // biome-ignore lint/style/noNonNullAssertion: images[0] guaranteed by API response
-        await downloadImage(result.images[0]!.url, outputPath);
+        outputPath = await downloadImage(result.images[0]!.url, outputPath);
         cost = estimateCost(source.model, source.resolution);
         promptLabel = source.prompt;
       } else if (mode === "upscale") {
@@ -368,7 +368,7 @@ export function EditScreen({
 
         outputPath = source.output.replace(IMAGE_EXT_REGEX, `-up${scale}x.png`);
         // biome-ignore lint/style/noNonNullAssertion: images[0] guaranteed by API response
-        await downloadImage(result.images[0]!.url, outputPath);
+        outputPath = await downloadImage(result.images[0]!.url, outputPath);
         cost = 0.02;
         promptLabel = `[upscale ${scale}x] ${source.prompt}`;
       } else {
@@ -384,7 +384,7 @@ export function EditScreen({
 
         outputPath = source.output.replace(IMAGE_EXT_REGEX, "-nobg.png");
         // biome-ignore lint/style/noNonNullAssertion: images[0] guaranteed by API response
-        await downloadImage(result.images[0]!.url, outputPath);
+        outputPath = await downloadImage(result.images[0]!.url, outputPath);
         cost = 0.02;
         promptLabel = `[rmbg] ${source.prompt}`;
       }

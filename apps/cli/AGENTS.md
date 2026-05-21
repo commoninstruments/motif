@@ -266,6 +266,9 @@ Series let you lock a visual style and generate multiple images that look like t
 ### Quick Start
 
 ```bash
+# One-shot themed run: plan 6 cohesive images before spending credits
+motif series run "brutalist architecture" --count 6 --dry-run --format json
+
 # Create a series from a cover image
 motif series create "Luna's Adventure" --from cover.png \
   --style "children's book, watercolor, soft pastels" -m banana -a 3:2
@@ -289,15 +292,17 @@ motif series history luna-s-adventure
 ### Stdin JSON
 
 ```bash
+echo '{"command":"series-run","theme":"brutalist architecture","numImages":6,"dryRun":true}' | motif series --format json
 echo '{"command":"series-generate","series":"luna-s-adventure","prompt":"Luna meets the fox","refs":"character"}' | motif series
 ```
 
 ### How It Works
 
-1. **Style prompt** is prepended to every generation in the series
+1. **Series run** turns a theme into one shared style prompt and one scene prompt per requested image
 2. **Reference images** (tagged) are passed as `--edit` images to the model
 3. **Outputs** are tracked per-series with full provenance (prompt, refs used, cost)
-4. **banana model** is recommended for series (14 reference images, best consistency)
+4. **Live series runs** reuse the first generated image as a style anchor for later images when the model supports references
+5. **banana model** is recommended for series (14 reference images, best consistency)
 
 ### Series Invariants
 
@@ -316,6 +321,7 @@ motif series show <slug>
 motif series ref-add <slug> <image> [-t tag] [-d description]
 motif series ref-remove <slug> <filename>
 motif series gen <slug> "prompt" [--refs tags] [--dry-run] [-m model] [-a aspect] [-o output]
+motif series run "theme" [--count n] [--series slug] [--refs tags] [--dry-run] [-m model] [-a aspect]
 motif series history <slug> [--limit n] [--offset n]
 motif series delete <slug>
 ```

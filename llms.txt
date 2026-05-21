@@ -21,6 +21,7 @@
 - [CLI describe command](./apps/cli/src/commands/describe.ts) - Runtime schema for commands, models, tools, leaderboards, errors, and enums.
 - [CLI structured output](./apps/cli/src/utils/output.ts) - JSON, NDJSON, field masks, and structured error emission.
 - [CLI input hardening](./apps/cli/src/utils/input.ts) - Prompt sanitization, path sandboxing, and option validation.
+- Series discovery: use `motif --describe series --format json`; `motif series run "theme" --count n --dry-run --format json` plans cohesive themed image sets before spending credits.
 - [MCP server](./packages/motif-mcp/src/create-server.ts) - Tool and resource definitions for MCP clients.
 - [SDK server](./packages/motif-sdk/src/server.ts) - Result-returning fal client, queue polling, upload support, and payload deletion.
 
@@ -30,4 +31,3 @@
 - [SDK request tests](./packages/motif-sdk/tests/server-fetch.test.ts) - Mocked fal fetch behavior, no-store headers, and request payload deletion.
 - [MCP tests](./packages/motif-mcp/tests/tools.test.ts) - MCP client/server protocol tests using InMemoryTransport.
 - [CI workflow](./.github/workflows/ci.yml) - Typecheck, lint, and tests on push and pull request.
-

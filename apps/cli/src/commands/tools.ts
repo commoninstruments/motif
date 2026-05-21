@@ -417,8 +417,11 @@ async function runFalTool(
       if (!url) {
         throw new Error(`No downloadable output found for ${toolId}`);
       }
-      await downloadImage(url, outputPath);
-      saved = { path: resolve(outputPath), size: getFileSize(outputPath) };
+      const actualOutputPath = await downloadImage(url, outputPath);
+      saved = {
+        path: resolve(actualOutputPath),
+        size: getFileSize(actualOutputPath),
+      };
     }
     emit(
       {

@@ -481,9 +481,9 @@ export function GenerateScreen({
       });
 
       setStatus("Downloading...");
-      const outputPath = generateFilename();
+      let outputPath = generateFilename();
       // biome-ignore lint/style/noNonNullAssertion: images[0] guaranteed by API response
-      await downloadImage(result.images[0]!.url, outputPath);
+      outputPath = await downloadImage(result.images[0]!.url, outputPath);
 
       const dims = await getImageDimensions(outputPath);
       const size = await getFileSize(outputPath);

@@ -594,6 +594,7 @@ function describeSchema() {
             "video",
             "last",
             "history",
+            "series",
             "tool",
             "describe",
             "errors",
@@ -605,12 +606,149 @@ function describeSchema() {
   };
 }
 
+function seriesSchema() {
+  return {
+    command: "series",
+    description:
+      "Manage reusable image series and run themed multi-image generation plans with shared style, tone, references, and history.",
+    mutating: true,
+    supports_dry_run: true,
+    subcommands: [
+      "create",
+      "list",
+      "show",
+      "ref-add",
+      "ref-remove",
+      "gen",
+      "run",
+      "history",
+      "delete",
+    ],
+    input: {
+      type: "object",
+      properties: {
+        command: {
+          type: "string",
+          enum: [
+            "series-create",
+            "series-list",
+            "series-show",
+            "series-ref-add",
+            "series-ref-remove",
+            "series-generate",
+            "series-run",
+            "series-history",
+            "series-delete",
+          ],
+          description: "Series command for stdin JSON payloads",
+        },
+        theme: {
+          type: "string",
+          description:
+            'High-level creative brief for series run, e.g. "brutalist architecture".',
+        },
+        count: {
+          type: "integer",
+          minimum: 1,
+          maximum: 24,
+          default: 4,
+          description: "Number of scene prompts/images in a series run",
+        },
+        numImages: {
+          type: "integer",
+          minimum: 1,
+          maximum: 24,
+          description: "Alias for count in stdin JSON series-run payloads.",
+        },
+        series: {
+          type: "string",
+          description:
+            "Existing series slug. Omit for series run to auto-create or reuse a series from the theme when generating.",
+        },
+        prompt: {
+          type: "string",
+          description:
+            "Single scene prompt for series gen, or alias for theme in stdin series-run.",
+        },
+        stylePrompt: {
+          type: "string",
+          description:
+            "Shared style/tone prompt stored on a series or applied to a series run.",
+        },
+        refs: {
+          type: "string",
+          description:
+            "Comma-separated reference tags to include from an existing series.",
+        },
+        model: {
+          type: "string",
+          enum: GENERATION_MODELS,
+          default: "banana",
+          description:
+            "Generation model. banana is recommended for series because it supports up to 14 references.",
+        },
+        aspect: {
+          type: "string",
+          enum: ASPECT_RATIOS,
+          default: "1:1",
+        },
+        resolution: {
+          type: "string",
+          enum: RESOLUTIONS,
+          default: "2K",
+        },
+        dryRun: {
+          type: "boolean",
+          default: false,
+          description:
+            "Plan prompts, references, and cost without calling fal or requiring FAL_KEY.",
+        },
+        noOpen: { type: "boolean", default: false },
+      },
+    },
+    output: {
+      type: "object",
+      properties: {
+        command: { type: "string" },
+        series: { type: ["string", "null"] },
+        theme: { type: "string" },
+        stylePrompt: { type: "string" },
+        scenes: {
+          type: "array",
+          description:
+            "Series run plan with one scene prompt per generated image.",
+          items: {
+            type: "object",
+            properties: {
+              index: { type: "integer" },
+              scenePrompt: { type: "string" },
+              prompt: { type: "string" },
+            },
+          },
+        },
+        images: {
+          type: "array",
+          description: "Saved image outputs for non-dry-run series runs.",
+        },
+        estimatedCost: { type: "number" },
+        cost: { type: "number" },
+      },
+    },
+    examples: [
+      'motif series run "brutalist architecture" --count 6 --dry-run --format json',
+      'motif series create "Luna Adventure" --style "watercolor children\'s book" -m banana',
+      'motif series gen luna-adventure "Luna enters the forest" --refs character,location --dry-run',
+    ],
+  };
+}
+
 const COMMAND_SCHEMAS: Record<string, () => object> = {
   generate: generateSchema,
   upscale: upscaleSchema,
   rmbg: removeBackgroundSchema,
   vary: varySchema,
   video: videoSchema,
+  series: seriesSchema,
   tool: toolSchema,
   last: lastSchema,
   history: historySchema,

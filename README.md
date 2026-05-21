@@ -373,6 +373,7 @@ echo '{"command":"tool","tool":"sam3-image","input":"https://example.com/input.p
 # Inspect the live command schema
 motif --describe
 motif --describe generate --format json
+motif --describe series --format json
 motif --describe tool --format json
 ```
 
@@ -383,6 +384,12 @@ When stdout is not a TTY, Motif defaults to structured JSON. Human-readable term
 Series help keep a consistent style, character, location, or visual system across related images. Series data lives under `~/.motif/series`.
 
 ```bash
+# Plan a cohesive themed set before spending credits
+motif series run "brutalist architecture" --count 6 --dry-run --format json
+
+# Generate the planned set into an auto-created series
+motif series run "brutalist architecture" --count 6
+
 # Create a series with a style prompt and optional starting reference
 motif series create "Luna Book Covers" --from cover-style.png --style "moody watercolor fantasy cover"
 
@@ -400,7 +407,9 @@ motif series history luna-book-covers
 motif series delete luna-book-covers
 ```
 
-Series commands also support `--format json`, `--format ndjson`, `--fields`, and stdin JSON.
+`series run` creates a shared style plan from the theme and one scene prompt per image. For live runs, Motif stores outputs in a series and reuses the first generated image as a style anchor for later images when the selected model supports references.
+
+Series commands also support `--format json`, `--format ndjson`, `--fields`, stdin JSON, and `motif --describe series --format json`.
 
 ## Options Reference
 
