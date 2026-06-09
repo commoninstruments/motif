@@ -136,7 +136,12 @@ export interface GenerateOptions {
   aspect?: AspectRatio;
   /** GPT background mode where supported */
   background?: BackgroundMode;
-  /** Motif prompt enrichment options, consumed before fal request construction */
+  /**
+   * Motif prompt enrichment choices applied before fal request construction.
+   *
+   * These options are not sent to fal directly; they append validated creative
+   * clauses to `prompt` and are omitted from the final request body.
+   */
   creative?: CreativeDirection;
   editImageUrls?: string[];
   /** Ask fal not to store IO payloads, and expose request ids for deletion. */

@@ -209,6 +209,12 @@ function imageContent(image: {
   };
 }
 
+/**
+ * Build the reusable creative direction input schema for MCP tools.
+ *
+ * The schema mirrors the SDK taxonomy so agents can discover valid option ids
+ * before spending credits on `generate` or `vary`.
+ */
 function creativeInputSchema() {
   return {
     type: "object",
@@ -594,6 +600,12 @@ const TOOLS = [
 
 // ─── Server factory ──────────────────────────────────────────────────
 
+/**
+ * Create a Motif MCP server without binding it to a transport.
+ *
+ * The caller owns the `MotifServer` instance and chooses stdio, in-memory, or
+ * another MCP transport; this factory only registers Motif resources and tools.
+ */
 export function createMotifMcpServer(motif: MotifServer): Server {
   const server = new Server(
     { name: "motif", version: "1.0.0" },

@@ -1,6 +1,12 @@
 // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters for prompt sanitization
 const CONTROL_CHAR_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 
+/**
+ * Creative direction fields applied to prompts in Motif's canonical order.
+ *
+ * The order matters when multiple fields are selected because prompt clauses
+ * are appended in this sequence for stable dry runs, tests, and history.
+ */
 export type CreativeField =
   | "recipe"
   | "shot"
@@ -11,15 +17,27 @@ export type CreativeField =
   | "material"
   | "motion";
 
+/**
+ * Selected creative option ids keyed by direction field.
+ *
+ * Values must match option ids from `CREATIVE_TAXONOMY`; unknown ids throw a
+ * `CreativeOptionError` before any fal request body is built.
+ */
 export type CreativeDirection = Partial<Record<CreativeField, string>>;
 
+/** A single selectable creative direction option exposed to CLI and MCP schemas. */
 export interface CreativeOption {
+  /** Prompt fragment appended when this option is selected. */
   clause: string;
+  /** Human-facing explanation used in schema metadata and generated docs. */
   description: string;
+  /** Stable machine id accepted by `CreativeDirection`. */
   id: string;
+  /** Short display label for UIs and schema enum descriptions. */
   label: string;
 }
 
+/** Structured details returned when a creative direction id is not recognized. */
 export interface CreativeOptionErrorDetails {
   availableIds: string[];
   code: "INVALID_OPTION";
@@ -27,6 +45,12 @@ export interface CreativeOptionErrorDetails {
   value: string;
 }
 
+/**
+ * Error thrown when prompt enrichment receives an unknown creative option id.
+ *
+ * The extra fields make CLI and agent callers able to show field-specific
+ * recovery hints without parsing the error message.
+ */
 export class CreativeOptionError
   extends Error
   implements CreativeOptionErrorDetails
@@ -47,6 +71,7 @@ export class CreativeOptionError
   }
 }
 
+/** Canonical creative field order used for prompt enrichment and schema output. */
 export const CREATIVE_FIELDS = [
   "recipe",
   "shot",
@@ -58,6 +83,12 @@ export const CREATIVE_FIELDS = [
   "motion",
 ] as const satisfies readonly CreativeField[];
 
+/**
+ * Built-in creative direction catalog.
+ *
+ * Each field contains the option ids accepted by `CreativeDirection` and the
+ * exact prompt clause that will be appended when selected.
+ */
 export const CREATIVE_TAXONOMY = {
   recipe: [
     {
@@ -125,24 +156,43 @@ export const CREATIVE_TAXONOMY = {
   ],
 } as const satisfies Record<CreativeField, readonly CreativeOption[]>;
 
+/** Result of applying creative direction to a base prompt. */
 export interface CreativePromptResult {
+  /** Sanitized user prompt before Motif adds creative clauses. */
   basePrompt: string;
   creative: {
+    /** Clauses appended to the prompt, de-duplicated in canonical field order. */
     clauses: string[];
+    /** Validated option ids that were applied. */
     selected: CreativeDirection;
   };
+  /** Final prompt sent to fal after creative enrichment. */
   prompt: string;
 }
 
+/** Input for Motif's prompt enrichment step. */
 export interface EnrichPromptOptions {
+  /** Optional selected creative option ids. */
   creative?: CreativeDirection;
+  /** User-authored prompt before Motif normalization and enrichment. */
   prompt: string;
 }
 
+/**
+ * Remove control characters and surrounding whitespace from a prompt.
+ *
+ * Newline style is normalized to `\n`; other text content is left unchanged.
+ */
 export function sanitizePrompt(prompt: string): string {
   return prompt.replace(CONTROL_CHAR_REGEX, "").replace(/\r\n/g, "\n").trim();
 }
 
+/**
+ * Append selected creative direction clauses to a prompt.
+ *
+ * Options are validated against `CREATIVE_TAXONOMY`, applied in
+ * `CREATIVE_FIELDS` order, and returned as metadata alongside the final prompt.
+ */
 export function enrichPrompt(
   options: EnrichPromptOptions,
 ): CreativePromptResult {

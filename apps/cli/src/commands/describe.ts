@@ -29,6 +29,12 @@ import { ERROR_CATALOG } from "../utils/error-catalog";
 import { type EmitOptions, emit } from "../utils/output";
 import { PACKAGE_VERSION } from "../version";
 
+/**
+ * Build creative direction properties for `motif describe` output.
+ *
+ * The enum metadata includes labels, descriptions, and appended prompt clauses
+ * so agents can choose option ids without inspecting SDK source.
+ */
 function creativeSchemaProperties(): Record<string, object> {
   return Object.fromEntries(
     CREATIVE_FIELDS.map((field) => [
