@@ -267,6 +267,24 @@ export const FAL_TOOLS = {
       output_format: "png",
     },
   },
+  "sam3-1-image": {
+    name: "SAM 3.1 Image",
+    endpoint: "fal-ai/sam-3-1/image",
+    task: "promptable image segmentation",
+    category: "segmentation",
+    description:
+      "Segment image objects with text, point, or box prompts. SAM 3.1 adds Object Multiplex for faster multi-object tracking.",
+    inputKind: "image",
+    inputField: "image_url",
+    outputKeys: ["image", "masks", "metadata", "scores", "boxes"],
+    pricing: "$0.005/request",
+    sourceUrl: "https://fal.ai/models/fal-ai/sam-3-1/image",
+    defaultOptions: {
+      apply_mask: true,
+      max_masks: 3,
+      output_format: "png",
+    },
+  },
   "sam3-image-rle": {
     name: "SAM 3 Image RLE",
     endpoint: "fal-ai/sam-3/image-rle",
