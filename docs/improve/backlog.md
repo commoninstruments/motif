@@ -47,7 +47,7 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 
 ### IMP-6 Test gaps: series execution, ref guards, ndjson, real flag wiring
 
-- **Status:** open · **Linear:** MOT-13
+- **Status:** shipped in motif-cli 1.3.0 (commit 9ff5bfe) · **Linear:** MOT-13 (Done)
 - **Evidence:** every `series run`/`series gen` test uses `--dry-run` — anchor chaining, output numbering, duplicate-name fallback (`series.ts:180-193,781-865`) untested. `series ref-add`/`ref-remove` path-traversal guards (`apps/cli/src/utils/series.ts:236,266`) never invoked by any test. `--format ndjson` (`utils/output.ts:97-104`) unexercised. `cli-options.test.ts` tests a replica Commander program, not `cli.ts` — ~14 real flags unverified end-to-end.
 - **Fix:** `series.test.ts` against temp HOME (incl. path-escape attempt); mocked-fal non-dry-run series tests; one `emitStream` unit + one `--format ndjson` e2e; migrate flag assertions onto the real program or dry-run contract tests.
 
@@ -66,31 +66,31 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 
 ### IMP-9 SURF-5 semantic exit codes + SURF-7 agent regression fixtures
 
-- **Status:** open · **Linear:** MOT-16
+- **Status:** shipped in motif-cli 1.4.0 · **Linear:** MOT-16 (Done)
 - **Evidence:** both pending in `docs/surface/plan.md:73-107` since 2026-05-20. `apps/cli/src/utils/errors.ts:68` and `src/index.ts:85` hardcode `process.exit(1)` despite computed error codes. No agent-task fixtures exist; SURF-7-style registry-vs-output fixtures would have mechanically caught IMP-4/IMP-5.
 - **Fix:** map error catalog `status` → exit codes; add fixture tests asserting CLI/MCP structured output against SDK registry.
 
 ### IMP-10 Extract generation orchestration from 1,977-line `cli.ts`
 
-- **Status:** open · **Linear:** MOT-17
+- **Status:** shipped in motif-cli 1.4.0 (cli.ts 1960→486 lines) · **Linear:** MOT-17 (Done)
 - **Evidence:** `generateImage`, `generateVariations`, `upscaleLast`, `removeBackgroundLast`, `generateVideo`, `saveGeneratedImages` all inline in `apps/cli/src/cli.ts` while `describe`/`history`/`series`/`tools` are properly extracted into `src/commands/`.
 - **Fix:** extract to `src/commands/generate.ts` (etc.) matching the established pattern. Do after IMP-1/2/7 to avoid churn. Optional companion: split MCP schema literals into `schemas.ts` if `create-server.ts` keeps growing.
 
 ### IMP-11 Refresh model registry with July 2026 fal catalog
 
-- **Status:** open · **Linear:** MOT-18
+- **Status:** shipped in sdk 0.5.0 / cli 1.3.0 / mcp 0.1.4 · **Linear:** MOT-18 (Done)
 - **Evidence:** 2026-07-11 web research (fal.ai pages + Artificial Analysis leaderboards): nothing pinned is deprecated and all prices match, but Seedream 5.0 Pro/Lite, Ideogram 4, Recraft V4, and FLUX.2 Turbo shipped since the June registry update; Seedream v4, Ideogram v3, Recraft v3 are soft-superseded. Tier-2 candidates (Reve 2.0, Krea 2, ImagineArt 2.0, HunyuanImage 3.0) and video alternatives (Seedance 2.0, HappyHorse 1.1) listed in MOT-18.
 - **Fix:** add tier-1 models to `models.ts` after fetching each endpoint's live API schema; keep superseded versions; reconcile clarity/gpt2 cost fallbacks. Changes public exports — sequence after IMP-4 so vary enums derive automatically.
 - **Verify:** dry-run contract tests for each new model; no live canaries without approval.
 
 ### IMP-12 Upgrade @howells/lint to 1.x (oxlint/oxfmt)
 
-- **Status:** open · **Linear:** MOT-19
+- **Status:** shipped (commit 388be63) · **Linear:** MOT-19 (Done)
 - Repo already uses `howells-lint` everywhere but at `^0.1.6`; 1.1.0 ships the oxlint/oxfmt presets. Bump all five package.jsons, update lint-staged, reconcile biome.json, fix new findings.
 
 ### IMP-13 General dependency update
 
-- **Status:** open · **Linear:** MOT-20
+- **Status:** shipped (commit 3809a8f) · **Linear:** MOT-20 (Done)
 - `pnpm outdated` sweep: minors wholesale, majors individually with changelog checks. Verify `pnpm check` + `npm pack --dry-run` allowlists.
 
 ## Explicitly not planned
