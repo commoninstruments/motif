@@ -7,13 +7,13 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 ## P1 — Bugs (published behavior is wrong)
 
 ### IMP-1 SDK `generate()`/`submitGeneration()` throw instead of returning Result
-- **Status:** open · **Linear:** MOT-8
+- **Status:** shipped in motif-sdk 0.3.2 · **Linear:** MOT-8 (Done)
 - **Evidence:** `packages/motif-sdk/src/server.ts:93,149` call `buildGenerateBody` unguarded; it throws (`CreativeOptionError`, unsupported-option errors, unknown model) despite the class doc promising "no thrown exceptions". Confirmed by runtime probe. MCP handlers (`packages/motif-mcp/src/create-server.ts:697,806`) have no try/catch, so an invalid `creative` id from an MCP client becomes an unhandled rejection instead of the structured `INVALID_OPTION` tool error. CLI only survives via duplicated pre-validation (`apps/cli/src/cli.ts:699-702`).
 - **Fix:** wrap `buildGenerateBody`/`enrichPrompt` in try/catch inside `generate()`/`submitGeneration()`, map to `err(new MotifError(...))` (mirror `runTool`, `server.ts:488-498`). Add a mock-free MCP test: invalid creative id → structured `isError: true` response with field details.
 - **Verify:** new SDK unit test (invalid creative → `Result.err`), new MCP integration test, `pnpm check`.
 
 ### IMP-2 Multi-image output collision silently destroys images
-- **Status:** open · **Linear:** MOT-9
+- **Status:** shipped in motif-cli 1.2.4 · **Linear:** MOT-9 (Done)
 - **Evidence:** `apps/cli/src/cli.ts:486` and `apps/cli/src/commands/series.ts:577` build per-image paths via `outputPath.replace(".png", "-N.png")` — a no-op for `.jpg`/`.webp`/extensionless paths, so `--num 4 --output out.jpg` writes 4 images to one path; only the last survives. History records 4 entries pointing at 1 file, hiding the loss.
 - **Fix:** shared helper using `path.parse` → `${name}-${i+1}${ext || ".png"}`; use in both call sites.
 - **Verify:** unit test for the helper incl. `.jpg`/no-extension; dry-run contract test asserting distinct paths.
@@ -51,7 +51,7 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 - **Fix:** CLI re-exports `sanitizePrompt` from SDK; extract one `resolveCreativeDirection` into `apps/cli/src/utils/creative.ts` deriving fields from `CREATIVE_FIELDS`.
 
 ### IMP-8 Verify banana2 4K pricing in `estimateCost`
-- **Status:** fixed 2026-07-11 (uncommitted) · **Linear:** MOT-15 (Done)
+- **Status:** shipped in motif-sdk 0.3.1/0.3.2 · **Linear:** MOT-15 (Done)
 - **Resolution:** fal's nano-banana-2 page confirms tiers 0.5K 0.75× / 1K 1× / 2K 1.5× / 4K 2×. `cost.ts` now applies the full curve; new `packages/motif-sdk/tests/cost.test.ts` pins all tiers.
 - **Evidence:** `packages/motif-sdk/src/cost.ts:12` doubles 4K price for `banana`/`gemini3` only; `banana2` supports resolution but is excluded — likely undercounts real spend in dry-run/MCP estimates/history.
 - **Fix:** check fal pricing page for banana2 4K; add to doubling branch or comment the intentional exclusion.
