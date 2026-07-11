@@ -425,6 +425,126 @@ describe("generate tool", () => {
   });
 });
 
+// ─── argument validation ─────────────────────────────────────────────
+
+describe("argument validation", () => {
+  it("rejects generate with numImages out of range and does not call fal", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "generate",
+      arguments: { prompt: "a fox", numImages: 500 },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+    expect(motif.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects generate with an unknown model and suggests valid ones", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "generate",
+      arguments: { prompt: "a fox", model: "bogus" },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+    expect(parsed.suggestions.join(" ")).toContain("model");
+    expect(motif.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects generate with an empty prompt", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "generate",
+      arguments: { prompt: "" },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+    expect(motif.generate).not.toHaveBeenCalled();
+  });
+
+  it("rejects vary with an edit-incapable model", async () => {
+    const motif = makeMockMotif();
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      name: "vary",
+      arguments: {
+        prompt: "make it blue",
+        imageUrls: ["https://example.com/ref.png"],
+        model: "recraft",
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+    expect(motif.generate).not.toHaveBeenCalled();
+  });
+
+  it("resolves history with no arguments key to the default page", async () => {
+    const { readHistory } = await import("../src/history.js");
+    const client = await makeClient(makeMockMotif());
+
+    const result = await client.callTool({ name: "history" });
+
+    expect(result.isError).toBeFalsy();
+    expect(readHistory).toHaveBeenCalledWith(10, 0);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.generations).toHaveLength(1);
+  });
+
+  it("rejects history with limit 0", async () => {
+    const client = await makeClient(makeMockMotif());
+
+    const result = await client.callTool({
+      name: "history",
+      arguments: { limit: 0 },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+  });
+
+  it("rejects history with limit 51 (schema maximum is 50)", async () => {
+    const client = await makeClient(makeMockMotif());
+
+    const result = await client.callTool({
+      name: "history",
+      arguments: { limit: 51 },
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    expect(parsed.code).toBe("INVALID_PARAMS");
+  });
+
+  it("accepts history with limit 50 (schema maximum)", async () => {
+    const { readHistory } = await import("../src/history.js");
+    const client = await makeClient(makeMockMotif());
+
+    const result = await client.callTool({
+      name: "history",
+      arguments: { limit: 50 },
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(readHistory).toHaveBeenCalledWith(50, 0);
+  });
+});
+
 // ─── upscale tool ────────────────────────────────────────────────────
 
 describe("upscale tool", () => {

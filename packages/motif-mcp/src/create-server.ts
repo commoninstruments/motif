@@ -198,6 +198,35 @@ function toolError(
   };
 }
 
+function invalidParams(message: string, suggestions: string[]) {
+  return toolError("INVALID_PARAMS", message, { suggestions });
+}
+
+/**
+ * Validate an optional value against an allowed enum.
+ *
+ * Returns an error message when the value is present but not a member, or
+ * `undefined` when the value is absent or valid.
+ */
+function validateEnum(
+  value: unknown,
+  allowed: readonly string[],
+  field: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || !allowed.includes(value)) {
+    return `Invalid ${field}: ${JSON.stringify(value)}`;
+  }
+  return undefined;
+}
+
+/** Build a suggestion string listing valid enum values (truncated if long). */
+function enumSuggestion(field: string, allowed: readonly string[]): string {
+  const shown = allowed.slice(0, 20);
+  const suffix = allowed.length > shown.length ? ", …" : "";
+  return `Valid ${field} values: ${shown.join(", ")}${suffix}`;
+}
+
 function imageContent(image: {
   height?: null | number;
   url: string;
@@ -634,15 +663,8 @@ export function createMotifMcpServer(motif: MotifServer): Server {
   // ── Call tool ─────────────────────────────────────────────────────
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
-
-    if (!args) {
-      return toolError("INVALID_PARAMS", "No arguments provided", {
-        suggestions: [
-          "Pass an arguments object matching the tool input schema.",
-        ],
-      });
-    }
+    const { name } = request.params;
+    const args = request.params.arguments ?? {};
 
     // ── generate ──────────────────────────────────────────────────
 
@@ -674,6 +696,49 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         enableWebSearch?: boolean;
         enableGoogleSearch?: boolean;
       };
+
+      if (typeof prompt !== "string" || prompt.trim() === "") {
+        return invalidParams("generate requires a non-empty string prompt.", [
+          "Pass a prompt describing the image to generate.",
+        ]);
+      }
+      const generateModelError = validateEnum(
+        model,
+        GENERATION_MODELS,
+        "model",
+      );
+      if (generateModelError) {
+        return invalidParams(generateModelError, [
+          enumSuggestion("model", GENERATION_MODELS),
+        ]);
+      }
+      if (!Number.isInteger(numImages) || numImages < 1 || numImages > 4) {
+        return invalidParams(
+          `Invalid numImages: ${JSON.stringify(numImages)}. Must be an integer between 1 and 4.`,
+          ["Choose numImages in the range 1-4."],
+        );
+      }
+      if (preset !== undefined && !(preset in PRESET_MAP)) {
+        return invalidParams(`Invalid preset: ${JSON.stringify(preset)}`, [
+          enumSuggestion("preset", Object.keys(PRESET_MAP)),
+        ]);
+      }
+      const aspectError = validateEnum(aspect, ASPECT_RATIOS, "aspect");
+      if (aspectError) {
+        return invalidParams(aspectError, [
+          enumSuggestion("aspect", ASPECT_RATIOS),
+        ]);
+      }
+      const resolutionError = validateEnum(
+        resolution,
+        RESOLUTIONS,
+        "resolution",
+      );
+      if (resolutionError) {
+        return invalidParams(resolutionError, [
+          enumSuggestion("resolution", RESOLUTIONS),
+        ]);
+      }
 
       const resolvedAspect =
         (preset ? PRESET_MAP[preset] : undefined) ??
@@ -789,6 +854,23 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         inputFidelity?: "low" | "high";
       };
 
+      if (typeof prompt !== "string" || prompt.trim() === "") {
+        return invalidParams("vary requires a non-empty string prompt.", [
+          "Pass a prompt describing the desired changes.",
+        ]);
+      }
+      if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+        return invalidParams("vary requires a non-empty imageUrls array.", [
+          "Pass at least one reference image URL in imageUrls.",
+        ]);
+      }
+      const varyModelError = validateEnum(model, EDIT_CAPABLE_MODELS, "model");
+      if (varyModelError) {
+        return invalidParams(varyModelError, [
+          enumSuggestion("model", EDIT_CAPABLE_MODELS),
+        ]);
+      }
+
       const result = await motif.generate({
         prompt,
         model,
@@ -823,10 +905,23 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── history ───────────────────────────────────────────────────
 
     if (name === "history") {
-      const { limit = 10, offset = 0 } = (args ?? {}) as {
+      const { limit = 10, offset = 0 } = args as {
         limit?: number;
         offset?: number;
       };
+
+      if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+        return invalidParams(
+          `Invalid limit: ${JSON.stringify(limit)}. Must be an integer between 1 and 50.`,
+          ["Choose limit in the range 1-50."],
+        );
+      }
+      if (!Number.isInteger(offset) || offset < 0) {
+        return invalidParams(
+          `Invalid offset: ${JSON.stringify(offset)}. Must be a non-negative integer.`,
+          ["Choose offset >= 0."],
+        );
+      }
 
       const structured = readHistory(limit, offset);
 
