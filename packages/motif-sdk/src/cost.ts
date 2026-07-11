@@ -12,6 +12,18 @@ export function estimateCost(
     if ((model === "banana" || model === "gemini3") && resolution === "4K") {
       return configuredPrice * 2 * numImages;
     }
+    if (model === "banana2") {
+      // fal tiers nano-banana-2 by resolution: 0.5K $0.06, 1K $0.08, 2K $0.12, 4K $0.16
+      const multiplier =
+        resolution === "4K"
+          ? 2
+          : resolution === "2K"
+            ? 1.5
+            : resolution === "0.5K"
+              ? 0.75
+              : 1;
+      return configuredPrice * multiplier * numImages;
+    }
     return configuredPrice * numImages;
   }
 
