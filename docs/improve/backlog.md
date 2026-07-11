@@ -72,6 +72,14 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 - **Fix:** add tier-1 models to `models.ts` after fetching each endpoint's live API schema; keep superseded versions; reconcile clarity/gpt2 cost fallbacks. Changes public exports — sequence after IMP-4 so vary enums derive automatically.
 - **Verify:** dry-run contract tests for each new model; no live canaries without approval.
 
+### IMP-12 Upgrade @howells/lint to 1.x (oxlint/oxfmt)
+- **Status:** open · **Linear:** MOT-19
+- Repo already uses `howells-lint` everywhere but at `^0.1.6`; 1.1.0 ships the oxlint/oxfmt presets. Bump all five package.jsons, update lint-staged, reconcile biome.json, fix new findings.
+
+### IMP-13 General dependency update
+- **Status:** open · **Linear:** MOT-20
+- `pnpm outdated` sweep: minors wholesale, majors individually with changelog checks. Verify `pnpm check` + `npm pack --dry-run` allowlists.
+
 ## Explicitly not planned
 
 - Studio/canvas anything — parked 2026-07-11, repo archived.
