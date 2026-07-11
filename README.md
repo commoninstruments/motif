@@ -369,6 +369,32 @@ motif "current F1 champion as a magazine cover" --model gemini3 --web-search
 motif "compare current product packaging trends" --model banana2 --google-search
 ```
 
+## Creative Direction
+
+Creative direction appends predefined clauses to the prompt before the fal request
+is built. Eight fields are available — `recipe`, `shot`, `lighting`, `genre`,
+`camera`, `color`, `material`, and `motion` — each set with a matching CLI flag or
+a key in the SDK `creative` option.
+
+```bash
+motif "a ceramic desk lamp" --model banana2 --shot close-up --lighting rim
+```
+
+```ts
+import { MotifServer } from "@howells/motif-sdk";
+
+const motif = new MotifServer(process.env.FAL_KEY!);
+const result = await motif.generate({
+  model: "banana2",
+  prompt: "a ceramic desk lamp",
+  creative: { shot: "close-up", lighting: "rim" },
+});
+```
+
+An unknown option id fails validation with a structured `INVALID_OPTION` error.
+Option ids are versioned with the taxonomy; read the current ids from
+`motif --describe --format json`.
+
 ## Post-Processing
 
 ```bash

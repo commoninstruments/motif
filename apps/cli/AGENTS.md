@@ -39,12 +39,19 @@ motif auto-detects the output context:
 
 **Always structured errors**: In JSON mode, errors are written to stderr as:
 ```json
-{"error":true,"code":"UNKNOWN_MODEL","message":"Unknown model: foo","is_retriable":false,"details":{"available":["gpt2","gpt","banana","gemini","gemini3","flux","flux-fast","recraft","ideogram"]}}
+{"error":true,"code":"UNKNOWN_MODEL","message":"Unknown model: foo","is_retriable":false,"details":{"available":["gpt2","gpt","banana2","banana","gemini","gemini3","seedream4","seedream45","flux2-max","flux2-pro","flux2-flex","flux2-dev","flux","flux-fast","recraft","ideogram","grok-image","qwen"]}}
 ```
 
-Error codes: `MISSING_API_KEY`, `UNKNOWN_MODEL`, `INVALID_MODEL_ID`, `INVALID_OUTPUT_PATH`,
-`INVALID_EDIT_PATH`, `INVALID_STDIN`, `EMPTY_PROMPT`, `TOO_MANY_REFERENCES`,
-`GENERATION_FAILED`, `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `NO_PREVIOUS`, `DESCRIBE_FAILED`.
+Error codes are grouped below. Every code the CLI can emit is listed; the live
+catalog is available from `motif --describe --format json`.
+
+- General: `MISSING_API_KEY`, `UNKNOWN_MODEL`, `INVALID_MODEL_ID`, `INVALID_OPTION`,
+  `INVALID_OUTPUT_PATH`, `INVALID_EDIT_PATH`, `INVALID_IMAGE_PATH`, `INVALID_STDIN`,
+  `EMPTY_PROMPT`, `TOO_MANY_REFERENCES`, `NO_PREVIOUS`, `GENERATION_FAILED`,
+  `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `DESCRIBE_FAILED`.
+- Tools: `UNKNOWN_TOOL`, `INVALID_TOOL_ID`, `TOOL_FAILED`.
+- Series: `SERIES_CREATE_FAILED`, `SERIES_NOT_FOUND`, `SERIES_REF_ADD_FAILED`,
+  `SERIES_REF_REMOVE_FAILED`, `SERIES_GENERATE_FAILED`, `SERIES_DELETE_FAILED`.
 
 ## Input Modes
 
@@ -70,7 +77,7 @@ Flag values override stdin JSON values for the same field.
 ```json
 {
   "prompt": "string (required for generate)",
-  "model": "gpt2 | gpt | banana | gemini | gemini3 | flux | flux-fast | recraft | ideogram",
+  "model": "gpt2 | gpt | banana2 | banana | gemini | gemini3 | seedream4 | seedream45 | flux2-max | flux2-pro | flux2-flex | flux2-dev | flux | flux-fast | recraft | ideogram | grok-image | qwen",
   "aspect": "1:1 | 16:9 | 9:16 | 2:3 | 3:2 | 4:3 | 3:4 | 4:5 | 5:4 | 21:9",
   "resolution": "1K | 2K | 4K",
   "numImages": 1,
@@ -89,6 +96,45 @@ Flag values override stdin JSON values for the same field.
   "generateAudio": true
 }
 ```
+
+## Creative Direction
+
+Creative direction enriches the prompt with predefined clauses before the request
+body is built. There are eight fields, applied in this canonical order:
+
+| Field | CLI flag | Purpose |
+|-------|----------|---------|
+| `recipe` | `--recipe <id>` | Overall creative recipe |
+| `shot` | `--shot <id>` | Shot and framing |
+| `lighting` | `--lighting <id>` | Lighting treatment |
+| `genre` | `--genre <id>` | Genre and mood |
+| `camera` | `--camera <id>` | Camera and lens language |
+| `color` | `--color <id>` | Color treatment |
+| `material` | `--material <id>` | Material or texture |
+| `motion` | `--motion <id>` | Motion treatment |
+
+Pass fields as CLI flags or as a `creative` object in stdin JSON:
+
+```bash
+# CLI flags
+motif "a ceramic desk lamp" -m banana2 --shot close-up --lighting rim
+
+# Stdin JSON
+echo '{"prompt":"a ceramic desk lamp","model":"banana2","creative":{"shot":"close-up","lighting":"rim"}}' | motif
+```
+
+Per-field flags override the matching key in the stdin `creative` object. Only the
+fields you set are applied; the rest are left untouched.
+
+An unknown option id fails before any fal request with a structured `INVALID_OPTION`
+error whose details include the field and the available ids for that field.
+
+Option ids are versioned with the taxonomy. Do not hardcode them; read the live
+ids from `motif --describe --format json`.
+
+The `generate` and `vary` commands both accept creative direction. Vary operates on
+the edit-capable model subset (`EDIT_CAPABLE_MODELS`) — the generation models whose
+fal endpoints support image editing.
 
 ## Schema Introspection
 
@@ -183,13 +229,23 @@ motif --history --limit 20 --fields model,cost
 | Model | Per Image | Notes |
 |-------|-----------|-------|
 | `flux-fast` | $0.003 | Near-instant, great for iterations |
-| `gemini` | $0.04 | Cheap, no resolution control |
+| `flux2-dev` | ~$0.012 | Open FLUX.2, billed per compute second ($0.00167/sec) |
+| `grok-image` | $0.02 | Fast, cheap generation and edits |
+| `qwen` | $0.02/MP | Low-cost open-weight generation |
+| `seedream4` | $0.03 | Low-cost, high-ranked generation and edits |
+| `flux2-pro` | $0.03/MP | Production FLUX quality per megapixel |
+| `ideogram` | $0.03 | Best text rendering in images |
+| `gemini` | $0.0398 | Cheap, no resolution control |
 | `recraft` | $0.04 | Best for design/brand work, vector art |
+| `seedream45` | $0.04 | Current Seedream generation and edits |
+| `flux2-flex` | $0.05/MP | FLUX with guidance and step controls |
 | `flux` | $0.06 | Photorealism benchmark |
-| `ideogram` | $0.06 | Best text rendering in images |
-| `gpt` | $0.13 | Supports transparency, 4 reference images |
+| `flux2-max` | $0.07/MP | Highest-quality FLUX |
+| `banana2` | $0.08 | $0.06 / $0.08 / $0.12 / $0.16 at 0.5K / 1K / 2K / 4K (0.75x / 1x / 1.5x / 2x) |
+| `gpt` | $0.133 | Supports transparency, 4 reference images |
 | `banana` | $0.15 ($0.30 at 4K) | 14 reference images, best editing |
 | `gemini3` | $0.15 ($0.30 at 4K) | Full feature support |
+| `gpt2` | $0.211 | Frontier OpenAI generation, transparent PNGs |
 
 ### Processing
 
