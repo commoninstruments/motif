@@ -90,7 +90,13 @@ export class MotifServer {
       return this.generateQueued(options);
     }
 
-    const { endpoint, body } = buildGenerateBody(options);
+    let built: ReturnType<typeof buildGenerateBody>;
+    try {
+      built = buildGenerateBody(options);
+    } catch (error) {
+      return err(toMotifError(error));
+    }
+    const { endpoint, body } = built;
     const response = await this.request(`${FAL_BASE_URL}/${endpoint}`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -146,7 +152,13 @@ export class MotifServer {
   async submitGeneration(
     options: GenerateOptions,
   ): Promise<Result<QueuedJob, MotifError>> {
-    const { endpoint, body } = buildGenerateBody(options);
+    let built: ReturnType<typeof buildGenerateBody>;
+    try {
+      built = buildGenerateBody(options);
+    } catch (error) {
+      return err(toMotifError(error));
+    }
+    const { endpoint, body } = built;
 
     const response = await this.request(`${FAL_QUEUE_URL}/${endpoint}`, {
       method: "POST",
@@ -683,4 +695,25 @@ export class MotifError extends Error {
     this.status = status;
     this.code = code;
   }
+}
+
+/**
+ * Coerce an unknown thrown value into a `MotifError`.
+ *
+ * Preserves an existing `MotifError`, and lifts a string `code` field (e.g.
+ * `CreativeOptionError`'s `"INVALID_OPTION"`) onto the returned error so callers
+ * keep structured error metadata. Status `0` marks a non-HTTP local error.
+ */
+function toMotifError(error: unknown): MotifError {
+  if (error instanceof MotifError) {
+    return error;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const code =
+    error instanceof Error &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : undefined;
+  return new MotifError(message, 0, code);
 }
