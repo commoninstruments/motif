@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, statSync, unlinkSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
+import { extname, join, parse, resolve } from "node:path";
 
 const DIMENSION_REGEX = /(\d+)\s*x\s*(\d+)/g;
 const SIPS_HEIGHT_REGEX = /pixelHeight:\s*(\d+)/;
@@ -230,6 +230,12 @@ export function getFileSize(filePath: string): string {
     return `${(bytes / 1024).toFixed(1)}KB`;
   }
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+/** Path for image `index` in a multi-image batch: out.jpg -> out-1.jpg */
+export function indexedOutputPath(outputPath: string, index: number): string {
+  const { dir, name, ext } = parse(outputPath);
+  return join(dir, `${name}-${index + 1}${ext || ".png"}`);
 }
 
 /** Generate a timestamped filename */

@@ -53,6 +53,7 @@ import {
   getFileSize,
   getImageDimensions,
   imageToDataUrl,
+  indexedOutputPath,
   openImage,
 } from "./utils/image";
 import {
@@ -483,7 +484,7 @@ async function saveGeneratedImages(
 }> {
   // Build paths for each image
   const paths = images.map((_, i) =>
-    numImages > 1 ? outputPath.replace(".png", `-${i + 1}.png`) : outputPath,
+    numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath,
   );
 
   // Download all images in parallel

@@ -35,6 +35,7 @@ import {
   downloadImage,
   getFileSize,
   getImageDimensions,
+  indexedOutputPath,
   openImage,
 } from "../utils/image";
 import {
@@ -574,7 +575,7 @@ async function cmdGenerate(
 
     // Build paths and download all images in parallel
     const paths = result.images.map((_, i) =>
-      numImages > 1 ? outputPath.replace(".png", `-${i + 1}.png`) : outputPath,
+      numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath,
     );
     const actualPaths = await Promise.all(
       result.images.map((image, i) =>
