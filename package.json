@@ -18,16 +18,19 @@
   },
   "devDependencies": {
     "@howells/lint": "^1.1.0",
-    "@howells/typescript-config": "^0.1.2",
+    "@howells/typescript-config": "^0.1.6",
     "husky": "^9.1.7",
-    "knip": "^6.12.0",
-    "lint-staged": "^17.0.2",
-    "turbo": "2.9.9",
+    "knip": "^6.26.0",
+    "lint-staged": "^17.0.8",
+    "turbo": "2.10.4",
     "typescript": "^6.0.3"
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx,json,jsonc,css,graphql}": [
+    "*.{js,jsx,ts,tsx}": [
       "howells-fix"
+    ],
+    "*.{json,jsonc}": [
+      "howells-oxfmt"
     ]
   },
   "engines": {
