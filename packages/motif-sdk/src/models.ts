@@ -756,6 +756,11 @@ export const GENERATION_MODELS = [
   "qwen",
 ] as const;
 
+/** Models whose fal endpoints support image editing (vary/edit flows). */
+export const EDIT_CAPABLE_MODELS = GENERATION_MODELS.filter(
+  (id) => MODELS[id]?.supportsEdit,
+);
+
 export const UTILITY_MODELS = ["clarity", "crystal", "rmbg", "bria"] as const;
 
 export const VIDEO_MODELS = ["kling"] as const;

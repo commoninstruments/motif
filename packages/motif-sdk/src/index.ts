@@ -62,6 +62,7 @@ export {
   VIDEO_TEXT_TO_VIDEO_TOP_15,
 } from "./leaderboards";
 export {
+  EDIT_CAPABLE_MODELS,
   GENERATION_MODELS,
   type GenerationModelName,
   IDEOGRAM_STYLES,

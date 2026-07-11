@@ -6,7 +6,7 @@
  * without stdio, subprocesses, or real fal.ai API calls.
  */
 
-import type { MotifServer } from "@howells/motif-sdk";
+import { EDIT_CAPABLE_MODELS, type MotifServer } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
@@ -178,6 +178,18 @@ describe("ListTools", () => {
     expect(properties.aspect?.enum).toContain("auto");
     expect(properties.aspect?.enum).toContain("8:1");
     expect(properties.resolution?.enum).toContain("0.5K");
+  });
+
+  it("vary schema advertises the edit-capable model enum", async () => {
+    const client = await makeClient(makeMockMotif());
+    const { tools } = await client.listTools();
+    const vary = tools.find((t) => t.name === "vary");
+    const properties = vary?.inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+
+    expect(properties.model?.enum).toEqual([...EDIT_CAPABLE_MODELS]);
   });
 
   it("generate schema advertises creative direction options", async () => {

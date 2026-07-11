@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EDIT_CAPABLE_MODELS } from "@howells/motif-sdk";
 import { afterEach, describe, expect, it } from "vitest";
 
 interface CliResult {
@@ -96,6 +97,20 @@ describe("CLI contract", () => {
     expect(schema).toHaveProperty("leaderboards");
     expect(schema).toHaveProperty("tools");
     expect(schema).toHaveProperty("errors");
+  });
+
+  it("advertises the edit-capable model enum for the vary command", async () => {
+    const result = await runMotif(["--describe", "--format", "json"]);
+
+    expect(result.code).toBe(0);
+
+    const schema = parseJsonLine(result.stdout);
+    const commands = schema.commands as Record<string, Record<string, unknown>>;
+    const vary = commands.vary as {
+      input: { properties: { model: { enum: string[] } } };
+    };
+
+    expect(vary.input.properties.model.enum).toEqual([...EDIT_CAPABLE_MODELS]);
   });
 
   it("advertises series commands in the primary schema", async () => {
