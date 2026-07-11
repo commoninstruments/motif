@@ -2,8 +2,10 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { CREATIVE_TAXONOMY } from "@howells/motif-sdk";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { exitCodeForStatus } from "../src/utils/errors";
 
 /**
@@ -28,9 +30,9 @@ function tempHome(): string {
   return dir;
 }
 
-function runMotif(
+async function runMotif(
   args: string[],
-  options: { stdin?: string; home?: string; falKey?: string } = {},
+  options: { stdin?: string; home?: string; falKey?: string } = {}
 ): Promise<CliResult> {
   const child = spawn(
     process.execPath,
@@ -45,13 +47,13 @@ function runMotif(
         NO_COLOR: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
-    },
+    }
   );
 
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
+  child.stdout.setEncoding("utf-8");
+  child.stderr.setEncoding("utf-8");
   child.stdout.on("data", (chunk) => {
     stdout += chunk;
   });
@@ -61,10 +63,10 @@ function runMotif(
 
   child.stdin.end(options.stdin ?? "");
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ code: code ?? 0, stdout, stderr });
+      resolve({ code: code ?? 0, stderr, stdout });
     });
   });
 }
@@ -103,7 +105,7 @@ describe("agent fixtures: describe schema contract", () => {
     expect(result.stderr).toBe("");
 
     const generate = parseGenerateSchema(result.stdout);
-    const properties = generate.input.properties;
+    const { properties } = generate.input;
 
     for (const [field, options] of Object.entries(CREATIVE_TAXONOMY)) {
       const expectedIds = options.map((option) => option.id);
@@ -137,7 +139,7 @@ describe("agent fixtures: semantic exit codes", () => {
   it("maps a missing API key (non-dry-run) to exit 3", async () => {
     const result = await runMotif(
       ["a cat on a windowsill", "--format", "json", "--model", "banana"],
-      { falKey: "" },
+      { falKey: "" }
     );
 
     expect(result.code).toBe(3);
@@ -188,11 +190,11 @@ describe("agent fixtures: structured error envelope", () => {
     const error = parseJsonLine(result.stderr);
     expect(error).toMatchObject({
       code: "UNKNOWN_MODEL",
-      type: "urn:motif:error:unknown-model",
-      title: "Unknown Model",
-      status: 400,
-      is_retriable: false,
       doc_uri: "motif://describe/errors#unknown-model",
+      is_retriable: false,
+      status: 400,
+      title: "Unknown Model",
+      type: "urn:motif:error:unknown-model",
     });
     for (const key of [
       "code",

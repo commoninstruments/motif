@@ -54,7 +54,7 @@ interface RawHistory {
   totalCost: { allTime: number; session: number; today: number };
 }
 
-const EMPTY_RESULT = (limit: number, offset: number): HistoryResult => ({
+const emptyResult = (limit: number, offset: number): HistoryResult => ({
   costs: { allTime: 0, session: 0, today: 0 },
   generations: [],
   hasMore: false,
@@ -65,14 +65,14 @@ const EMPTY_RESULT = (limit: number, offset: number): HistoryResult => ({
 
 export function readHistory(limit = 10, offset = 0): HistoryResult {
   if (!existsSync(HISTORY_PATH)) {
-    return EMPTY_RESULT(limit, offset);
+    return emptyResult(limit, offset);
   }
 
   let history: RawHistory;
   try {
     history = JSON.parse(readFileSync(HISTORY_PATH, "utf-8")) as RawHistory;
   } catch {
-    return EMPTY_RESULT(limit, offset);
+    return emptyResult(limit, offset);
   }
 
   // Stored oldest-first; reverse for newest-first
@@ -91,7 +91,7 @@ export function readHistory(limit = 10, offset = 0): HistoryResult {
       prompt: g.prompt,
       resolution: g.resolution,
       timestamp: g.timestamp,
-      ...(g.editedFrom !== undefined ? { editedFrom: g.editedFrom } : {}),
+      ...(g.editedFrom === undefined ? {} : { editedFrom: g.editedFrom }),
     })),
     hasMore: offset + limit < total,
     limit,

@@ -7,25 +7,29 @@
  */
 
 import { basename, resolve } from "node:path";
+
 import {
   ASPECT_RATIOS,
-  type AspectRatio,
   buildGenerateBody,
-  type CreativeDirection,
   enrichPrompt,
   estimateCost,
   estimateVideoCost,
   GENERATION_MODELS,
-  type GenerateOptions,
-  type ImageSize,
   MODELS,
   RESOLUTIONS,
-  type Resolution,
   sanitizePrompt,
+} from "@howells/motif-sdk";
+import type {
+  AspectRatio,
+  CreativeDirection,
+  GenerateOptions,
+  ImageSize,
+  Resolution,
 } from "@howells/motif-sdk";
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
+
 import {
   deletePayloads,
   generate,
@@ -40,13 +44,13 @@ import { runToolPayload } from "./commands/tools";
 import {
   addGeneration,
   addGenerations,
-  type Generation,
   generateId,
   getApiKey,
   getLastGeneration,
   loadConfig,
   loadHistory,
 } from "./utils/config";
+import type { Generation } from "./utils/config";
 import { resolveCreativeDirection } from "./utils/creative";
 import { exitForErrorCode, handleError } from "./utils/errors";
 import {
@@ -67,14 +71,8 @@ import {
   validateOutputPath,
   validateResourceId,
 } from "./utils/input";
-import {
-  type EmitOptions,
-  emit,
-  emitError,
-  isStructured,
-  type OutputFormat,
-  resolveFormat,
-} from "./utils/output";
+import { emit, emitError, isStructured, resolveFormat } from "./utils/output";
+import type { EmitOptions, OutputFormat } from "./utils/output";
 import { PACKAGE_VERSION } from "./version";
 
 // -- Constants --
@@ -104,16 +102,16 @@ const IMAGE_SIZE_STRINGS = [
 function validateOption<T>(format: OutputFormat, fn: () => T): T {
   try {
     return fn();
-  } catch (err) {
-    handleError(err, "INVALID_OPTION", format);
+  } catch (error) {
+    handleError(error, "INVALID_OPTION", format);
   }
 }
 
 function validateOutput(format: OutputFormat, outputPath: string): string {
   try {
     return validateOutputPath(outputPath);
-  } catch (err) {
-    handleError(err, "INVALID_OUTPUT_PATH", format);
+  } catch (error) {
+    handleError(error, "INVALID_OUTPUT_PATH", format);
   }
 }
 
@@ -128,7 +126,7 @@ function derivedOutputPath(sourcePath: string, suffix: string): string {
 }
 
 function parseImageSizeOption(
-  value: StdinPayload["imageSize"] | string | undefined,
+  value: StdinPayload["imageSize"] | string | undefined
 ): ImageSize | undefined {
   if (value === undefined) {
     return undefined;
@@ -137,7 +135,7 @@ function parseImageSizeOption(
   if (typeof value !== "string") {
     const { height, width } = value;
     if (!Number.isInteger(width) || !Number.isInteger(height)) {
-      throw new Error("image size width and height must be integers");
+      throw new TypeError("image size width and height must be integers");
     }
     if (width <= 0 || height <= 0) {
       throw new Error("image size width and height must be positive");
@@ -151,10 +149,10 @@ function parseImageSizeOption(
     return value as ImageSize;
   }
 
-  const match = value.match(/^(\d+)x(\d+)$/);
+  const match = /^(\d+)x(\d+)$/.exec(value);
   if (!match) {
     throw new Error(
-      `image size must be one of ${IMAGE_SIZE_STRINGS.join(", ")} or WIDTHxHEIGHT: ${JSON.stringify(value)}`,
+      `image size must be one of ${IMAGE_SIZE_STRINGS.join(", ")} or WIDTHxHEIGHT: ${JSON.stringify(value)}`
     );
   }
 
@@ -337,7 +335,7 @@ function resolvePreset(
   stdinAspect: string | undefined,
   stdinResolution: string | undefined,
   defaultAspect: AspectRatio,
-  defaultResolution: Resolution,
+  defaultResolution: Resolution
 ): { aspect: AspectRatio; resolution: Resolution } {
   const cliPreset =
     (options.cover && "cover") ||
@@ -358,16 +356,16 @@ function resolvePreset(
     { aspect: AspectRatio; resolution?: Resolution }
   > = {
     cover: { aspect: "2:3", resolution: "2K" },
-    story: { aspect: "9:16" },
-    reel: { aspect: "9:16" },
     feed: { aspect: "4:5" },
-    og: { aspect: "16:9" },
-    wallpaper: { aspect: "9:16", resolution: "2K" },
-    ultra: { aspect: "21:9", resolution: "2K" },
-    wide: { aspect: "21:9" },
-    square: { aspect: "1:1" },
     landscape: { aspect: "16:9" },
+    og: { aspect: "16:9" },
     portrait: { aspect: "2:3" },
+    reel: { aspect: "9:16" },
+    square: { aspect: "1:1" },
+    story: { aspect: "9:16" },
+    ultra: { aspect: "21:9", resolution: "2K" },
+    wallpaper: { aspect: "9:16", resolution: "2K" },
+    wide: { aspect: "21:9" },
   };
 
   if (preset && preset in PRESET_MAP) {
@@ -380,7 +378,7 @@ function resolvePreset(
   }
   if (preset) {
     throw new Error(
-      `preset must be one of ${Object.keys(PRESET_MAP).join(", ")}: ${JSON.stringify(preset)}`,
+      `preset must be one of ${Object.keys(PRESET_MAP).join(", ")}: ${JSON.stringify(preset)}`
     );
   }
 
@@ -390,7 +388,7 @@ function resolvePreset(
         ? validateEnumOption(
             options.aspect ?? stdinAspect ?? "",
             ASPECT_RATIOS,
-            "aspect",
+            "aspect"
           )
         : defaultAspect,
     resolution:
@@ -398,7 +396,7 @@ function resolvePreset(
         ? validateEnumOption(
             options.resolution ?? stdinResolution ?? "",
             RESOLUTIONS,
-            "resolution",
+            "resolution"
           )
         : defaultResolution,
   };
@@ -409,7 +407,7 @@ function resolvePreset(
 function resolveEditPaths(
   editFiles: string[] | undefined,
   modelConfig: { maxReferenceImages?: number; name: string },
-  format: OutputFormat,
+  format: OutputFormat
 ): string[] | undefined {
   if (!editFiles?.length) {
     return undefined;
@@ -422,15 +420,15 @@ function resolveEditPaths(
         code: "TOO_MANY_REFERENCES",
         message: `${modelConfig.name} supports at most ${maxRef} reference images, got ${editFiles.length}`,
       },
-      format,
+      format
     );
     exitForErrorCode("TOO_MANY_REFERENCES");
   }
 
   try {
     return editFiles.map((p) => validateEditPath(p));
-  } catch (err) {
-    handleError(err, "INVALID_EDIT_PATH", format);
+  } catch (error) {
+    handleError(error, "INVALID_EDIT_PATH", format);
   }
 }
 
@@ -457,7 +455,7 @@ async function saveGeneratedImages(
   config: Awaited<ReturnType<typeof loadConfig>>,
   emitOpts: EmitOptions,
   noOpen?: boolean,
-  historyRecorded = true,
+  historyRecorded = true
 ): Promise<{
   id: string;
   images: SavedImage[];
@@ -467,15 +465,16 @@ async function saveGeneratedImages(
 }> {
   // Build paths for each image
   const paths = images.map((_, i) =>
-    numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath,
+    numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath
   );
 
   // Download all images in parallel
   const actualPaths = await Promise.all(
-    images.map((image, i) =>
-      // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed within bounds by the map
-      downloadImage(image.url, paths[i]!),
-    ),
+    images.map(
+      async (image, i) =>
+        // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed within bounds by the map
+        await downloadImage(image.url, paths[i]!)
+    )
   );
 
   // Collect metadata sequentially (dims via file command, console output ordering)
@@ -490,31 +489,31 @@ async function saveGeneratedImages(
     const size = getFileSize(path);
 
     savedImages.push({
-      path: resolve(path),
-      width: dims?.width,
       height: dims?.height,
+      path: resolve(path),
       size,
+      width: dims?.width,
     });
 
     if (!isStructured(emitOpts.format)) {
       console.log(
         chalk.green(`✓ Saved: ${path}`) +
           chalk.dim(
-            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
-          ),
+            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`
+          )
       );
     }
 
     generations.push({
-      id: generateId(),
-      prompt: meta.prompt,
-      model: meta.model,
       aspect: meta.aspect,
-      resolution: meta.resolution,
-      output: resolve(path),
       cost: estimateCost(meta.model, meta.resolution, 1),
-      timestamp: now,
       editedFrom: meta.editPaths?.[0] ? resolve(meta.editPaths[0]) : undefined,
+      id: generateId(),
+      model: meta.model,
+      output: resolve(path),
+      prompt: meta.prompt,
+      resolution: meta.resolution,
+      timestamp: now,
     });
   }
 
@@ -530,8 +529,8 @@ async function saveGeneratedImages(
     const history = await loadHistory();
     console.log(
       chalk.dim(
-        `\nSession: $${history.totalCost.session.toFixed(2)} | Today: $${history.totalCost.today.toFixed(2)}`,
-      ),
+        `\nSession: $${history.totalCost.session.toFixed(2)} | Today: $${history.totalCost.today.toFixed(2)}`
+      )
     );
   }
 
@@ -542,10 +541,10 @@ async function saveGeneratedImages(
   }
 
   return {
-    id: lastGen.id,
-    images: savedImages,
     cost: totalCost,
     historyRecorded,
+    id: lastGen.id,
+    images: savedImages,
     timestamp: lastGen.timestamp,
   };
 }
@@ -557,7 +556,7 @@ async function generateImage(
   options: CliOptions,
   stdinData: StdinPayload | null,
   config: Awaited<ReturnType<typeof loadConfig>>,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   const { aspect, resolution } = validateOption(emitOpts.format, () =>
     resolvePreset(
@@ -566,8 +565,8 @@ async function generateImage(
       stdinData?.aspect,
       stdinData?.resolution,
       config.defaultAspect,
-      config.defaultResolution,
-    ),
+      config.defaultResolution
+    )
   );
 
   const modelId = options.model || stdinData?.model || config.defaultModel;
@@ -575,23 +574,23 @@ async function generateImage(
   // Validate model name against hallucination patterns
   try {
     validateResourceId(modelId, "model");
-  } catch (err) {
-    handleError(err, "INVALID_MODEL_ID", emitOpts.format);
+  } catch (error) {
+    handleError(error, "INVALID_MODEL_ID", emitOpts.format);
   }
 
   const numImages = validateOption(emitOpts.format, () =>
     parseIntegerOption(stdinData?.numImages ?? options.num ?? 1, "num images", {
-      min: 1,
       max: 4,
-    }),
+      min: 1,
+    })
   );
 
   let outputPath: string;
   try {
     const rawOutput = options.output || stdinData?.output;
     outputPath = rawOutput ? validateOutputPath(rawOutput) : generateFilename();
-  } catch (err) {
-    handleError(err, "INVALID_OUTPUT_PATH", emitOpts.format);
+  } catch (error) {
+    handleError(error, "INVALID_OUTPUT_PATH", emitOpts.format);
   }
 
   const modelConfig = MODELS[modelId];
@@ -599,10 +598,10 @@ async function generateImage(
     emitError(
       {
         code: "UNKNOWN_MODEL",
-        message: `Unknown model: ${modelId}`,
         details: { available: GENERATION_MODELS },
+        message: `Unknown model: ${modelId}`,
       },
-      emitOpts.format,
+      emitOpts.format
     );
     exitForErrorCode("UNKNOWN_MODEL");
   }
@@ -610,7 +609,7 @@ async function generateImage(
   const editPaths = resolveEditPaths(
     options.edit || stdinData?.editImages,
     modelConfig,
-    emitOpts.format,
+    emitOpts.format
   );
 
   const cost = estimateCost(modelId, resolution, numImages);
@@ -619,7 +618,7 @@ async function generateImage(
   const seed = validateOption(emitOpts.format, () =>
     options.seed !== undefined || stdinData?.seed !== undefined
       ? parseIntegerOption(options.seed ?? stdinData?.seed ?? 0, "seed")
-      : undefined,
+      : undefined
   );
   const negativePrompt = options.negative || stdinData?.negativePrompt;
   const style = options.style || stdinData?.style;
@@ -628,27 +627,27 @@ async function generateImage(
       ? validateEnumOption(
           options.outputFormat ?? stdinData?.outputFormat ?? "",
           OUTPUT_FORMATS,
-          "output format",
+          "output format"
         )
-      : undefined,
+      : undefined
   );
   const background = validateOption(emitOpts.format, () =>
     options.background || stdinData?.background
       ? validateEnumOption(
           options.background ?? stdinData?.background ?? "",
           BACKGROUND_MODES,
-          "background",
+          "background"
         )
-      : undefined,
+      : undefined
   );
   const quality = validateOption(emitOpts.format, () =>
     options.quality || stdinData?.quality
       ? validateEnumOption(
           options.quality ?? stdinData?.quality ?? "",
           QUALITY_LEVELS,
-          "quality",
+          "quality"
         )
-      : undefined,
+      : undefined
   );
   if (
     outputFormat &&
@@ -657,10 +656,10 @@ async function generateImage(
   ) {
     handleError(
       new Error(
-        `${modelConfig.name} supports output formats: ${modelConfig.supportedOutputFormats.join(", ")}`,
+        `${modelConfig.name} supports output formats: ${modelConfig.supportedOutputFormats.join(", ")}`
       ),
       "INVALID_OPTION",
-      emitOpts.format,
+      emitOpts.format
     );
   }
   const safetyTolerance = validateOption(emitOpts.format, () =>
@@ -668,9 +667,9 @@ async function generateImage(
       ? validateEnumOption(
           options.safety ?? stdinData?.safetyTolerance ?? "",
           SAFETY_LEVELS,
-          "safety tolerance",
+          "safety tolerance"
         )
-      : undefined,
+      : undefined
   );
   const enableWebSearch = options.webSearch || stdinData?.enableWebSearch;
   const enableGoogleSearch =
@@ -681,11 +680,11 @@ async function generateImage(
   const syncMode = options.syncMode || stdinData?.syncMode;
   const creative = resolveCreativeDirection(options, stdinData?.creative);
   const creativeResult = creative
-    ? validateOption(emitOpts.format, () => enrichPrompt({ prompt, creative }))
+    ? validateOption(emitOpts.format, () => enrichPrompt({ creative, prompt }))
     : undefined;
   const requestPrompt = creativeResult?.prompt ?? prompt;
   const imageSize = validateOption(emitOpts.format, () =>
-    parseImageSizeOption(options.imageSize ?? stdinData?.imageSize),
+    parseImageSizeOption(options.imageSize ?? stdinData?.imageSize)
   );
   const maskImageUrl = options.mask ?? stdinData?.maskImageUrl;
   const limitGenerations = options.disableLimitGenerations
@@ -697,18 +696,18 @@ async function generateImage(
       ? parseNumberOption(
           options.imagePromptStrength ?? stdinData?.imagePromptStrength ?? 0,
           "image prompt strength",
-          { min: 0, max: 1 },
+          { max: 1, min: 0 }
         )
-      : undefined,
+      : undefined
   );
   const thinkingLevel = validateOption(emitOpts.format, () =>
     options.thinking || stdinData?.thinkingLevel
       ? validateEnumOption(
           options.thinking ?? stdinData?.thinkingLevel ?? "",
           THINKING_LEVELS,
-          "thinking level",
+          "thinking level"
         )
-      : undefined,
+      : undefined
   );
   const guidanceScale = validateOption(emitOpts.format, () =>
     options.guidanceScale !== undefined ||
@@ -716,18 +715,18 @@ async function generateImage(
       ? parseNumberOption(
           options.guidanceScale ?? stdinData?.guidanceScale ?? 0,
           "guidance scale",
-          { min: 1, max: 20 },
+          { max: 20, min: 1 }
         )
-      : undefined,
+      : undefined
   );
   const numInferenceSteps = validateOption(emitOpts.format, () =>
     options.steps !== undefined || stdinData?.numInferenceSteps !== undefined
       ? parseIntegerOption(
           options.steps ?? stdinData?.numInferenceSteps ?? 0,
           "inference steps",
-          { min: 1, max: 12 },
+          { max: 12, min: 1 }
         )
-      : undefined,
+      : undefined
   );
   const raw = options.raw || stdinData?.raw;
   const enhancePrompt = options.enhancePrompt || stdinData?.enhancePrompt;
@@ -736,48 +735,48 @@ async function generateImage(
       ? validateEnumOption(
           options.renderingSpeed ?? stdinData?.renderingSpeed ?? "",
           RENDERING_SPEEDS,
-          "rendering speed",
+          "rendering speed"
         )
-      : undefined,
+      : undefined
   );
   const expandPrompt = options.expandPrompt ?? stdinData?.expandPrompt;
   const ephemeral = options.ephemeral || stdinData?.ephemeral;
   const dryRunGenerateOptions: GenerateOptions = {
-    prompt,
-    model: modelId,
-    creative,
     aspect,
-    resolution,
-    numImages,
-    editImageUrls: editPaths,
-    ephemeral,
-    transparent: options.transparent || stdinData?.transparent,
-    inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
-    seed,
-    outputFormat,
     background,
-    quality,
-    negativePrompt,
-    style,
-    renderingSpeed,
-    guidanceScale,
-    numInferenceSteps,
-    raw,
-    enhancePrompt,
-    safetyTolerance,
-    enableWebSearch,
+    creative,
+    editImageUrls: editPaths,
     enableGoogleSearch,
     enableSafetyChecker,
-    syncMode,
-    imageSize,
-    imagePromptStrength,
-    maskImageUrl,
-    limitGenerations,
-    thinkingLevel,
+    enableWebSearch,
+    enhancePrompt,
+    ephemeral,
     expandPrompt,
+    guidanceScale,
+    imagePromptStrength,
+    imageSize,
+    inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
+    limitGenerations,
+    maskImageUrl,
+    model: modelId,
+    negativePrompt,
+    numImages,
+    numInferenceSteps,
+    outputFormat,
+    prompt,
+    quality,
+    raw,
+    renderingSpeed,
+    resolution,
+    safetyTolerance,
+    seed,
+    style,
+    syncMode,
+    thinkingLevel,
+    transparent: options.transparent || stdinData?.transparent,
   };
   const requestPreview = validateOption(emitOpts.format, () =>
-    buildGenerateBody(dryRunGenerateOptions),
+    buildGenerateBody(dryRunGenerateOptions)
   );
 
   // -- Dry run --
@@ -853,11 +852,11 @@ async function generateImage(
     console.log(chalk.bold(`\nModel: ${modelConfig.name}`));
     if (modelConfig.supportsAspect) {
       console.log(
-        `Aspect: ${aspect} | Resolution: ${modelConfig.supportsResolution ? resolution : "N/A"}`,
+        `Aspect: ${aspect} | Resolution: ${modelConfig.supportsResolution ? resolution : "N/A"}`
       );
     }
     console.log(
-      `Prompt: ${chalk.dim(requestPrompt.slice(0, 80))}${requestPrompt.length > 80 ? "..." : ""}`,
+      `Prompt: ${chalk.dim(requestPrompt.slice(0, 80))}${requestPrompt.length > 80 ? "..." : ""}`
     );
     console.log(`Est. cost: ${chalk.yellow(`$${cost.toFixed(3)}`)}`);
     if (ephemeral) {
@@ -874,38 +873,38 @@ async function generateImage(
 
   try {
     const result = await generate({
-      prompt,
-      creative,
-      model: modelId,
       aspect,
-      resolution,
-      numImages,
-      editImages: editPaths,
-      ephemeral,
-      transparent: options.transparent || stdinData?.transparent,
-      inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
-      seed,
       background,
-      quality,
-      outputFormat,
-      negativePrompt,
-      style,
-      renderingSpeed,
-      guidanceScale,
-      numInferenceSteps,
-      raw,
-      enhancePrompt,
-      safetyTolerance,
-      enableWebSearch,
+      creative,
+      editImages: editPaths,
       enableGoogleSearch,
       enableSafetyChecker,
-      syncMode,
-      imageSize,
-      imagePromptStrength,
-      maskImageUrl,
-      limitGenerations,
-      thinkingLevel,
+      enableWebSearch,
+      enhancePrompt,
+      ephemeral,
       expandPrompt,
+      guidanceScale,
+      imagePromptStrength,
+      imageSize,
+      inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
+      limitGenerations,
+      maskImageUrl,
+      model: modelId,
+      negativePrompt,
+      numImages,
+      numInferenceSteps,
+      outputFormat,
+      prompt,
+      quality,
+      raw,
+      renderingSpeed,
+      resolution,
+      safetyTolerance,
+      seed,
+      style,
+      syncMode,
+      thinkingLevel,
+      transparent: options.transparent || stdinData?.transparent,
     });
 
     spinner?.succeed("Generated!");
@@ -914,11 +913,11 @@ async function generateImage(
       result.images,
       outputPath,
       numImages,
-      { prompt: requestPrompt, model: modelId, aspect, resolution, editPaths },
+      { aspect, editPaths, model: modelId, prompt: requestPrompt, resolution },
       config,
       emitOpts,
       options.noOpen || stdinData?.noOpen,
-      !ephemeral,
+      !ephemeral
     );
 
     let payloadsDeleted = false;
@@ -934,8 +933,8 @@ async function generateImage(
           if (!isStructured(emitOpts.format)) {
             console.warn(
               chalk.yellow(
-                `Warning: saved locally, but fal payload deletion failed: ${payloadDeleteError}`,
-              ),
+                `Warning: saved locally, but fal payload deletion failed: ${payloadDeleteError}`
+              )
             );
           }
         }
@@ -967,12 +966,12 @@ async function generateImage(
           resolution,
           numImages,
         },
-        emitOpts,
+        emitOpts
       );
     }
-  } catch (err) {
+  } catch (error) {
     spinner?.fail("Generation failed");
-    handleError(err, "GENERATION_FAILED", emitOpts.format);
+    handleError(error, "GENERATION_FAILED", emitOpts.format);
   }
 }
 
@@ -981,7 +980,7 @@ async function generateVariations(
   options: CliOptions,
   stdinData: StdinPayload | null,
   config: Awaited<ReturnType<typeof loadConfig>>,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   const last = await getLastGeneration();
   if (!last) {
@@ -990,7 +989,7 @@ async function generateVariations(
         code: "NO_PREVIOUS",
         message: "No previous generation to create variations of",
       },
-      emitOpts.format,
+      emitOpts.format
     );
     exitForErrorCode("NO_PREVIOUS");
   }
@@ -998,9 +997,9 @@ async function generateVariations(
   const prompt = customPrompt || stdinData?.prompt || last.prompt;
   const numImages = validateOption(emitOpts.format, () =>
     parseIntegerOption(stdinData?.numImages ?? options.num ?? 4, "num images", {
-      min: 1,
       max: 4,
-    }),
+      min: 1,
+    })
   );
 
   if (!isStructured(emitOpts.format)) {
@@ -1012,15 +1011,15 @@ async function generateVariations(
     prompt,
     {
       ...options,
-      model: options.model || stdinData?.model || last.model,
       aspect: options.aspect || stdinData?.aspect || last.aspect,
+      model: options.model || stdinData?.model || last.model,
+      num: String(numImages),
       resolution:
         options.resolution || stdinData?.resolution || last.resolution,
-      num: String(numImages),
     },
     null, // Don't pass stdinData again (already merged into options)
     config,
-    emitOpts,
+    emitOpts
   );
 }
 
@@ -1029,7 +1028,7 @@ async function upscaleLast(
   options: CliOptions,
   stdinData: StdinPayload | null,
   config: Awaited<ReturnType<typeof loadConfig>>,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   let sourceImagePath: string;
   let sourcePrompt = "[upscale]";
@@ -1041,15 +1040,15 @@ async function upscaleLast(
   if (resolvedPath) {
     try {
       sourceImagePath = validateEditPath(resolvedPath);
-    } catch (err) {
-      handleError(err, "INVALID_IMAGE_PATH", emitOpts.format);
+    } catch (error) {
+      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
     }
   } else {
     const last = await getLastGeneration();
     if (!last) {
       emitError(
         { code: "NO_PREVIOUS", message: "No previous generation to upscale" },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("NO_PREVIOUS");
     }
@@ -1064,9 +1063,9 @@ async function upscaleLast(
       validateEnumOption(
         String(stdinData?.scale ?? options.scale ?? 2),
         SCALE_FACTORS,
-        "scale factor",
-      ),
-    ),
+        "scale factor"
+      )
+    )
   );
   const rawOutput = options.output || stdinData?.output;
   const outputPath = rawOutput
@@ -1076,13 +1075,13 @@ async function upscaleLast(
   // -- Dry run --
   if (options.dryRun) {
     const dryResult = {
-      dryRun: true,
       command: "upscale",
-      source: sourceImagePath,
-      scale: scaleFactor,
+      dryRun: true,
+      estimatedCost: 0.02,
       model: config.upscaler,
       output: outputPath,
-      estimatedCost: 0.02,
+      scale: scaleFactor,
+      source: sourceImagePath,
       valid: true,
     };
     emit(dryResult, emitOpts);
@@ -1143,46 +1142,46 @@ async function upscaleLast(
       console.log(
         chalk.green(`✓ Saved: ${actualOutputPath}`) +
           chalk.dim(
-            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
-          ),
+            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`
+          )
       );
     }
 
     await addGeneration({
-      id: generateId(),
-      prompt: `[upscale ${scaleFactor}x] ${sourcePrompt}`,
-      model: config.upscaler,
       aspect: sourceAspect,
-      resolution: sourceResolution,
-      output: resolve(actualOutputPath),
       cost: 0.02,
-      timestamp: new Date().toISOString(),
       editedFrom: sourceImagePath,
+      id: generateId(),
+      model: config.upscaler,
+      output: resolve(actualOutputPath),
+      prompt: `[upscale ${scaleFactor}x] ${sourcePrompt}`,
+      resolution: sourceResolution,
+      timestamp: new Date().toISOString(),
     });
 
     if (isStructured(emitOpts.format)) {
       emit(
         {
           command: "upscale",
-          path: resolve(actualOutputPath),
-          source: sourceImagePath,
-          scale: scaleFactor,
-          model: config.upscaler,
-          width: dims?.width,
-          height: dims?.height,
-          size,
           cost: 0.02,
+          height: dims?.height,
+          model: config.upscaler,
+          path: resolve(actualOutputPath),
+          scale: scaleFactor,
+          size,
+          source: sourceImagePath,
+          width: dims?.width,
         },
-        emitOpts,
+        emitOpts
       );
     }
 
     if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
       await openImage(actualOutputPath);
     }
-  } catch (err) {
+  } catch (error) {
     spinner?.fail("Upscale failed");
-    handleError(err, "UPSCALE_FAILED", emitOpts.format);
+    handleError(error, "UPSCALE_FAILED", emitOpts.format);
   }
 }
 
@@ -1190,7 +1189,7 @@ async function removeBackgroundLast(
   options: CliOptions,
   stdinData: StdinPayload | null,
   config: Awaited<ReturnType<typeof loadConfig>>,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   const last = await getLastGeneration();
   if (!last) {
@@ -1199,7 +1198,7 @@ async function removeBackgroundLast(
         code: "NO_PREVIOUS",
         message: "No previous generation to remove background from",
       },
-      emitOpts.format,
+      emitOpts.format
     );
     exitForErrorCode("NO_PREVIOUS");
   }
@@ -1212,12 +1211,12 @@ async function removeBackgroundLast(
   // -- Dry run --
   if (options.dryRun) {
     const dryResult = {
-      dryRun: true,
       command: "rmbg",
-      source: last.output,
+      dryRun: true,
+      estimatedCost: 0.02,
       model: config.backgroundRemover,
       output: outputPath,
-      estimatedCost: 0.02,
+      source: last.output,
       valid: true,
     };
     emit(dryResult, emitOpts);
@@ -1283,45 +1282,45 @@ async function removeBackgroundLast(
       console.log(
         chalk.green(`✓ Saved: ${actualOutputPath}`) +
           chalk.dim(
-            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
-          ),
+            ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`
+          )
       );
     }
 
     await addGeneration({
-      id: generateId(),
-      prompt: `[rmbg] ${last.prompt}`,
-      model: config.backgroundRemover,
       aspect: last.aspect,
-      resolution: last.resolution,
-      output: resolve(actualOutputPath),
       cost: 0.02,
-      timestamp: new Date().toISOString(),
       editedFrom: last.output,
+      id: generateId(),
+      model: config.backgroundRemover,
+      output: resolve(actualOutputPath),
+      prompt: `[rmbg] ${last.prompt}`,
+      resolution: last.resolution,
+      timestamp: new Date().toISOString(),
     });
 
     if (isStructured(emitOpts.format)) {
       emit(
         {
           command: "rmbg",
-          path: resolve(actualOutputPath),
-          source: last.output,
-          model: config.backgroundRemover,
-          width: dims?.width,
-          height: dims?.height,
-          size,
           cost: 0.02,
+          height: dims?.height,
+          model: config.backgroundRemover,
+          path: resolve(actualOutputPath),
+          size,
+          source: last.output,
+          width: dims?.width,
         },
-        emitOpts,
+        emitOpts
       );
     }
 
     if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
       await openImage(actualOutputPath);
     }
-  } catch (err) {
+  } catch (error) {
     spinner?.fail("Background removal failed");
-    handleError(err, "RMBG_FAILED", emitOpts.format);
+    handleError(error, "RMBG_FAILED", emitOpts.format);
   }
 }
 
@@ -1330,7 +1329,7 @@ async function generateVideo(
   options: CliOptions,
   stdinData: StdinPayload | null,
   _config: Awaited<ReturnType<typeof loadConfig>>,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   // Resolve source image
   const resolvedPath = imagePath || stdinData?.imagePath;
@@ -1339,8 +1338,8 @@ async function generateVideo(
   if (resolvedPath) {
     try {
       sourceImagePath = validateEditPath(resolvedPath);
-    } catch (err) {
-      handleError(err, "INVALID_IMAGE_PATH", emitOpts.format);
+    } catch (error) {
+      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
     }
   } else {
     const last = await getLastGeneration();
@@ -1351,7 +1350,7 @@ async function generateVideo(
           message:
             "No previous generation. Provide an image path: motif --video image.png",
         },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("NO_PREVIOUS");
     }
@@ -1364,8 +1363,8 @@ async function generateVideo(
     parseIntegerOption(
       stdinData?.duration ?? options.videoDuration ?? 5,
       "video duration",
-      { min: 3, max: 15 },
-    ),
+      { max: 15, min: 3 }
+    )
   );
   const generateAudio = stdinData?.generateAudio ?? !options.videoNoAudio;
 
@@ -1373,20 +1372,20 @@ async function generateVideo(
   const rawOutput = options.output || stdinData?.output;
   const outputPath = rawOutput
     ? validateOutput(emitOpts.format, rawOutput)
-    : `motif-video-${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "")}.mp4`;
+    : `motif-video-${new Date().toISOString().slice(0, 19).replaceAll(/[-:T]/g, "")}.mp4`;
 
   // -- Dry run --
   if (options.dryRun) {
     const dryResult = {
-      dryRun: true,
       command: "video",
-      source: sourceImagePath,
-      prompt,
+      dryRun: true,
       duration,
+      estimatedCost: cost,
       generateAudio,
       model: "kling",
       output: resolve(outputPath),
-      estimatedCost: cost,
+      prompt,
+      source: sourceImagePath,
       valid: true,
     };
     emit(dryResult, emitOpts);
@@ -1406,7 +1405,7 @@ async function generateVideo(
     console.log(chalk.bold("\nGenerating video..."));
     console.log(`Source: ${chalk.dim(sourceImagePath)}`);
     console.log(
-      `Duration: ${duration}s | Audio: ${generateAudio ? "yes" : "no"}`,
+      `Duration: ${duration}s | Audio: ${generateAudio ? "yes" : "no"}`
     );
     console.log(`Est. cost: ${chalk.yellow(`$${cost.toFixed(2)}`)}`);
   }
@@ -1417,10 +1416,10 @@ async function generateVideo(
 
   try {
     const job = await submitVideo({
-      imageUrl: sourceImagePath,
-      prompt,
       duration,
       generateAudio,
+      imageUrl: sourceImagePath,
+      prompt,
       ...(stdinData?.videoNegativePrompt && {
         negativePrompt: stdinData.videoNegativePrompt,
       }),
@@ -1430,17 +1429,17 @@ async function generateVideo(
       ...(stdinData?.videoCfgScale !== undefined && {
         cfgScale: validateOption(emitOpts.format, () =>
           parseNumberOption(stdinData.videoCfgScale ?? 0, "video CFG scale", {
-            min: 0,
             max: 1,
-          }),
+            min: 0,
+          })
         ),
       }),
       ...(options.videoCfgScale !== undefined && {
         cfgScale: validateOption(emitOpts.format, () =>
           parseNumberOption(options.videoCfgScale ?? 0, "video CFG scale", {
-            min: 0,
             max: 1,
-          }),
+            min: 0,
+          })
         ),
       }),
     });
@@ -1459,7 +1458,7 @@ async function generateVideo(
               ? `Queued${position ? ` (position ${position})` : ""}...`
               : "Generating video...";
         }
-      },
+      }
     );
 
     spinner?.succeed("Video generated!");
@@ -1472,42 +1471,42 @@ async function generateVideo(
     if (!isStructured(emitOpts.format)) {
       console.log(
         chalk.green(`✓ Saved: ${actualOutputPath}`) +
-          chalk.dim(` (${duration}s, ${fileSize})`),
+          chalk.dim(` (${duration}s, ${fileSize})`)
       );
     }
 
     // Record in history
     await addGeneration({
-      id: generateId(),
-      prompt: `[video ${duration}s] ${prompt}`,
-      model: "kling",
       aspect: "1:1",
-      resolution: "1K",
-      output: resolve(actualOutputPath),
       cost,
-      timestamp: new Date().toISOString(),
       editedFrom: sourceImagePath,
+      id: generateId(),
+      model: "kling",
+      output: resolve(actualOutputPath),
+      prompt: `[video ${duration}s] ${prompt}`,
+      resolution: "1K",
+      timestamp: new Date().toISOString(),
     });
 
     if (isStructured(emitOpts.format)) {
       emit(
         {
           command: "video",
-          path: resolve(actualOutputPath),
-          source: sourceImagePath,
-          prompt,
+          cost,
           duration,
           generateAudio,
           model: "kling",
+          path: resolve(actualOutputPath),
+          prompt,
           size: fileSize,
-          cost,
+          source: sourceImagePath,
         },
-        emitOpts,
+        emitOpts
       );
     }
-  } catch (err) {
+  } catch (error) {
     spinner?.fail("Video generation failed");
-    handleError(err, "VIDEO_FAILED", emitOpts.format);
+    handleError(error, "VIDEO_FAILED", emitOpts.format);
   }
 }
 
@@ -1529,17 +1528,17 @@ async function showLastGeneration(emitOpts: EmitOptions): Promise<void> {
         ...last,
         modelName: MODELS[last.model]?.name ?? last.model,
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
 
   console.log(chalk.bold("\nLast Generation:"));
   console.log(
-    `  Prompt: ${chalk.cyan(last.prompt.slice(0, 60))}${last.prompt.length > 60 ? "..." : ""}`,
+    `  Prompt: ${chalk.cyan(last.prompt.slice(0, 60))}${last.prompt.length > 60 ? "..." : ""}`
   );
   console.log(
-    `  Model:  ${chalk.green(MODELS[last.model]?.name || last.model)}`,
+    `  Model:  ${chalk.green(MODELS[last.model]?.name || last.model)}`
   );
   console.log(`  Aspect: ${last.aspect} | Resolution: ${last.resolution}`);
   console.log(`  Output: ${chalk.dim(last.output)}`);
@@ -1551,7 +1550,7 @@ async function showLastGeneration(emitOpts: EmitOptions): Promise<void> {
 
 export async function runCli(
   args: string[],
-  preloadedConfig?: Awaited<ReturnType<typeof loadConfig>>,
+  preloadedConfig?: Awaited<ReturnType<typeof loadConfig>>
 ): Promise<void> {
   const config = preloadedConfig ?? (await loadConfig());
 
@@ -1562,32 +1561,32 @@ export async function runCli(
     .argument("[prompt]", "Image generation prompt")
     .addHelpText(
       "after",
-      "\nCommands:\n  motif studio               Launch interactive terminal Studio",
+      "\nCommands:\n  motif studio               Launch interactive terminal Studio"
     )
     // Agent-first global flags
     .option(
       "--format <format>",
-      "Output format: json, human, ndjson (default: auto-detect from TTY)",
+      "Output format: json, human, ndjson (default: auto-detect from TTY)"
     )
     .option(
       "--fields <fields>",
-      "Comma-separated fields to include in output (e.g. --fields id,cost,path)",
+      "Comma-separated fields to include in output (e.g. --fields id,cost,path)"
     )
     .option("--dry-run", "Validate inputs without making API calls")
     .option(
       "--ephemeral",
-      "Save output locally, then delete fal request IO payloads when possible",
+      "Save output locally, then delete fal request IO payloads when possible"
     )
     // Model & generation
     .option(
       "-m, --model <model>",
-      `Model to use (${GENERATION_MODELS.join(", ")})`,
+      `Model to use (${GENERATION_MODELS.join(", ")})`
     )
     .option("-e, --edit <files...>", "Reference image(s) for editing")
     .option("--loose", "Use reference as loose inspiration (GPT only)")
     .option(
       "-a, --aspect <ratio>",
-      `Aspect ratio (${ASPECT_RATIOS.join(", ")})`,
+      `Aspect ratio (${ASPECT_RATIOS.join(", ")})`
     )
     .option("-r, --resolution <res>", `Resolution (${RESOLUTIONS.join(", ")})`)
     .option("-o, --output <file>", "Output filename")
@@ -1611,12 +1610,12 @@ export async function runCli(
     .option("--transparent", "Transparent background (PNG, GPT model only)")
     .option(
       "--background <mode>",
-      "GPT background mode: auto, transparent, opaque",
+      "GPT background mode: auto, transparent, opaque"
     )
     .option("--quality <quality>", "Image quality: auto, low, medium, high")
     .option(
       "--image-size <size>",
-      "Direct fal image_size override, e.g. auto, square_hd, 1536x1024",
+      "Direct fal image_size override, e.g. auto, square_hd, 1536x1024"
     )
     .option("--sync-mode", "Ask fal to return media as data URI")
     .option("--mask <url>", "Mask image URL for supported edit models")
@@ -1634,67 +1633,67 @@ export async function runCli(
     .option("--seed <n>", "Reproducible generation seed")
     .option(
       "--negative <text>",
-      "Negative prompt — what NOT to include (ideogram)",
+      "Negative prompt — what NOT to include (ideogram)"
     )
     .option(
       "--style <style>",
-      "Style preset: recraft 70+ styles (realistic_image, digital_illustration/pixel_art, etc.) or ideogram AUTO|GENERAL|REALISTIC|DESIGN",
+      "Style preset: recraft 70+ styles (realistic_image, digital_illustration/pixel_art, etc.) or ideogram AUTO|GENERAL|REALISTIC|DESIGN"
     )
     .option("--output-format <format>", "Output format: jpeg, png, webp")
     .option(
       "--safety <level>",
-      "Safety tolerance 1–6 (1=strictest) — selected Gemini/FLUX models",
+      "Safety tolerance 1–6 (1=strictest) — selected Gemini/FLUX models"
     )
     .option(
       "--web-search",
-      "Enable web search for generative context (banana2, banana, gemini3)",
+      "Enable web search for generative context (banana2, banana, gemini3)"
     )
     .option(
       "--google-search",
-      "Enable fal enable_google_search alias where supported",
+      "Enable fal enable_google_search alias where supported"
     )
     .option(
       "--limit-generations",
-      "Limit model-internal generation rounds where supported",
+      "Limit model-internal generation rounds where supported"
     )
     .option(
       "--disable-limit-generations",
-      "Disable model-internal generation limiting where supported",
+      "Disable model-internal generation limiting where supported"
     )
     .option(
       "--thinking <level>",
-      "Thinking level where supported: minimal, high",
+      "Thinking level where supported: minimal, high"
     )
     .option("--safety-checker", "Enable fal safety checker where supported")
     .option(
       "--disable-safety-checker",
-      "Disable fal safety checker where supported",
+      "Disable fal safety checker where supported"
     )
     .option(
       "--image-prompt-strength <n>",
-      "Reference image strength where supported, 0–1",
+      "Reference image strength where supported, 0–1"
     )
     .option(
       "--guidance-scale <n>",
-      "CFG guidance scale (controllable FLUX models, 1–20)",
+      "CFG guidance scale (controllable FLUX models, 1–20)"
     )
     .option(
       "--steps <n>",
-      "Inference step count (controllable FLUX models, 1–12)",
+      "Inference step count (controllable FLUX models, 1–12)"
     )
     .option("--raw", "Generate less processed, more natural output (flux only)")
     .option(
       "--enhance-prompt",
-      "Auto-enhance the prompt before generation (flux only)",
+      "Auto-enhance the prompt before generation (flux only)"
     )
     .option(
       "--rendering-speed <speed>",
-      "Speed/quality trade-off: TURBO, BALANCED, QUALITY (ideogram)",
+      "Speed/quality trade-off: TURBO, BALANCED, QUALITY (ideogram)"
     )
     .option("--expand-prompt", "Enable MagicPrompt prompt expansion (ideogram)")
     .option(
       "--no-expand-prompt",
-      "Disable MagicPrompt prompt expansion (ideogram)",
+      "Disable MagicPrompt prompt expansion (ideogram)"
     )
     // Creative direction
     .option("--recipe <id>", "Creative recipe id, e.g. cinematic")
@@ -1709,7 +1708,7 @@ export async function runCli(
     .option("--video-negative <text>", "Negative prompt for video generation")
     .option(
       "--video-cfg-scale <n>",
-      "CFG guidance scale for video (0–1, kling)",
+      "CFG guidance scale for video (0–1, kling)"
     )
     // Introspection & history
     .option("--describe [command]", "Show CLI schema as JSON (for agents)")
@@ -1725,8 +1724,8 @@ export async function runCli(
   // Resolve output format (TTY detection + explicit flag)
   const format = resolveFormat(options.format);
   const emitOpts: EmitOptions = {
-    format,
     fields: options.fields,
+    format,
     sanitize: true, // Always sanitize API responses
   };
 
@@ -1734,8 +1733,8 @@ export async function runCli(
   let stdinData: StdinPayload | null = null;
   try {
     stdinData = await readStdinJson<StdinPayload>();
-  } catch (err) {
-    handleError(err, "INVALID_STDIN", format);
+  } catch (error) {
+    handleError(error, "INVALID_STDIN", format);
   }
 
   // Stdin can specify a command
@@ -1750,8 +1749,8 @@ export async function runCli(
       typeof options.describe === "string" ? options.describe : undefined;
     try {
       runDescribe(cmdName, emitOpts);
-    } catch (err) {
-      handleError(err, "DESCRIBE_FAILED", format);
+    } catch (error) {
+      handleError(error, "DESCRIBE_FAILED", format);
     }
     return;
   }
@@ -1767,7 +1766,7 @@ export async function runCli(
           stdinData?.offset ??
           (options.offset ? Number.parseInt(options.offset, 10) : undefined),
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
@@ -1793,8 +1792,8 @@ export async function runCli(
     ) {
       try {
         getApiKey(config);
-      } catch (err) {
-        handleError(err, "MISSING_API_KEY", format);
+      } catch (error) {
+        handleError(error, "MISSING_API_KEY", format);
       }
     }
     await runToolPayload(
@@ -1810,7 +1809,7 @@ export async function runCli(
         scale: stdinData.scale?.toString(),
         tool: stdinData.tool,
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
@@ -1834,8 +1833,8 @@ export async function runCli(
   if (requiresApiKey) {
     try {
       getApiKey(config);
-    } catch (err) {
-      handleError(err, "MISSING_API_KEY", format);
+    } catch (error) {
+      handleError(error, "MISSING_API_KEY", format);
     }
   }
 
@@ -1870,7 +1869,7 @@ export async function runCli(
     if (!sanitized) {
       emitError(
         { code: "EMPTY_PROMPT", message: "Prompt is empty after sanitization" },
-        format,
+        format
       );
       exitForErrorCode("EMPTY_PROMPT");
     }

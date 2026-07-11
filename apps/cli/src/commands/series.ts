@@ -10,9 +10,9 @@
  */
 
 import { basename, resolve } from "node:path";
+
 import {
   ASPECT_RATIOS,
-  type CreativeDirection,
   enrichPrompt,
   estimateCost,
   GENERATION_MODELS,
@@ -20,17 +20,19 @@ import {
   RESOLUTIONS,
   sanitizePrompt,
 } from "@howells/motif-sdk";
+import type { CreativeDirection } from "@howells/motif-sdk";
 import chalk from "chalk";
 import { Command } from "commander";
 import ora from "ora";
+
 import { generate } from "../api/fal";
 import {
   addGenerations,
-  type Generation,
   generateId,
   getApiKey,
   loadConfig,
 } from "../utils/config";
+import type { Generation } from "../utils/config";
 import { resolveCreativeDirection } from "../utils/creative";
 import { exitForErrorCode, handleError } from "../utils/errors";
 import {
@@ -48,13 +50,13 @@ import {
   validateResourceId,
 } from "../utils/input";
 import {
-  type EmitOptions,
   emit,
   emitError,
   emitStream,
   isStructured,
   resolveFormat,
 } from "../utils/output";
+import type { EmitOptions } from "../utils/output";
 import {
   addRef,
   buildSeriesPrompt,
@@ -65,10 +67,10 @@ import {
   recordOutput,
   removeRef,
   resolveRefs,
-  type SeriesConfig,
   seriesOutputsDir,
   slugify,
 } from "../utils/series";
+import type { SeriesConfig } from "../utils/series";
 
 // -- Helpers --
 
@@ -86,18 +88,18 @@ const SERIES_RUN_SCENE_FOCI = [
 
 function seriesAsJson(config: SeriesConfig): Record<string, unknown> {
   return {
-    id: config.id,
-    name: config.name,
-    slug: config.slug,
-    model: config.model,
-    modelName: MODELS[config.model]?.name ?? config.model,
-    stylePrompt: config.stylePrompt,
+    created: config.created,
     defaultAspect: config.defaultAspect,
     defaultResolution: config.defaultResolution,
-    refCount: config.refs.length,
+    id: config.id,
+    model: config.model,
+    modelName: MODELS[config.model]?.name ?? config.model,
+    name: config.name,
     outputCount: config.outputs.length,
+    refCount: config.refs.length,
     refs: config.refs,
-    created: config.created,
+    slug: config.slug,
+    stylePrompt: config.stylePrompt,
     updated: config.updated,
   };
 }
@@ -105,8 +107,8 @@ function seriesAsJson(config: SeriesConfig): Record<string, unknown> {
 function validateSeriesOption<T>(emitOpts: EmitOptions, fn: () => T): T {
   try {
     return fn();
-  } catch (err) {
-    handleError(err, "INVALID_OPTION", emitOpts.format);
+  } catch (error) {
+    handleError(error, "INVALID_OPTION", emitOpts.format);
   }
 }
 
@@ -119,7 +121,7 @@ function splitRefTags(refs: string | undefined): string[] | undefined {
 
 export function buildSeriesRunStylePrompt(
   theme: string,
-  style?: string,
+  style?: string
 ): string {
   const base = style?.trim();
   if (base) {
@@ -152,24 +154,24 @@ export async function loadOrCreateRunSeries(options: {
   theme: string;
 }): Promise<SeriesConfig> {
   if (options.series) {
-    return loadSeries(options.series);
+    return await loadSeries(options.series);
   }
 
   const name = options.theme;
   const slug = slugify(name);
   try {
     return await createSeries({
-      name,
-      stylePrompt: options.stylePrompt,
-      model: options.model,
       defaultAspect: options.aspect,
       defaultResolution: options.resolution,
+      model: options.model,
+      name,
+      stylePrompt: options.stylePrompt,
     });
-  } catch (err) {
-    if (String((err as Error).message).includes("already exists")) {
-      return loadSeries(slug);
+  } catch (error) {
+    if (String((error as Error).message).includes("already exists")) {
+      return await loadSeries(slug);
     }
-    throw err;
+    throw error;
   }
 }
 
@@ -184,7 +186,7 @@ async function cmdCreate(
     aspect?: string;
     resolution?: string;
   },
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     if (opts.model) {
@@ -192,27 +194,27 @@ async function cmdCreate(
     }
     const model = opts.model
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.model ?? "", GENERATION_MODELS, "model"),
+          validateEnumOption(opts.model ?? "", GENERATION_MODELS, "model")
         )
       : undefined;
     const defaultAspect = opts.aspect
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect"),
+          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : undefined;
     const defaultResolution = opts.resolution
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution"),
+          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
       : undefined;
 
     const config = await createSeries({
-      name,
-      stylePrompt: opts.style,
-      model,
       defaultAspect,
       defaultResolution,
       fromImage: opts.from ? resolve(opts.from) : undefined,
+      model,
+      name,
+      stylePrompt: opts.style,
     });
 
     if (isStructured(emitOpts.format)) {
@@ -221,21 +223,21 @@ async function cmdCreate(
       console.log(chalk.green(`✓ Created series: ${config.name}`));
       console.log(`  Slug:  ${chalk.cyan(config.slug)}`);
       console.log(
-        `  Model: ${chalk.dim(MODELS[config.model]?.name ?? config.model)}`,
+        `  Model: ${chalk.dim(MODELS[config.model]?.name ?? config.model)}`
       );
       if (config.stylePrompt) {
         console.log(
-          `  Style: ${chalk.dim(config.stylePrompt.slice(0, 80))}...`,
+          `  Style: ${chalk.dim(config.stylePrompt.slice(0, 80))}...`
         );
       }
       if (config.refs.length > 0) {
         console.log(
-          `  Refs:  ${config.refs.map((r) => `${r.tag}:${r.filename}`).join(", ")}`,
+          `  Refs:  ${config.refs.map((r) => `${r.tag}:${r.filename}`).join(", ")}`
         );
       }
     }
-  } catch (err) {
-    handleError(err, "SERIES_CREATE_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_CREATE_FAILED", emitOpts.format);
   }
 }
 
@@ -254,7 +256,7 @@ async function cmdList(emitOpts: EmitOptions): Promise<void> {
         series: series.map(seriesAsJson),
         total: series.length,
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
@@ -262,8 +264,8 @@ async function cmdList(emitOpts: EmitOptions): Promise<void> {
   if (series.length === 0) {
     console.log(
       chalk.yellow(
-        'No series found. Create one with: motif series create "My Series"',
-      ),
+        'No series found. Create one with: motif series create "My Series"'
+      )
     );
     return;
   }
@@ -272,7 +274,7 @@ async function cmdList(emitOpts: EmitOptions): Promise<void> {
   for (const s of series) {
     console.log(`  ${chalk.cyan(s.slug)} — ${s.name}`);
     console.log(
-      `    ${chalk.dim(`${MODELS[s.model]?.name ?? s.model} | ${s.refs.length} refs | ${s.outputs.length} outputs | ${new Date(s.updated).toLocaleDateString()}`)}`,
+      `    ${chalk.dim(`${MODELS[s.model]?.name ?? s.model} | ${s.refs.length} refs | ${s.outputs.length} outputs | ${new Date(s.updated).toLocaleDateString()}`)}`
     );
   }
 }
@@ -288,7 +290,7 @@ async function cmdShow(slug: string, emitOpts: EmitOptions): Promise<void> {
           ...seriesAsJson(config),
           outputs: config.outputs,
         },
-        emitOpts,
+        emitOpts
       );
       return;
     }
@@ -297,10 +299,10 @@ async function cmdShow(slug: string, emitOpts: EmitOptions): Promise<void> {
     console.log(`  ID:     ${chalk.dim(config.id)}`);
     console.log(`  Slug:   ${chalk.cyan(config.slug)}`);
     console.log(
-      `  Model:  ${chalk.green(MODELS[config.model]?.name ?? config.model)}`,
+      `  Model:  ${chalk.green(MODELS[config.model]?.name ?? config.model)}`
     );
     console.log(
-      `  Aspect: ${config.defaultAspect} | Resolution: ${config.defaultResolution}`,
+      `  Aspect: ${config.defaultAspect} | Resolution: ${config.defaultResolution}`
     );
     if (config.stylePrompt) {
       console.log(`  Style:  ${chalk.dim(config.stylePrompt)}`);
@@ -320,15 +322,15 @@ async function cmdShow(slug: string, emitOpts: EmitOptions): Promise<void> {
       console.log(chalk.bold(`\n  Outputs (${config.outputs.length}):`));
       for (const out of config.outputs.slice(-5)) {
         console.log(
-          `    ${chalk.dim(out.filename)} — ${out.prompt.slice(0, 50)}... ($${out.cost.toFixed(3)})`,
+          `    ${chalk.dim(out.filename)} — ${out.prompt.slice(0, 50)}... ($${out.cost.toFixed(3)})`
         );
       }
       if (config.outputs.length > 5) {
         console.log(chalk.dim(`    ... and ${config.outputs.length - 5} more`));
       }
     }
-  } catch (err) {
-    handleError(err, "SERIES_NOT_FOUND", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_NOT_FOUND", emitOpts.format);
   }
 }
 
@@ -336,48 +338,48 @@ async function cmdRefAdd(
   slug: string,
   imagePath: string,
   opts: { tag: string; description?: string },
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     const ref = await addRef(
       slug,
       resolve(imagePath),
       opts.tag,
-      opts.description ?? "",
+      opts.description ?? ""
     );
 
     if (isStructured(emitOpts.format)) {
-      emit({ command: "series-ref-add", series: slug, ref }, emitOpts);
+      emit({ command: "series-ref-add", ref, series: slug }, emitOpts);
     } else {
       console.log(
         chalk.green(
-          `✓ Added reference: ${chalk.yellow(ref.tag)} → ${ref.filename}`,
-        ),
+          `✓ Added reference: ${chalk.yellow(ref.tag)} → ${ref.filename}`
+        )
       );
     }
-  } catch (err) {
-    handleError(err, "SERIES_REF_ADD_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_REF_ADD_FAILED", emitOpts.format);
   }
 }
 
 async function cmdRefRemove(
   slug: string,
   filename: string,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     await removeRef(slug, filename);
 
     if (isStructured(emitOpts.format)) {
       emit(
-        { command: "series-ref-remove", series: slug, removed: filename },
-        emitOpts,
+        { command: "series-ref-remove", removed: filename, series: slug },
+        emitOpts
       );
     } else {
       console.log(chalk.green(`✓ Removed reference: ${filename}`));
     }
-  } catch (err) {
-    handleError(err, "SERIES_REF_REMOVE_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_REF_REMOVE_FAILED", emitOpts.format);
   }
 }
 
@@ -403,7 +405,7 @@ async function cmdGenerate(
     resolution?: string;
     shot?: string;
   },
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     const config = await loadSeries(slug);
@@ -413,7 +415,7 @@ async function cmdGenerate(
     if (!sanitized) {
       emitError(
         { code: "EMPTY_PROMPT", message: "Prompt is empty after sanitization" },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("EMPTY_PROMPT");
     }
@@ -421,7 +423,7 @@ async function cmdGenerate(
     const creative = resolveCreativeDirection(opts, opts.creative);
     const creativeResult = creative
       ? validateSeriesOption(emitOpts, () =>
-          enrichPrompt({ prompt: sanitized, creative }),
+          enrichPrompt({ creative, prompt: sanitized })
         )
       : undefined;
     const requestPrompt = creativeResult?.prompt ?? sanitized;
@@ -439,16 +441,16 @@ async function cmdGenerate(
     const modelId = opts.model ?? config.model;
     const aspect = opts.aspect
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect"),
+          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : config.defaultAspect;
     const resolution = opts.resolution
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution"),
+          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
       : config.defaultResolution;
     const numImages = validateSeriesOption(emitOpts, () =>
-      parseIntegerOption(opts.num ?? "1", "num images", { min: 1, max: 4 }),
+      parseIntegerOption(opts.num ?? "1", "num images", { max: 4, min: 1 })
     );
 
     const modelConfig = MODELS[modelId];
@@ -456,10 +458,10 @@ async function cmdGenerate(
       emitError(
         {
           code: "UNKNOWN_MODEL",
-          message: `Unknown model: ${modelId}`,
           details: { available: GENERATION_MODELS },
+          message: `Unknown model: ${modelId}`,
         },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("UNKNOWN_MODEL");
     }
@@ -472,7 +474,7 @@ async function cmdGenerate(
           code: "TOO_MANY_REFERENCES",
           message: `${modelConfig.name} supports ${maxRefs} references, series has ${refPaths.length}. Use --refs to select specific tags.`,
         },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("TOO_MANY_REFERENCES");
     }
@@ -531,7 +533,7 @@ async function cmdGenerate(
     if (!isStructured(emitOpts.format)) {
       console.log(chalk.bold(`\nSeries: ${config.name}`));
       console.log(
-        `Model: ${chalk.green(modelConfig.name)} | Refs: ${refPaths.length}`,
+        `Model: ${chalk.green(modelConfig.name)} | Refs: ${refPaths.length}`
       );
       console.log(`Prompt: ${chalk.dim(fullPrompt.slice(0, 100))}...`);
       console.log(`Cost: ${chalk.yellow(`~$${cost.toFixed(3)}`)}`);
@@ -542,34 +544,35 @@ async function cmdGenerate(
       : ora("Generating...").start();
 
     const result = await generate({
-      prompt: fullPrompt,
-      model: modelId,
       aspect,
-      resolution,
-      numImages,
       editImages: refPaths.length > 0 ? refPaths : undefined,
+      model: modelId,
+      numImages,
+      prompt: fullPrompt,
+      resolution,
     });
 
     spinner?.succeed("Generated!");
 
     // Build paths and download all images in parallel
     const paths = result.images.map((_, i) =>
-      numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath,
+      numImages > 1 ? indexedOutputPath(outputPath, i) : outputPath
     );
     const actualPaths = await Promise.all(
-      result.images.map((image, i) =>
-        // biome-ignore lint/style/noNonNullAssertion: index guaranteed within map bounds
-        downloadImage(image.url, paths[i]!),
-      ),
+      result.images.map(
+        async (image, i) =>
+          // biome-ignore lint/style/noNonNullAssertion: index guaranteed within map bounds
+          await downloadImage(image.url, paths[i]!)
+      )
     );
 
     // Collect metadata and build history records
-    const savedImages: Array<{
+    const savedImages: {
       path: string;
       width?: number;
       height?: number;
       size: string;
-    }> = [];
+    }[] = [];
     const generations: Generation[] = [];
     const now = new Date().toISOString();
 
@@ -580,29 +583,29 @@ async function cmdGenerate(
       const size = getFileSize(path);
 
       savedImages.push({
-        path: resolve(path),
-        width: dims?.width,
         height: dims?.height,
+        path: resolve(path),
         size,
+        width: dims?.width,
       });
 
       if (!isStructured(emitOpts.format)) {
         console.log(
           chalk.green(`✓ Saved: ${path}`) +
             chalk.dim(
-              ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`,
-            ),
+              ` (${dims ? `${dims.width}x${dims.height}` : "?"}, ${size})`
+            )
         );
       }
 
       generations.push({
-        id: generateId(),
-        prompt: fullPrompt,
-        model: modelId,
         aspect,
-        resolution,
-        output: resolve(path),
         cost: estimateCost(modelId, resolution, 1),
+        id: generateId(),
+        model: modelId,
+        output: resolve(path),
+        prompt: fullPrompt,
+        resolution,
         timestamp: now,
       });
     }
@@ -612,13 +615,13 @@ async function cmdGenerate(
 
     // Record in series history
     await recordOutput(slug, {
+      aspect,
+      cost,
       filename: basename(actualPaths[0] ?? outputFilename),
+      model: modelId,
       prompt: fullPrompt,
       refsUsed: refTags ?? config.refs.map((r) => r.tag),
-      model: modelId,
-      aspect,
       resolution,
-      cost,
       timestamp: new Date().toISOString(),
     });
 
@@ -641,15 +644,15 @@ async function cmdGenerate(
           }),
           outputIndex: config.outputs.length + 1,
         },
-        emitOpts,
+        emitOpts
       );
     }
 
     if (appConfig.openAfterGenerate && !opts.noOpen && savedImages[0]) {
       openImage(savedImages[0].path);
     }
-  } catch (err) {
-    handleError(err, "SERIES_GENERATE_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_GENERATE_FAILED", emitOpts.format);
   }
 }
 
@@ -675,14 +678,14 @@ async function cmdRun(
     shot?: string;
     style?: string;
   },
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     const sanitizedTheme = sanitizePrompt(theme);
     if (!sanitizedTheme) {
       emitError(
         { code: "EMPTY_PROMPT", message: "Theme is empty after sanitization" },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("EMPTY_PROMPT");
     }
@@ -698,28 +701,28 @@ async function cmdRun(
       emitError(
         {
           code: "UNKNOWN_MODEL",
-          message: `Unknown model: ${modelId}`,
           details: { available: GENERATION_MODELS },
+          message: `Unknown model: ${modelId}`,
         },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("UNKNOWN_MODEL");
     }
 
     const count = validateSeriesOption(emitOpts, () =>
       parseIntegerOption(opts.count ?? "4", "series run count", {
-        min: 1,
         max: SERIES_RUN_MAX_COUNT,
-      }),
+        min: 1,
+      })
     );
     const aspect = opts.aspect
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect"),
+          validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : (existingSeries?.defaultAspect ?? "1:1");
     const resolution = opts.resolution
       ? validateSeriesOption(emitOpts, () =>
-          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution"),
+          validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
       : (existingSeries?.defaultResolution ?? "2K");
     const stylePrompt =
@@ -736,7 +739,7 @@ async function cmdRun(
           code: "TOO_MANY_REFERENCES",
           message: `${modelConfig.name} supports ${maxRefs} references, series run selected ${refPaths.length}. Use --refs to select fewer tags.`,
         },
-        emitOpts.format,
+        emitOpts.format
       );
       exitForErrorCode("TOO_MANY_REFERENCES");
     }
@@ -746,16 +749,16 @@ async function cmdRun(
     const enrichedScenes = baseScenePrompts.map((baseScenePrompt) =>
       creative
         ? validateSeriesOption(emitOpts, () =>
-            enrichPrompt({ prompt: baseScenePrompt, creative }),
+            enrichPrompt({ creative, prompt: baseScenePrompt })
           )
-        : undefined,
+        : undefined
     );
     const scenePrompts = baseScenePrompts.map(
       (baseScenePrompt, index) =>
-        enrichedScenes[index]?.prompt ?? baseScenePrompt,
+        enrichedScenes[index]?.prompt ?? baseScenePrompt
     );
     const fullPrompts = scenePrompts.map((scenePrompt) =>
-      stylePrompt ? `${stylePrompt}. ${scenePrompt}` : scenePrompt,
+      stylePrompt ? `${stylePrompt}. ${scenePrompt}` : scenePrompt
     );
     const estimatedCost = estimateCost(modelId, resolution, count);
     const canUseAnchorReference =
@@ -788,12 +791,12 @@ async function cmdRun(
             baseScenePrompt: baseScenePrompts[index],
             enrichedScenePrompt: scenePrompt,
             index: index + 1,
-            scenePrompt,
             prompt: fullPrompts[index],
+            scenePrompt,
           })),
           valid: true,
         },
-        emitOpts,
+        emitOpts
       );
       if (!isStructured(emitOpts.format)) {
         console.log(chalk.bold(`\n🔍 Dry run — series run\n`));
@@ -801,7 +804,7 @@ async function cmdRun(
         console.log(`  Count:  ${count}`);
         console.log(`  Model:  ${chalk.green(modelConfig.name)}`);
         console.log(
-          `  Cost:   ${chalk.yellow(`~$${estimatedCost.toFixed(3)}`)}`,
+          `  Cost:   ${chalk.yellow(`~$${estimatedCost.toFixed(3)}`)}`
         );
       }
       return;
@@ -822,13 +825,13 @@ async function cmdRun(
     const spinner = isStructured(emitOpts.format)
       ? null
       : ora(`Generating ${count} image series...`).start();
-    const savedImages: Array<{
+    const savedImages: {
       path: string;
       scenePrompt: string;
       width?: number;
       height?: number;
       size: string;
-    }> = [];
+    }[] = [];
     const generations: Generation[] = [];
     const now = new Date().toISOString();
     let anchorPath: string | undefined;
@@ -844,12 +847,12 @@ async function cmdRun(
             ? refPaths
             : undefined;
       const result = await generate({
-        prompt: fullPrompts[i] ?? sanitizedTheme,
-        model: modelId,
         aspect,
-        resolution,
-        numImages: 1,
         editImages,
+        model: modelId,
+        numImages: 1,
+        prompt: fullPrompts[i] ?? sanitizedTheme,
+        resolution,
       });
       const image = result.images[0];
       if (!image) {
@@ -862,33 +865,33 @@ async function cmdRun(
       const dims = await getImageDimensions(actualOutputPath);
       const size = getFileSize(actualOutputPath);
       savedImages.push({
+        height: dims?.height,
         path: resolve(actualOutputPath),
         scenePrompt: scenePrompts[i] ?? sanitizedTheme,
-        width: dims?.width,
-        height: dims?.height,
         size,
+        width: dims?.width,
       });
       generations.push({
-        id: generateId(),
-        prompt: fullPrompts[i] ?? sanitizedTheme,
-        model: modelId,
         aspect,
-        resolution,
-        output: resolve(actualOutputPath),
         cost: estimateCost(modelId, resolution, 1),
+        id: generateId(),
+        model: modelId,
+        output: resolve(actualOutputPath),
+        prompt: fullPrompts[i] ?? sanitizedTheme,
+        resolution,
         timestamp: now,
       });
       await recordOutput(config.slug, {
+        aspect,
+        cost: estimateCost(modelId, resolution, 1),
         filename: basename(actualOutputPath),
+        model: modelId,
         prompt: fullPrompts[i] ?? sanitizedTheme,
         refsUsed: [
           ...(refTags ?? config.refs.map((ref) => ref.tag)),
           ...(anchorPath && i > 0 ? ["series-anchor"] : []),
         ],
-        model: modelId,
-        aspect,
         resolution,
-        cost: estimateCost(modelId, resolution, 1),
         timestamp: new Date().toISOString(),
       });
     }
@@ -899,28 +902,28 @@ async function cmdRun(
     if (isStructured(emitOpts.format)) {
       emit(
         {
+          aspect,
           command: "series-run",
+          cost: estimatedCost,
           count,
           dryRun: false,
-          series: config.slug,
-          theme: sanitizedTheme,
-          stylePrompt,
+          images: savedImages,
           model: modelId,
           modelName: modelConfig.name,
-          aspect,
           resolution,
-          images: savedImages,
-          cost: estimatedCost,
+          series: config.slug,
+          stylePrompt,
+          theme: sanitizedTheme,
         },
-        emitOpts,
+        emitOpts
       );
     }
 
     if (appConfig.openAfterGenerate && !opts.noOpen && savedImages[0]) {
       openImage(savedImages[0].path);
     }
-  } catch (err) {
-    handleError(err, "SERIES_GENERATE_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_GENERATE_FAILED", emitOpts.format);
   }
 }
 
@@ -930,28 +933,28 @@ async function cmdDelete(slug: string, emitOpts: EmitOptions): Promise<void> {
     await deleteSeries(slug);
 
     if (isStructured(emitOpts.format)) {
-      emit({ command: "series-delete", slug, name: config.name }, emitOpts);
+      emit({ command: "series-delete", name: config.name, slug }, emitOpts);
     } else {
       console.log(chalk.green(`✓ Deleted series: ${config.name}`));
     }
-  } catch (err) {
-    handleError(err, "SERIES_DELETE_FAILED", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_DELETE_FAILED", emitOpts.format);
   }
 }
 
 async function cmdHistory(
   slug: string,
   opts: { limit?: string; offset?: string },
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     const config = await loadSeries(slug);
     const all = [...config.outputs].reverse();
     const limit = validateSeriesOption(emitOpts, () =>
-      parseIntegerOption(opts.limit ?? "10", "limit", { min: 1 }),
+      parseIntegerOption(opts.limit ?? "10", "limit", { min: 1 })
     );
     const offset = validateSeriesOption(emitOpts, () =>
-      parseIntegerOption(opts.offset ?? "0", "offset", { min: 0 }),
+      parseIntegerOption(opts.offset ?? "0", "offset", { min: 0 })
     );
     const page = all.slice(offset, offset + limit);
 
@@ -964,14 +967,14 @@ async function cmdHistory(
       emit(
         {
           command: "series-history",
-          series: slug,
-          outputs: page,
-          total: all.length,
-          offset,
-          limit,
           hasMore: offset + limit < all.length,
+          limit,
+          offset,
+          outputs: page,
+          series: slug,
+          total: all.length,
         },
-        emitOpts,
+        emitOpts
       );
       return;
     }
@@ -983,20 +986,20 @@ async function cmdHistory(
 
     console.log(
       chalk.bold(
-        `\n${config.name} — Outputs (${offset + 1}-${offset + page.length} of ${all.length}):\n`,
-      ),
+        `\n${config.name} — Outputs (${offset + 1}-${offset + page.length} of ${all.length}):\n`
+      )
     );
     for (const out of page) {
       console.log(`  ${chalk.dim(out.filename)}`);
       console.log(
-        `    ${chalk.cyan(out.prompt.slice(0, 70))}${out.prompt.length > 70 ? "..." : ""}`,
+        `    ${chalk.cyan(out.prompt.slice(0, 70))}${out.prompt.length > 70 ? "..." : ""}`
       );
       console.log(
-        `    ${chalk.dim(`$${out.cost.toFixed(3)} | ${out.model} | refs: ${out.refsUsed.join(",")}`)}`,
+        `    ${chalk.dim(`$${out.cost.toFixed(3)} | ${out.model} | refs: ${out.refsUsed.join(",")}`)}`
       );
     }
-  } catch (err) {
-    handleError(err, "SERIES_NOT_FOUND", emitOpts.format);
+  } catch (error) {
+    handleError(error, "SERIES_NOT_FOUND", emitOpts.format);
   }
 }
 
@@ -1049,7 +1052,7 @@ export async function runSeries(args: string[]): Promise<void> {
     args.find((a) => a.startsWith("--format="))?.split("=")?.[1] ??
       (args.includes("--format")
         ? args[args.indexOf("--format") + 1]
-        : undefined),
+        : undefined)
   );
   const fields =
     args.find((a) => a.startsWith("--fields="))?.split("=")?.[1] ??
@@ -1057,7 +1060,7 @@ export async function runSeries(args: string[]): Promise<void> {
       ? args[args.indexOf("--fields") + 1]
       : undefined);
 
-  const emitOpts: EmitOptions = { format, fields, sanitize: true };
+  const emitOpts: EmitOptions = { fields, format, sanitize: true };
 
   // Strip global flags before passing to Commander
   const filteredArgs = args.filter((a, i) => {
@@ -1116,7 +1119,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .option(
       "-t, --tag <tag>",
       "Tag for the reference (e.g. character, location)",
-      "style",
+      "style"
     )
     .option("-d, --description <desc>", "Description of the reference")
     .action(async (slug: string, image: string, opts) => {
@@ -1135,7 +1138,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .description("Generate an image in a series with consistent styling")
     .option(
       "--refs <tags>",
-      "Comma-separated ref tags to include (default: all)",
+      "Comma-separated ref tags to include (default: all)"
     )
     .option("-a, --aspect <ratio>", "Aspect ratio (overrides series default)")
     .option("-r, --resolution <res>", "Resolution (overrides series default)")
@@ -1164,7 +1167,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("--style <prompt>", "Shared style prompt for the run")
     .option(
       "--refs <tags>",
-      "Comma-separated ref tags to include from an existing series",
+      "Comma-separated ref tags to include from an existing series"
     )
     .option("-a, --aspect <ratio>", "Aspect ratio")
     .option("-r, --resolution <res>", "Resolution")
@@ -1204,58 +1207,64 @@ export async function runSeries(args: string[]): Promise<void> {
 
 async function handleStdinCommand(
   data: SeriesStdinPayload,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   switch (data.command) {
-    case "series-create":
+    case "series-create": {
       if (!data.name) {
         throw new Error("name is required");
       }
       await cmdCreate(
         data.name,
         {
-          from: data.from,
-          style: data.stylePrompt,
-          model: data.model,
           aspect: data.aspect,
+          from: data.from,
+          model: data.model,
           resolution: data.resolution,
+          style: data.stylePrompt,
         },
-        emitOpts,
+        emitOpts
       );
       break;
-    case "series-list":
+    }
+    case "series-list": {
       await cmdList(emitOpts);
       break;
-    case "series-show":
+    }
+    case "series-show": {
       if (!data.series) {
         throw new Error("series slug is required");
       }
       await cmdShow(data.series, emitOpts);
       break;
-    case "series-delete":
+    }
+    case "series-delete": {
       if (!data.series) {
         throw new Error("series slug is required");
       }
       await cmdDelete(data.series, emitOpts);
       break;
-    case "series-ref-add":
+    }
+    case "series-ref-add": {
       if (!(data.series && data.image && data.tag)) {
         throw new Error("series, image, and tag are required");
       }
       await cmdRefAdd(
         data.series,
         data.image,
-        { tag: data.tag, description: data.description },
-        emitOpts,
+        { description: data.description, tag: data.tag },
+        emitOpts
       );
       break;
-    case "series-ref-remove":
+    }
+    case "series-ref-remove": {
       if (!(data.series && data.filename)) {
         throw new Error("series and filename are required");
       }
       await cmdRefRemove(data.series, data.filename, emitOpts);
       break;
-    case "series-generate":
+    }
+    case "series-generate": {
       if (!(data.series && data.prompt)) {
         throw new Error("series and prompt are required");
       }
@@ -1263,45 +1272,47 @@ async function handleStdinCommand(
         data.series,
         data.prompt,
         {
-          refs: data.refs,
-          model: data.model,
           aspect: data.aspect,
-          resolution: data.resolution,
-          output: data.output,
-          num: data.numImages ? String(data.numImages) : undefined,
-          noOpen: data.noOpen,
-          dryRun: data.dryRun,
           creative: data.creative,
+          dryRun: data.dryRun,
+          model: data.model,
+          noOpen: data.noOpen,
+          num: data.numImages ? String(data.numImages) : undefined,
+          output: data.output,
+          refs: data.refs,
+          resolution: data.resolution,
         },
-        emitOpts,
+        emitOpts
       );
       break;
-    case "series-run":
+    }
+    case "series-run": {
       if (!(data.theme || data.prompt)) {
         throw new Error("theme is required");
       }
       await cmdRun(
         data.theme ?? data.prompt ?? "",
         {
-          refs: data.refs,
-          model: data.model,
           aspect: data.aspect,
-          resolution: data.resolution,
           count: data.count
             ? String(data.count)
             : data.numImages
               ? String(data.numImages)
               : undefined,
-          noOpen: data.noOpen,
-          dryRun: data.dryRun,
           creative: data.creative,
+          dryRun: data.dryRun,
+          model: data.model,
+          noOpen: data.noOpen,
+          refs: data.refs,
+          resolution: data.resolution,
           series: data.series,
           style: data.stylePrompt,
         },
-        emitOpts,
+        emitOpts
       );
       break;
-    case "series-history":
+    }
+    case "series-history": {
       if (!data.series) {
         throw new Error("series slug is required");
       }
@@ -1311,10 +1322,12 @@ async function handleStdinCommand(
           limit: data.limit ? String(data.limit) : undefined,
           offset: data.offset ? String(data.offset) : undefined,
         },
-        emitOpts,
+        emitOpts
       );
       break;
-    default:
+    }
+    default: {
       throw new Error(`Unknown series command: ${data.command}`);
+    }
   }
 }

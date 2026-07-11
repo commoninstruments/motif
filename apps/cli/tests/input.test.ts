@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   parseIntegerOption,
   parseNumberOption,
@@ -12,12 +13,12 @@ import {
 describe("sanitizePrompt", () => {
   it("passes through normal text", () => {
     expect(sanitizePrompt("a cat on a windowsill")).toBe(
-      "a cat on a windowsill",
+      "a cat on a windowsill"
     );
   });
 
   it("strips control characters", () => {
-    expect(sanitizePrompt("hello\x00world\x07")).toBe("helloworld");
+    expect(sanitizePrompt("hello\u0000world\u0007")).toBe("helloworld");
   });
 
   it("preserves newlines", () => {
@@ -33,7 +34,7 @@ describe("sanitizePrompt", () => {
   });
 
   it("returns empty string for control-only input", () => {
-    expect(sanitizePrompt("\x00\x01\x02")).toBe("");
+    expect(sanitizePrompt("\u0000\u0001\u0002")).toBe("");
   });
 });
 
@@ -46,43 +47,43 @@ describe("validateResourceId", () => {
 
   it("rejects path traversal with ..", () => {
     expect(() => validateResourceId("../etc/passwd", "model")).toThrow(
-      "path traversal",
+      "path traversal"
     );
   });
 
   it("rejects forward slashes", () => {
     expect(() => validateResourceId("fal-ai/gpt-image-1", "model")).toThrow(
-      "path traversal",
+      "path traversal"
     );
   });
 
   it("rejects backslashes", () => {
     expect(() => validateResourceId("foo\\bar", "model")).toThrow(
-      "path traversal",
+      "path traversal"
     );
   });
 
   it("rejects percent-encoded traversal", () => {
     expect(() => validateResourceId("%2e%2e%2fetc", "model")).toThrow(
-      "percent-encoded",
+      "percent-encoded"
     );
     expect(() => validateResourceId("foo%2Fbar", "model")).toThrow(
-      "percent-encoded",
+      "percent-encoded"
     );
   });
 
   it("rejects embedded query params", () => {
     expect(() => validateResourceId("model?version=2", "model")).toThrow(
-      "query params",
+      "query params"
     );
     expect(() => validateResourceId("model#anchor", "model")).toThrow(
-      "query params",
+      "query params"
     );
   });
 
   it("rejects control characters", () => {
-    expect(() => validateResourceId("model\x00name", "model")).toThrow(
-      "control characters",
+    expect(() => validateResourceId("model\u0000name", "model")).toThrow(
+      "control characters"
     );
   });
 });
@@ -100,31 +101,31 @@ describe("validateOutputPath", () => {
 
   it("rejects path traversal with ..", () => {
     expect(() => validateOutputPath("../outside.png")).toThrow(
-      "within current directory",
+      "within current directory"
     );
   });
 
   it("rejects absolute paths outside CWD", () => {
     expect(() => validateOutputPath("/tmp/evil.png")).toThrow(
-      "within current directory",
+      "within current directory"
     );
   });
 
   it("rejects percent-encoded traversal", () => {
     expect(() => validateOutputPath("%2e%2e/evil.png")).toThrow(
-      "percent-encoded",
+      "percent-encoded"
     );
   });
 
   it("rejects embedded query params", () => {
     expect(() => validateOutputPath("file.png?foo=bar")).toThrow(
-      "query params",
+      "query params"
     );
   });
 
   it("rejects control characters", () => {
-    expect(() => validateOutputPath("file\x00.png")).toThrow(
-      "control characters",
+    expect(() => validateOutputPath("file\u0000.png")).toThrow(
+      "control characters"
     );
   });
 });
@@ -132,19 +133,19 @@ describe("validateOutputPath", () => {
 describe("validateEditPath", () => {
   it("rejects percent-encoded traversal", () => {
     expect(() => validateEditPath("%2e%2e/image.png")).toThrow(
-      "percent-encoded",
+      "percent-encoded"
     );
   });
 
   it("rejects control characters", () => {
-    expect(() => validateEditPath("image\x00.png")).toThrow(
-      "control characters",
+    expect(() => validateEditPath("image\u0000.png")).toThrow(
+      "control characters"
     );
   });
 
   it("rejects non-existent files", () => {
     expect(() => validateEditPath("/nonexistent/file.png")).toThrow(
-      "not found",
+      "not found"
     );
   });
 
@@ -156,7 +157,7 @@ describe("validateEditPath", () => {
 
 describe("parseIntegerOption", () => {
   it("accepts integers within range", () => {
-    expect(parseIntegerOption("4", "count", { min: 1, max: 4 })).toBe(4);
+    expect(parseIntegerOption("4", "count", { max: 4, min: 1 })).toBe(4);
   });
 
   it("rejects decimal and mixed strings", () => {
@@ -172,7 +173,7 @@ describe("parseIntegerOption", () => {
 
 describe("parseNumberOption", () => {
   it("accepts finite numbers within range", () => {
-    expect(parseNumberOption("0.7", "cfg", { min: 0, max: 1 })).toBe(0.7);
+    expect(parseNumberOption("0.7", "cfg", { max: 1, min: 0 })).toBe(0.7);
   });
 
   it("rejects invalid and out-of-range numbers", () => {
@@ -184,13 +185,13 @@ describe("parseNumberOption", () => {
 describe("validateEnumOption", () => {
   it("accepts listed values", () => {
     expect(validateEnumOption("png", ["jpeg", "png", "webp"], "format")).toBe(
-      "png",
+      "png"
     );
   });
 
   it("rejects unlisted values", () => {
     expect(() =>
-      validateEnumOption("gif", ["jpeg", "png", "webp"], "format"),
+      validateEnumOption("gif", ["jpeg", "png", "webp"], "format")
     ).toThrow("one of");
   });
 });

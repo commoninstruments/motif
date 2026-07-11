@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getFalKeyFromEnv, parseMotifEnv } from "../src/index";
 
 describe("Motif env schema", () => {

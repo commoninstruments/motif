@@ -5,13 +5,10 @@
 
 import { MODELS } from "@howells/motif-sdk";
 import chalk from "chalk";
+
 import { loadHistory } from "../utils/config";
-import {
-  type EmitOptions,
-  emit,
-  emitStream,
-  isStructured,
-} from "../utils/output";
+import { emit, emitStream, isStructured } from "../utils/output";
+import type { EmitOptions } from "../utils/output";
 
 export interface HistoryOptions {
   limit?: number;
@@ -20,7 +17,7 @@ export interface HistoryOptions {
 
 export async function runHistory(
   historyOpts: HistoryOptions,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   const history = await loadHistory();
 
@@ -38,7 +35,7 @@ export async function runHistory(
         ...g,
         modelName: MODELS[g.model]?.name ?? g.model,
       })),
-      emitOpts,
+      emitOpts
     );
     return;
   }
@@ -46,17 +43,17 @@ export async function runHistory(
   if (isStructured(emitOpts.format)) {
     emit(
       {
+        costs: history.totalCost,
         generations: page.map((g) => ({
           ...g,
           modelName: MODELS[g.model]?.name ?? g.model,
         })),
-        total,
-        offset,
-        limit,
         hasMore: offset + limit < total,
-        costs: history.totalCost,
+        limit,
+        offset,
+        total,
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
@@ -69,18 +66,18 @@ export async function runHistory(
 
   console.log(
     chalk.bold(
-      `\nGeneration History (${offset + 1}-${offset + page.length} of ${total}):\n`,
-    ),
+      `\nGeneration History (${offset + 1}-${offset + page.length} of ${total}):\n`
+    )
   );
 
   for (const gen of page) {
     const modelName = MODELS[gen.model]?.name ?? gen.model;
     const date = new Date(gen.timestamp).toLocaleString();
     console.log(
-      `  ${chalk.dim(gen.id.slice(0, 8))} ${chalk.cyan(gen.prompt.slice(0, 50))}${gen.prompt.length > 50 ? "..." : ""}`,
+      `  ${chalk.dim(gen.id.slice(0, 8))} ${chalk.cyan(gen.prompt.slice(0, 50))}${gen.prompt.length > 50 ? "..." : ""}`
     );
     console.log(
-      `    ${chalk.green(modelName)} | ${gen.aspect} | $${gen.cost.toFixed(3)} | ${chalk.dim(date)}`,
+      `    ${chalk.green(modelName)} | ${gen.aspect} | $${gen.cost.toFixed(3)} | ${chalk.dim(date)}`
     );
     console.log(`    ${chalk.dim(gen.output)}`);
     console.log();
@@ -88,8 +85,8 @@ export async function runHistory(
 
   console.log(
     chalk.dim(
-      `Session: $${history.totalCost.session.toFixed(2)} | Today: $${history.totalCost.today.toFixed(2)} | All time: $${history.totalCost.allTime.toFixed(2)}`,
-    ),
+      `Session: $${history.totalCost.session.toFixed(2)} | Today: $${history.totalCost.today.toFixed(2)} | All time: $${history.totalCost.allTime.toFixed(2)}`
+    )
   );
 
   if (offset + limit < total) {

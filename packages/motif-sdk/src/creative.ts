@@ -1,5 +1,5 @@
-// biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters for prompt sanitization
-const CONTROL_CHAR_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+// oxlint-disable-next-line no-control-regex -- intentionally matches control characters for prompt sanitization
+const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 /**
  * Creative direction fields applied to prompts in Motif's canonical order.
@@ -62,7 +62,7 @@ export class CreativeOptionError
 
   constructor(details: Omit<CreativeOptionErrorDetails, "code">) {
     super(
-      `Unknown creative ${details.field}: ${details.value}. Available: ${details.availableIds.join(", ")}`,
+      `Unknown creative ${details.field}: ${details.value}. Available: ${details.availableIds.join(", ")}`
     );
     this.name = "CreativeOptionError";
     this.availableIds = details.availableIds;
@@ -90,38 +90,6 @@ export const CREATIVE_FIELDS = [
  * exact prompt clause that will be appended when selected.
  */
 export const CREATIVE_TAXONOMY = {
-  recipe: [
-    {
-      clause: "cinematic scene",
-      description: "Frames the prompt as a cinematic still or scene.",
-      id: "cinematic",
-      label: "Cinematic",
-    },
-  ],
-  shot: [
-    {
-      clause: "close-up composition with controlled depth of field",
-      description: "Tight framing that emphasizes subject detail.",
-      id: "close-up",
-      label: "Close-up",
-    },
-  ],
-  lighting: [
-    {
-      clause: "rim lighting with defined edge highlights",
-      description: "Back or side light that separates the subject edge.",
-      id: "rim",
-      label: "Rim",
-    },
-  ],
-  genre: [
-    {
-      clause: "film noir mood with high contrast shadows",
-      description: "High-contrast cinematic mood with shadow-forward drama.",
-      id: "film-noir",
-      label: "Film noir",
-    },
-  ],
   camera: [
     {
       clause: "macro product photography with crisp surface detail",
@@ -138,6 +106,22 @@ export const CREATIVE_TAXONOMY = {
       label: "Monochrome",
     },
   ],
+  genre: [
+    {
+      clause: "film noir mood with high contrast shadows",
+      description: "High-contrast cinematic mood with shadow-forward drama.",
+      id: "film-noir",
+      label: "Film noir",
+    },
+  ],
+  lighting: [
+    {
+      clause: "rim lighting with defined edge highlights",
+      description: "Back or side light that separates the subject edge.",
+      id: "rim",
+      label: "Rim",
+    },
+  ],
   material: [
     {
       clause: "reflective material surfaces with controlled highlights",
@@ -152,6 +136,22 @@ export const CREATIVE_TAXONOMY = {
       description: "Freezes the subject without implied movement.",
       id: "still",
       label: "Still",
+    },
+  ],
+  recipe: [
+    {
+      clause: "cinematic scene",
+      description: "Frames the prompt as a cinematic still or scene.",
+      id: "cinematic",
+      label: "Cinematic",
+    },
+  ],
+  shot: [
+    {
+      clause: "close-up composition with controlled depth of field",
+      description: "Tight framing that emphasizes subject detail.",
+      id: "close-up",
+      label: "Close-up",
     },
   ],
 } as const satisfies Record<CreativeField, readonly CreativeOption[]>;
@@ -184,7 +184,7 @@ export interface EnrichPromptOptions {
  * Newline style is normalized to `\n`; other text content is left unchanged.
  */
 export function sanitizePrompt(prompt: string): string {
-  return prompt.replace(CONTROL_CHAR_REGEX, "").replace(/\r\n/g, "\n").trim();
+  return prompt.replace(CONTROL_CHAR_REGEX, "").replaceAll("\r\n", "\n").trim();
 }
 
 /**
@@ -194,7 +194,7 @@ export function sanitizePrompt(prompt: string): string {
  * `CREATIVE_FIELDS` order, and returned as metadata alongside the final prompt.
  */
 export function enrichPrompt(
-  options: EnrichPromptOptions,
+  options: EnrichPromptOptions
 ): CreativePromptResult {
   const basePrompt = sanitizePrompt(options.prompt);
   const clauses: string[] = [];
@@ -207,7 +207,7 @@ export function enrichPrompt(
     }
 
     const option = CREATIVE_TAXONOMY[field].find(
-      (candidate) => candidate.id === optionId,
+      (candidate) => candidate.id === optionId
     );
     if (!option) {
       throw new CreativeOptionError({

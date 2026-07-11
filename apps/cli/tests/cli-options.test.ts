@@ -42,7 +42,7 @@ function buildProgram(): Command {
       .option("--enhance-prompt", "Auto-enhance prompt (flux)")
       .option(
         "--rendering-speed <speed>",
-        "Speed/quality: TURBO, BALANCED, QUALITY",
+        "Speed/quality: TURBO, BALANCED, QUALITY"
       )
       .option("--expand-prompt", "Enable MagicPrompt expansion (ideogram)")
       .option("--no-expand-prompt", "Disable MagicPrompt expansion (ideogram)")
@@ -184,7 +184,7 @@ describe("CLI video options parsing", () => {
     const program = buildProgram();
     program.parse(
       ["node", "motif", "--video", "--video-negative", "static, jitter"],
-      { from: "node" },
+      { from: "node" }
     );
     const opts = program.opts();
     expect(opts.videoNegative).toBe("static, jitter");
@@ -222,7 +222,7 @@ describe("CLI multiple new options combined", () => {
         "--steps",
         "10",
       ],
-      { from: "node" },
+      { from: "node" }
     );
     const opts = program.opts();
     expect(opts.seed).toBe("123");

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { MotifError, MotifServer } from "../src/index";
 
 describe("MotifServer builder-error contract", () => {
@@ -6,9 +7,9 @@ describe("MotifServer builder-error contract", () => {
 
   it("generate resolves with an err() for unknown creative option ids", async () => {
     const result = await motif.generate({
+      creative: { lighting: "not-a-real-id" },
       model: "banana",
       prompt: "x",
-      creative: { lighting: "not-a-real-id" },
     });
 
     expect(result.isErr()).toBe(true);
@@ -21,9 +22,9 @@ describe("MotifServer builder-error contract", () => {
 
   it("submitGeneration resolves with an err() for unknown creative option ids", async () => {
     const result = await motif.submitGeneration({
+      creative: { lighting: "not-a-real-id" },
       model: "banana",
       prompt: "x",
-      creative: { lighting: "not-a-real-id" },
     });
 
     expect(result.isErr()).toBe(true);
@@ -36,7 +37,7 @@ describe("MotifServer builder-error contract", () => {
 
   it("generate resolves with an err() for an unknown model", async () => {
     const result = await motif.generate({
-      model: "nope" as never,
+      model: "nope",
       prompt: "x",
     });
 
@@ -58,7 +59,7 @@ describe("MotifServer builder-error contract", () => {
     if (result.isErr()) {
       expect(result.error).toBeInstanceOf(MotifError);
       expect(result.error.message).toContain(
-        "FLUX Schnell does not support quality",
+        "FLUX Schnell does not support quality"
       );
     }
   });

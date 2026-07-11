@@ -7,8 +7,7 @@ pnpm install
 cp .env.example .env
 ```
 
-Set `FAL_KEY` when running live generation. Dry runs, schema description, and
-most tests do not require an API key.
+Set `FAL_KEY` when running live generation. Dry runs, schema description, and most tests do not require an API key.
 
 ## Project Layout
 
@@ -38,6 +37,4 @@ pnpm --filter @howells/motif-sdk pack --dry-run
 pnpm --filter @howells/motif-mcp pack --dry-run
 ```
 
-Packages use strict `files` allowlists. Do not add local environment files,
-generated images, coverage output, or build cache directories to published
-artifacts.
+Packages use strict `files` allowlists. Do not add local environment files, generated images, coverage output, or build cache directories to published artifacts.

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { MotifServer } from "../src/index";
 
 function jsonResponse(data: unknown): Response {
@@ -34,16 +35,16 @@ describe("MotifServer fetch integration", () => {
         jsonResponse({
           images: [{ url: "https://example.com/out.png" }],
           prompt: "studio portrait",
-        }),
-      ),
+        })
+      )
     );
 
     const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
-      model: "gpt",
-      prompt: "studio portrait",
       aspect: "16:9",
       background: "transparent",
+      model: "gpt",
+      prompt: "studio portrait",
       quality: "medium",
       syncMode: true,
     });
@@ -56,12 +57,12 @@ describe("MotifServer fetch integration", () => {
     expect(request.method).toBe("POST");
     expect(request.headers.Authorization).toBe("Key test-key");
     expect(request.body).toMatchObject({
-      prompt: "studio portrait",
-      image_size: "1536x1024",
       background: "transparent",
+      image_size: "1536x1024",
+      num_images: 1,
+      prompt: "studio portrait",
       quality: "medium",
       sync_mode: true,
-      num_images: 1,
     });
   });
 
@@ -72,15 +73,15 @@ describe("MotifServer fetch integration", () => {
         jsonResponse({
           images: [{ url: "https://example.com/out.png" }],
           request_id: "req_ephemeral_123",
-        }),
-      ),
+        })
+      )
     );
 
     const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
+      ephemeral: true,
       model: "banana",
       prompt: "local-only image",
-      ephemeral: true,
     });
 
     expect(result.isOk()).toBe(true);
@@ -100,17 +101,17 @@ describe("MotifServer fetch integration", () => {
           request_id: "req_123",
           response_url:
             "https://queue.fal.run/openai/gpt-image-2/image-to-image/requests/req_123",
-        }),
-      ),
+        })
+      )
     );
 
     const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
     const result = await motif.submitGeneration({
-      model: "gpt2",
-      prompt: "change the wall color",
       editImageUrls: ["https://example.com/interior.png"],
       imageSize: "1280x720",
       maskImageUrl: "https://example.com/wall-mask.png",
+      model: "gpt2",
+      prompt: "change the wall color",
       quality: "auto",
       syncMode: true,
     });
@@ -125,22 +126,22 @@ describe("MotifServer fetch integration", () => {
 
     const request = requestAt(0);
     expect(request.url).toBe(
-      "https://queue.fal.run/openai/gpt-image-2/image-to-image",
+      "https://queue.fal.run/openai/gpt-image-2/image-to-image"
     );
     expect(request.body).toMatchObject({
-      prompt: "change the wall color",
-      image_size: { width: 1280, height: 720 },
-      quality: "auto",
-      sync_mode: true,
+      image_size: { height: 720, width: 1280 },
       image_urls: ["https://example.com/interior.png"],
       mask_image_url: "https://example.com/wall-mask.png",
+      prompt: "change the wall color",
+      quality: "auto",
+      sync_mode: true,
     });
   });
 
   it("deletes fal request payloads by request id", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+      vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     );
 
     const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
@@ -150,7 +151,7 @@ describe("MotifServer fetch integration", () => {
 
     const request = requestAt(0);
     expect(request.url).toBe(
-      "https://api.fal.ai/v1/models/requests/req_ephemeral_123/payloads",
+      "https://api.fal.ai/v1/models/requests/req_ephemeral_123/payloads"
     );
     expect(request.method).toBe("DELETE");
     expect(request.headers.Authorization).toBe("Key test-key");
@@ -163,19 +164,19 @@ describe("MotifServer fetch integration", () => {
         jsonResponse({
           image: { url: "https://example.com/mask.png" },
           masks: [],
-        }),
-      ),
+        })
+      )
     );
 
     const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
     const result = await motif.runTool({
-      tool: "sam3-image",
       input: "https://example.com/input.png",
       options: {
         apply_mask: false,
         max_masks: 2,
         prompt: "shoe",
       },
+      tool: "sam3-image",
     });
 
     expect(result.isOk()).toBe(true);
@@ -183,10 +184,10 @@ describe("MotifServer fetch integration", () => {
     const request = requestAt(0);
     expect(request.url).toBe("https://fal.run/fal-ai/sam-3/image");
     expect(request.body).toMatchObject({
-      image_url: "https://example.com/input.png",
-      output_format: "png",
       apply_mask: false,
+      image_url: "https://example.com/input.png",
       max_masks: 2,
+      output_format: "png",
       prompt: "shoe",
     });
   });

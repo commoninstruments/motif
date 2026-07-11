@@ -12,6 +12,7 @@ import { MotifServer } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
+
 import { createMotifMcpServer } from "../src/create-server.js";
 
 async function makeClient(motif: MotifServer) {
@@ -30,16 +31,16 @@ describe("generate tool with a real MotifServer", () => {
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "generate",
       arguments: {
+        creative: { lighting: "not-a-real-id" },
         model: "banana",
         prompt: "x",
-        creative: { lighting: "not-a-real-id" },
       },
+      name: "generate",
     });
 
     expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0].text;
+    const { text } = (result.content as { text: string }[])[0];
     const parsed = JSON.parse(text);
     expect(parsed.error).toBe(true);
     expect(parsed.message).toContain("Unknown creative lighting");

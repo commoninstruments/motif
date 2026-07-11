@@ -6,10 +6,12 @@
  * without stdio, subprocesses, or real fal.ai API calls.
  */
 
-import { EDIT_CAPABLE_MODELS, type MotifServer } from "@howells/motif-sdk";
+import { EDIT_CAPABLE_MODELS } from "@howells/motif-sdk";
+import type { MotifServer } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it, vi } from "vitest";
+
 import { createMotifMcpServer } from "../src/create-server.js";
 
 // ─── History mock ────────────────────────────────────────────────────
@@ -40,43 +42,43 @@ vi.mock("../src/history.js", () => ({
 // ─── Mock helpers ────────────────────────────────────────────────────
 
 function makeOk<T>(value: T) {
-  return { isOk: () => true, isErr: () => false, value };
+  return { isErr: () => false, isOk: () => true, value };
 }
 
 function makeErr(message: string) {
   return {
-    isOk: () => false,
+    error: { code: "GENERATION_FAILED", message },
     isErr: () => true,
-    error: { message, code: "GENERATION_FAILED" },
+    isOk: () => false,
   };
 }
 
 const MOCK_IMAGES = [
-  { url: "https://fal.media/img.png", width: 1024, height: 1024 },
+  { height: 1024, url: "https://fal.media/img.png", width: 1024 },
 ];
 
 function makeMockMotif() {
   return {
+    estimateCost: vi.fn().mockReturnValue(0.13),
     generate: vi
       .fn()
       .mockResolvedValue(makeOk({ images: MOCK_IMAGES, seed: 42 })),
+    removeBackground: vi
+      .fn()
+      .mockResolvedValue(
+        makeOk({ images: [{ url: "https://fal.media/transparent.png" }] })
+      ),
     upscale: vi.fn().mockResolvedValue(
       makeOk({
         images: [
           {
+            height: 2048,
             url: "https://fal.media/upscaled.png",
             width: 2048,
-            height: 2048,
           },
         ],
-      }),
+      })
     ),
-    removeBackground: vi
-      .fn()
-      .mockResolvedValue(
-        makeOk({ images: [{ url: "https://fal.media/transparent.png" }] }),
-      ),
-    estimateCost: vi.fn().mockReturnValue(0.13),
   } as unknown as MotifServer;
 }
 
@@ -118,7 +120,7 @@ describe("ListTools", () => {
     for (const tool of tools) {
       expect(
         tool.annotations,
-        `${tool.name} should have annotations`,
+        `${tool.name} should have annotations`
       ).toBeDefined();
     }
   });
@@ -129,11 +131,11 @@ describe("ListTools", () => {
     const generationTools = tools.filter((t) => t.name !== "history");
     for (const tool of generationTools) {
       expect(tool.annotations?.readOnlyHint, `${tool.name} readOnlyHint`).toBe(
-        false,
+        false
       );
       expect(
         tool.annotations?.openWorldHint,
-        `${tool.name} openWorldHint`,
+        `${tool.name} openWorldHint`
       ).toBe(true);
     }
   });
@@ -152,7 +154,7 @@ describe("ListTools", () => {
     for (const tool of tools) {
       expect(
         tool.outputSchema,
-        `${tool.name} should have outputSchema`,
+        `${tool.name} should have outputSchema`
       ).toBeDefined();
     }
   });
@@ -202,11 +204,11 @@ describe("ListTools", () => {
     >;
 
     expect(properties.creative?.properties?.recipe?.enum).toContain(
-      "cinematic",
+      "cinematic"
     );
     expect(properties.creative?.properties?.lighting?.enum).toContain("rim");
     expect(properties.creative?.properties?.material?.enum).toContain(
-      "reflective",
+      "reflective"
     );
   });
 
@@ -283,23 +285,23 @@ describe("generate tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "generate",
       arguments: { prompt: "a red fox" },
+      name: "generate",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ prompt: "a red fox", model: "gpt" }),
+      expect.objectContaining({ model: "gpt", prompt: "a red fox" })
     );
   });
 
   it("returns images array in structuredContent", async () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({
-      name: "generate",
       arguments: { prompt: "a fox" },
+      name: "generate",
     });
 
-    const text = (result.content[0] as { text: string }).text;
+    const { text } = result.content[0] as { text: string };
     const parsed = JSON.parse(text);
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0].url).toBe("https://fal.media/img.png");
@@ -308,8 +310,8 @@ describe("generate tool", () => {
   it("includes cost_estimate in response", async () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({
-      name: "generate",
       arguments: { prompt: "a fox" },
+      name: "generate",
     });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
@@ -321,15 +323,15 @@ describe("generate tool", () => {
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOk({
         images: [
-          { url: "https://fal.media/no-dims.png", width: null, height: null },
+          { height: null, url: "https://fal.media/no-dims.png", width: null },
         ],
-      }),
+      })
     );
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "generate",
       arguments: { prompt: "a fox" },
+      name: "generate",
     });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
@@ -341,12 +343,12 @@ describe("generate tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
+      arguments: { preset: "landscape", prompt: "a fox" },
       name: "generate",
-      arguments: { prompt: "a fox", preset: "landscape" },
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ aspect: "16:9" }),
+      expect.objectContaining({ aspect: "16:9" })
     );
   });
 
@@ -355,30 +357,30 @@ describe("generate tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "generate",
       arguments: {
-        prompt: "a fox",
-        model: "banana2",
         aspect: "auto",
-        resolution: "0.5K",
-        outputFormat: "png",
-        seed: 42,
-        enableWebSearch: true,
         enableGoogleSearch: true,
+        enableWebSearch: true,
+        model: "banana2",
+        outputFormat: "png",
+        prompt: "a fox",
+        resolution: "0.5K",
+        seed: 42,
       },
+      name: "generate",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: "a fox",
-        model: "banana2",
         aspect: "auto",
-        resolution: "0.5K",
-        outputFormat: "png",
-        seed: 42,
-        enableWebSearch: true,
         enableGoogleSearch: true,
-      }),
+        enableWebSearch: true,
+        model: "banana2",
+        outputFormat: "png",
+        prompt: "a fox",
+        resolution: "0.5K",
+        seed: 42,
+      })
     );
   });
 
@@ -387,31 +389,31 @@ describe("generate tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "generate",
       arguments: {
-        prompt: "a fox",
         creative: { lighting: "rim", material: "reflective" },
+        prompt: "a fox",
       },
+      name: "generate",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({
         creative: { lighting: "rim", material: "reflective" },
         prompt: "a fox",
-      }),
+      })
     );
   });
 
   it("returns structured tool errors when generate fails", async () => {
     const motif = makeMockMotif();
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
-      makeErr("fal.ai 502"),
+      makeErr("fal.ai 502")
     );
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "generate",
       arguments: { prompt: "a fox" },
+      name: "generate",
     });
 
     expect(result.isError).toBe(true);
@@ -433,8 +435,8 @@ describe("argument validation", () => {
     const client = await makeClient(motif);
 
     const result = await client.callTool({
+      arguments: { numImages: 500, prompt: "a fox" },
       name: "generate",
-      arguments: { prompt: "a fox", numImages: 500 },
     });
 
     expect(result.isError).toBe(true);
@@ -448,8 +450,8 @@ describe("argument validation", () => {
     const client = await makeClient(motif);
 
     const result = await client.callTool({
+      arguments: { model: "bogus", prompt: "a fox" },
       name: "generate",
-      arguments: { prompt: "a fox", model: "bogus" },
     });
 
     expect(result.isError).toBe(true);
@@ -464,8 +466,8 @@ describe("argument validation", () => {
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "generate",
       arguments: { prompt: "" },
+      name: "generate",
     });
 
     expect(result.isError).toBe(true);
@@ -479,12 +481,12 @@ describe("argument validation", () => {
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "vary",
       arguments: {
-        prompt: "make it blue",
         imageUrls: ["https://example.com/ref.png"],
         model: "recraft",
+        prompt: "make it blue",
       },
+      name: "vary",
     });
 
     expect(result.isError).toBe(true);
@@ -509,8 +511,8 @@ describe("argument validation", () => {
     const client = await makeClient(makeMockMotif());
 
     const result = await client.callTool({
-      name: "history",
       arguments: { limit: 0 },
+      name: "history",
     });
 
     expect(result.isError).toBe(true);
@@ -522,8 +524,8 @@ describe("argument validation", () => {
     const client = await makeClient(makeMockMotif());
 
     const result = await client.callTool({
-      name: "history",
       arguments: { limit: 51 },
+      name: "history",
     });
 
     expect(result.isError).toBe(true);
@@ -536,8 +538,8 @@ describe("argument validation", () => {
     const client = await makeClient(makeMockMotif());
 
     const result = await client.callTool({
-      name: "history",
       arguments: { limit: 50 },
+      name: "history",
     });
 
     expect(result.isError).toBeFalsy();
@@ -553,23 +555,23 @@ describe("upscale tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "upscale",
       arguments: { imageUrl: "https://example.com/img.png" },
+      name: "upscale",
     });
 
     expect(motif.upscale).toHaveBeenCalledWith(
       expect.objectContaining({
         imageUrl: "https://example.com/img.png",
         model: "clarity",
-      }),
+      })
     );
   });
 
   it("returns upscaled image URL", async () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({
-      name: "upscale",
       arguments: { imageUrl: "https://example.com/img.png" },
+      name: "upscale",
     });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
@@ -585,23 +587,23 @@ describe("remove_background tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "remove_background",
       arguments: { imageUrl: "https://example.com/img.png" },
+      name: "remove_background",
     });
 
     expect(motif.removeBackground).toHaveBeenCalledWith(
       expect.objectContaining({
         imageUrl: "https://example.com/img.png",
         model: "rmbg",
-      }),
+      })
     );
   });
 
   it("returns transparent PNG URL", async () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({
-      name: "remove_background",
       arguments: { imageUrl: "https://example.com/img.png" },
+      name: "remove_background",
     });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
@@ -617,18 +619,18 @@ describe("vary tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "vary",
       arguments: {
-        prompt: "make it blue",
         imageUrls: ["https://example.com/ref.png"],
+        prompt: "make it blue",
       },
+      name: "vary",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: "make it blue",
         editImageUrls: ["https://example.com/ref.png"],
-      }),
+        prompt: "make it blue",
+      })
     );
   });
 
@@ -637,16 +639,16 @@ describe("vary tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "vary",
       arguments: {
-        prompt: "variation",
         imageUrls: ["https://example.com/ref.png"],
         inputFidelity: "high",
+        prompt: "variation",
       },
+      name: "vary",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
-      expect.objectContaining({ inputFidelity: "high" }),
+      expect.objectContaining({ inputFidelity: "high" })
     );
   });
 
@@ -655,12 +657,12 @@ describe("vary tool", () => {
     const client = await makeClient(motif);
 
     await client.callTool({
-      name: "vary",
       arguments: {
-        prompt: "variation",
-        imageUrls: ["https://example.com/ref.png"],
         creative: { genre: "film-noir", shot: "close-up" },
+        imageUrls: ["https://example.com/ref.png"],
+        prompt: "variation",
       },
+      name: "vary",
     });
 
     expect(motif.generate).toHaveBeenCalledWith(
@@ -668,7 +670,7 @@ describe("vary tool", () => {
         creative: { genre: "film-noir", shot: "close-up" },
         editImageUrls: ["https://example.com/ref.png"],
         prompt: "variation",
-      }),
+      })
     );
   });
 
@@ -677,18 +679,18 @@ describe("vary tool", () => {
     (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
       makeOk({
         images: [
-          { url: "https://fal.media/variation.png", width: null, height: null },
+          { height: null, url: "https://fal.media/variation.png", width: null },
         ],
-      }),
+      })
     );
     const client = await makeClient(motif);
 
     const result = await client.callTool({
-      name: "vary",
       arguments: {
-        prompt: "variation",
         imageUrls: ["https://example.com/ref.png"],
+        prompt: "variation",
       },
+      name: "vary",
     });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
@@ -705,7 +707,7 @@ describe("history tool", () => {
     const { readHistory } = await import("../src/history.js");
     const client = await makeClient(makeMockMotif());
 
-    await client.callTool({ name: "history", arguments: {} });
+    await client.callTool({ arguments: {}, name: "history" });
 
     expect(readHistory).toHaveBeenCalledWith(10, 0);
   });
@@ -715,8 +717,8 @@ describe("history tool", () => {
     const client = await makeClient(makeMockMotif());
 
     await client.callTool({
-      name: "history",
       arguments: { limit: 5, offset: 20 },
+      name: "history",
     });
 
     expect(readHistory).toHaveBeenCalledWith(5, 20);
@@ -724,7 +726,7 @@ describe("history tool", () => {
 
   it("returns generations array in response", async () => {
     const client = await makeClient(makeMockMotif());
-    const result = await client.callTool({ name: "history", arguments: {} });
+    const result = await client.callTool({ arguments: {}, name: "history" });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
     expect(parsed.generations).toHaveLength(1);
@@ -734,7 +736,7 @@ describe("history tool", () => {
 
   it("returns pagination metadata", async () => {
     const client = await makeClient(makeMockMotif());
-    const result = await client.callTool({ name: "history", arguments: {} });
+    const result = await client.callTool({ arguments: {}, name: "history" });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
     expect(parsed.total).toBe(1);
@@ -745,7 +747,7 @@ describe("history tool", () => {
 
   it("returns cost summary", async () => {
     const client = await makeClient(makeMockMotif());
-    const result = await client.callTool({ name: "history", arguments: {} });
+    const result = await client.callTool({ arguments: {}, name: "history" });
 
     const parsed = JSON.parse((result.content[0] as { text: string }).text);
     expect(typeof parsed.costs.allTime).toBe("number");
@@ -761,7 +763,7 @@ describe("unknown tool", () => {
     const client = await makeClient(makeMockMotif());
 
     await expect(
-      client.callTool({ name: "nonexistent", arguments: {} }),
+      client.callTool({ arguments: {}, name: "nonexistent" })
     ).rejects.toThrow();
   });
 });

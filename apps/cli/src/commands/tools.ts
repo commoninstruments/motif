@@ -1,14 +1,16 @@
 import { resolve } from "node:path";
+
 import {
   buildFalToolRequest,
   FAL_TOOL_IDS,
   FAL_TOOLS,
   FAL_TOOLS_CHECKED_AT,
-  type FalToolRequest,
   isFalToolId,
 } from "@howells/motif-sdk";
+import type { FalToolRequest } from "@howells/motif-sdk";
 import chalk from "chalk";
 import { Command } from "commander";
+
 import { runTool } from "../api/fal";
 import { handleError } from "../utils/errors";
 import { downloadImage, getFileSize } from "../utils/image";
@@ -18,13 +20,8 @@ import {
   validateOutputPath,
   validateResourceId,
 } from "../utils/input";
-import {
-  type EmitOptions,
-  emit,
-  isStructured,
-  type OutputFormat,
-  resolveFormat,
-} from "../utils/output";
+import { emit, isStructured, resolveFormat } from "../utils/output";
+import type { EmitOptions, OutputFormat } from "../utils/output";
 
 interface ToolOptions {
   applyMask?: boolean;
@@ -69,7 +66,7 @@ function emitOptsFromArgs(args: string[]): EmitOptions {
     args.find((a) => a.startsWith("--format="))?.split("=")?.[1] ??
       (args.includes("--format")
         ? args[args.indexOf("--format") + 1]
-        : undefined),
+        : undefined)
   );
   const fields =
     args.find((a) => a.startsWith("--fields="))?.split("=")?.[1] ??
@@ -99,10 +96,18 @@ function stripGlobalFlags(args: string[]): string[] {
 }
 
 function parseOptionValue(value: string): unknown {
-  if (value === "true") return true;
-  if (value === "false") return false;
-  if (value === "null") return null;
-  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  if (value === "null") {
+    return null;
+  }
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) {
+    return Number(value);
+  }
   try {
     return JSON.parse(value);
   } catch {
@@ -111,7 +116,7 @@ function parseOptionValue(value: string): unknown {
 }
 
 function parseOptionPairs(
-  values: string[] | undefined,
+  values: string[] | undefined
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const pair of values ?? []) {
@@ -129,7 +134,9 @@ function parseOptionPairs(
 }
 
 function parseJsonOptions(value: string | undefined): Record<string, unknown> {
-  if (!value) return {};
+  if (!value) {
+    return {};
+  }
   const parsed = JSON.parse(value) as unknown;
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("--json must be a JSON object");
@@ -139,7 +146,7 @@ function parseJsonOptions(value: string | undefined): Record<string, unknown> {
 
 function buildOptions(
   options: ToolOptions,
-  format: OutputFormat,
+  format: OutputFormat
 ): Record<string, unknown> {
   try {
     return {
@@ -151,32 +158,32 @@ function buildOptions(
       ...(options.operatingResolution
         ? { operating_resolution: options.operatingResolution }
         : {}),
-      ...(options.applyMask !== undefined
-        ? { apply_mask: options.applyMask }
-        : {}),
-      ...(options.cropToBbox !== undefined
-        ? { crop_to_bbox: options.cropToBbox }
-        : {}),
-      ...(options.coarse !== undefined ? { coarse: options.coarse } : {}),
-      ...(options.maskOnly !== undefined
-        ? { mask_only: options.maskOnly }
-        : {}),
+      ...(options.applyMask === undefined
+        ? {}
+        : { apply_mask: options.applyMask }),
+      ...(options.cropToBbox === undefined
+        ? {}
+        : { crop_to_bbox: options.cropToBbox }),
+      ...(options.coarse === undefined ? {} : { coarse: options.coarse }),
+      ...(options.maskOnly === undefined
+        ? {}
+        : { mask_only: options.maskOnly }),
       ...(options.returnMultipleMasks ? { return_multiple_masks: true } : {}),
       ...(options.includeScores ? { include_scores: true } : {}),
       ...(options.includeBoxes ? { include_boxes: true } : {}),
       ...(options.maxMasks
         ? {
             max_masks: parseIntegerOption(options.maxMasks, "max masks", {
-              min: 1,
               max: 50,
+              min: 1,
             }),
           }
         : {}),
       ...(options.scale
         ? {
             upscale_factor: parseNumberOption(options.scale, "scale", {
-              min: 1,
               max: 8,
+              min: 1,
             }),
           }
         : {}),
@@ -185,15 +192,15 @@ function buildOptions(
         ? { background_color: options.backgroundColor }
         : {}),
       ...(options.codec ? { output_container_and_codec: options.codec } : {}),
-      ...(options.preserveAudio !== undefined
-        ? { preserve_audio: options.preserveAudio }
-        : {}),
+      ...(options.preserveAudio === undefined
+        ? {}
+        : { preserve_audio: options.preserveAudio }),
       ...(options.detectionThreshold
         ? {
             detection_threshold: parseNumberOption(
               options.detectionThreshold,
               "detection threshold",
-              { min: 0, max: 1 },
+              { max: 1, min: 0 }
             ),
           }
         : {}),
@@ -202,7 +209,7 @@ function buildOptions(
             points_per_side: parseIntegerOption(
               options.pointsPerSide,
               "points per side",
-              { min: 1 },
+              { min: 1 }
             ),
           }
         : {}),
@@ -211,7 +218,7 @@ function buildOptions(
             pred_iou_thresh: parseNumberOption(
               options.predIouThresh,
               "predicted IOU threshold",
-              { min: 0, max: 1 },
+              { max: 1, min: 0 }
             ),
           }
         : {}),
@@ -220,7 +227,7 @@ function buildOptions(
             stability_score_thresh: parseNumberOption(
               options.stabilityScoreThresh,
               "stability score threshold",
-              { min: 0, max: 1 },
+              { max: 1, min: 0 }
             ),
           }
         : {}),
@@ -229,7 +236,7 @@ function buildOptions(
             min_mask_region_area: parseIntegerOption(
               options.minMaskRegionArea,
               "minimum mask region area",
-              { min: 0 },
+              { min: 0 }
             ),
           }
         : {}),
@@ -238,7 +245,7 @@ function buildOptions(
             num_inference_steps: parseIntegerOption(
               options.numInferenceSteps,
               "number of inference steps",
-              { min: 1 },
+              { min: 1 }
             ),
           }
         : {}),
@@ -247,7 +254,7 @@ function buildOptions(
             ensemble_size: parseIntegerOption(
               options.ensembleSize,
               "ensemble size",
-              { min: 2 },
+              { min: 2 }
             ),
           }
         : {}),
@@ -270,7 +277,7 @@ function buildOptions(
 
 function primaryUrl(
   result: Record<string, unknown>,
-  keys: string[],
+  keys: string[]
 ): string | undefined {
   for (const key of keys) {
     const value = result[key];
@@ -278,14 +285,18 @@ function primaryUrl(
       return value;
     }
     if (value && typeof value === "object" && "url" in value) {
-      const url = (value as { url?: unknown }).url;
-      if (typeof url === "string") return url;
+      const { url } = value;
+      if (typeof url === "string") {
+        return url;
+      }
     }
     if (Array.isArray(value)) {
       for (const item of value) {
         if (item && typeof item === "object" && "url" in item) {
-          const url = (item as { url?: unknown }).url;
-          if (typeof url === "string") return url;
+          const { url } = item as { url?: unknown };
+          if (typeof url === "string") {
+            return url;
+          }
         }
       }
     }
@@ -296,23 +307,23 @@ function primaryUrl(
 function listTools(emitOpts: EmitOptions): void {
   emit(
     {
-      command: "tool.list",
       checkedAt: FAL_TOOLS_CHECKED_AT,
+      command: "tool.list",
       tools: Object.fromEntries(
         FAL_TOOL_IDS.map((id) => [
           id,
           {
-            name: FAL_TOOLS[id].name,
-            endpoint: FAL_TOOLS[id].endpoint,
             category: FAL_TOOLS[id].category,
-            task: FAL_TOOLS[id].task,
+            endpoint: FAL_TOOLS[id].endpoint,
             inputKind: FAL_TOOLS[id].inputKind,
+            name: FAL_TOOLS[id].name,
             pricing: FAL_TOOLS[id].pricing,
+            task: FAL_TOOLS[id].task,
           },
-        ]),
+        ])
       ),
     },
-    emitOpts,
+    emitOpts
   );
 
   if (!isStructured(emitOpts.format)) {
@@ -320,7 +331,7 @@ function listTools(emitOpts: EmitOptions): void {
     for (const id of FAL_TOOL_IDS) {
       const tool = FAL_TOOLS[id];
       console.log(
-        `${chalk.green(id)}  ${tool.name}  ${chalk.dim(tool.pricing)}`,
+        `${chalk.green(id)}  ${tool.name}  ${chalk.dim(tool.pricing)}`
       );
     }
   }
@@ -335,17 +346,17 @@ function describeTool(toolId: string | undefined, emitOpts: EmitOptions): void {
     handleError(
       new Error(`Unknown fal tool: ${toolId}`),
       "UNKNOWN_TOOL",
-      emitOpts.format,
+      emitOpts.format
     );
   }
   emit(
     {
-      command: "tool.describe",
       checkedAt: FAL_TOOLS_CHECKED_AT,
+      command: "tool.describe",
       id: toolId,
       ...FAL_TOOLS[toolId],
     },
-    emitOpts,
+    emitOpts
   );
 }
 
@@ -353,7 +364,7 @@ async function runFalTool(
   toolId: string,
   input: string | undefined,
   options: ToolOptions,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   try {
     validateResourceId(toolId, "tool");
@@ -364,7 +375,7 @@ async function runFalTool(
     handleError(
       new Error(`Unknown fal tool: ${toolId}`),
       "UNKNOWN_TOOL",
-      emitOpts.format,
+      emitOpts.format
     );
   }
 
@@ -377,10 +388,10 @@ async function runFalTool(
   let request: FalToolRequest;
   try {
     request = buildFalToolRequest({
-      tool: toolId,
       input: inputs?.[0],
       inputs,
       options: requestOptions,
+      tool: toolId,
     });
   } catch (error) {
     handleError(error, "INVALID_OPTION", emitOpts.format);
@@ -389,26 +400,26 @@ async function runFalTool(
   if (options.dryRun) {
     emit(
       {
+        body: request.body,
         command: "tool.run",
         dryRun: true,
+        endpoint: request.endpoint,
+        pricing: request.tool.pricing,
         tool: toolId,
         toolName: request.tool.name,
-        endpoint: request.endpoint,
-        body: request.body,
-        pricing: request.tool.pricing,
         valid: true,
       },
-      emitOpts,
+      emitOpts
     );
     return;
   }
 
   try {
     const result = await runTool({
-      tool: toolId,
       input: inputs?.[0],
       inputs,
       options: requestOptions,
+      tool: toolId,
     });
     let saved: { path: string; size: string } | undefined;
     if (options.output) {
@@ -426,13 +437,13 @@ async function runFalTool(
     emit(
       {
         command: "tool.run",
-        tool: toolId,
-        toolName: request.tool.name,
         endpoint: request.endpoint,
         result,
+        tool: toolId,
+        toolName: request.tool.name,
         ...(saved ? { saved } : {}),
       },
-      emitOpts,
+      emitOpts
     );
   } catch (error) {
     handleError(error, "TOOL_FAILED", emitOpts.format);
@@ -447,7 +458,7 @@ export interface ToolStdinPayload extends ToolOptions {
 
 export async function runToolPayload(
   payload: ToolStdinPayload,
-  emitOpts: EmitOptions,
+  emitOpts: EmitOptions
 ): Promise<void> {
   if (payload.command === "tool-list") {
     listTools(emitOpts);
@@ -468,7 +479,7 @@ export async function runToolPayload(
     payload.tool,
     payload.input,
     { ...payload, providerOptions: payload.options },
-    emitOpts,
+    emitOpts
   );
 }
 
@@ -489,12 +500,16 @@ export async function runTools(args: string[]): Promise<void> {
   program
     .command("list")
     .description("List supported fal tools")
-    .action(() => listTools(emitOpts));
+    .action(() => {
+      listTools(emitOpts);
+    });
 
   program
     .command("describe [tool]")
     .description("Describe a fal tool")
-    .action((tool?: string) => describeTool(tool, emitOpts));
+    .action((tool?: string) => {
+      describeTool(tool, emitOpts);
+    });
 
   program
     .command("run <tool> [input]")
@@ -507,17 +522,17 @@ export async function runTools(args: string[]): Promise<void> {
     .option("--output-format <format>", "Output format, e.g. jpeg, png, webp")
     .option(
       "--operating-resolution <size>",
-      "Operating resolution where supported",
+      "Operating resolution where supported"
     )
     .option("--apply-mask", "Apply mask overlay where supported")
     .option("--no-apply-mask", "Do not apply mask overlay where supported")
     .option(
       "--crop-to-bbox",
-      "Crop output to detected foreground box where supported",
+      "Crop output to detected foreground box where supported"
     )
     .option(
       "--no-crop-to-bbox",
-      "Do not crop output to detected foreground box",
+      "Do not crop output to detected foreground box"
     )
     .option("--coarse", "Use coarse preprocessing where supported")
     .option("--no-coarse", "Disable coarse preprocessing where supported")
@@ -531,25 +546,25 @@ export async function runTools(args: string[]): Promise<void> {
     .option("--model <name>", "Provider-specific model/mode")
     .option(
       "--background-color <color>",
-      "Background color for video background removal",
+      "Background color for video background removal"
     )
     .option(
       "--codec <codec>",
-      "Output container/codec for video background removal",
+      "Output container/codec for video background removal"
     )
     .option("--preserve-audio", "Preserve audio where supported")
     .option("--no-preserve-audio", "Do not preserve audio where supported")
     .option("--detection-threshold <n>", "Detection threshold 0-1")
     .option(
       "--points-per-side <n>",
-      "SAM2 automatic segmentation sample density",
+      "SAM2 automatic segmentation sample density"
     )
     .option("--pred-iou-thresh <n>", "SAM2 predicted IOU threshold")
     .option("--stability-score-thresh <n>", "SAM2 stability score threshold")
     .option("--min-mask-region-area <n>", "SAM2 minimum mask area")
     .option(
       "--num-inference-steps <n>",
-      "Diffusion/preprocessor inference steps",
+      "Diffusion/preprocessor inference steps"
     )
     .option("--ensemble-size <n>", "Depth ensemble size where supported")
     .option("--target-fps <n>", "Target FPS for video tools")
@@ -559,21 +574,21 @@ export async function runTools(args: string[]): Promise<void> {
     .option(
       "--option <key=value>",
       "Raw option pair; repeatable",
-      (value, previous: string[] = []) => [...previous, value],
+      (value, previous: string[] = []) => [...previous, value]
     )
     .action(
       async (
         tool: string,
         positionalInput: string | undefined,
-        options: ToolOptions,
+        options: ToolOptions
       ) => {
         await runFalTool(
           tool,
           options.input ?? positionalInput,
           options,
-          emitOpts,
+          emitOpts
         );
-      },
+      }
     );
 
   if (filteredArgs.length === 0) {

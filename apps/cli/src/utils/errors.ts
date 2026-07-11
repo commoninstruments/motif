@@ -1,5 +1,6 @@
 import { getErrorMetadata } from "./error-catalog";
-import { emitError, type OutputFormat } from "./output";
+import { emitError } from "./output";
+import type { OutputFormat } from "./output";
 
 /** Map a catalog HTTP-style status to a semantic process exit code. */
 export function exitCodeForStatus(status: number): number {
@@ -39,7 +40,7 @@ export function getErrorMessage(err: unknown): string {
 
 function hasProperty<K extends string>(
   value: unknown,
-  key: K,
+  key: K
 ): value is Record<K, unknown> {
   return typeof value === "object" && value !== null && key in value;
 }
@@ -74,22 +75,22 @@ function getStructuredDetails(err: unknown): unknown {
 export function handleError(
   err: unknown,
   code: string,
-  format: OutputFormat,
+  format: OutputFormat
 ): never {
   const metadata = getErrorMetadata(code);
   emitError(
     {
       code,
-      message: getErrorMessage(err),
-      doc_uri: metadata.docUri,
       details: getStructuredDetails(err),
+      doc_uri: metadata.docUri,
       is_retriable: metadata.isRetriable,
+      message: getErrorMessage(err),
       status: metadata.status,
       suggestions: metadata.suggestions,
       title: metadata.title,
       type: metadata.type,
     },
-    format,
+    format
   );
   process.exit(exitCodeForStatus(metadata.status));
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { enrichPrompt } from "../src/index";
 
 describe("enrichPrompt", () => {
@@ -19,12 +20,12 @@ describe("enrichPrompt", () => {
 
   it("appends creative clauses in canonical field order", () => {
     const result = enrichPrompt({
-      prompt: "luxury watch on black marble",
       creative: {
         lighting: "rim",
         recipe: "cinematic",
         shot: "close-up",
       },
+      prompt: "luxury watch on black marble",
     });
 
     expect(result).toEqual({
@@ -49,24 +50,23 @@ describe("enrichPrompt", () => {
   it("throws a structured error for unknown creative option ids", () => {
     expect(() =>
       enrichPrompt({
-        prompt: "studio portrait",
         creative: {
           lighting: "rim-light",
         },
-      }),
+        prompt: "studio portrait",
+      })
     ).toThrowError(
       expect.objectContaining({
         availableIds: ["rim"],
         code: "INVALID_OPTION",
         field: "lighting",
         value: "rim-light",
-      }),
+      })
     );
   });
 
   it("supports the initial option set for every creative field", () => {
     const result = enrichPrompt({
-      prompt: "luxury watch on black marble",
       creative: {
         camera: "macro-product",
         color: "monochrome",
@@ -77,6 +77,7 @@ describe("enrichPrompt", () => {
         recipe: "cinematic",
         shot: "close-up",
       },
+      prompt: "luxury watch on black marble",
     });
 
     expect(result.creative).toEqual({

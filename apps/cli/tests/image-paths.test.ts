@@ -1,5 +1,7 @@
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { indexedOutputPath } from "../src/utils/image";
 
 describe("indexedOutputPath", () => {
@@ -13,7 +15,7 @@ describe("indexedOutputPath", () => {
 
   it("indexes a .webp path with a directory", () => {
     expect(indexedOutputPath("shots/out.webp", 0)).toBe(
-      join("shots", "out-1.webp"),
+      join("shots", "out-1.webp")
     );
   });
 
@@ -23,7 +25,7 @@ describe("indexedOutputPath", () => {
 
   it("keeps the directory of an absolute path", () => {
     expect(indexedOutputPath("/tmp/renders/out.png", 2)).toBe(
-      join("/tmp/renders", "out-3.png"),
+      join("/tmp/renders", "out-3.png")
     );
   });
 });

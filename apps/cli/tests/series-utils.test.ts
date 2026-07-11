@@ -7,7 +7,9 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { SeriesRef } from "../src/utils/series";
 
 /**
@@ -75,11 +77,11 @@ describe("createSeries", () => {
 
   it("honors supplied model, aspect, resolution, and style prompt", async () => {
     const config = await series.createSeries({
-      name: "Custom",
-      stylePrompt: "watercolor, soft pastels",
-      model: "gpt",
       defaultAspect: "3:2",
       defaultResolution: "4K",
+      model: "gpt",
+      name: "Custom",
+      stylePrompt: "watercolor, soft pastels",
     });
 
     expect(config.model).toBe("gpt");
@@ -91,8 +93,8 @@ describe("createSeries", () => {
   it("copies the initial style reference when fromImage is given", async () => {
     const image = makeImage("cover.png");
     const config = await series.createSeries({
-      name: "Cover",
       fromImage: image,
+      name: "Cover",
     });
 
     expect(config.refs).toHaveLength(1);
@@ -100,14 +102,14 @@ describe("createSeries", () => {
     expect(ref?.tag).toBe("style");
     expect(ref?.filename).toBe("style-cover.png");
     expect(
-      existsSync(join(series.seriesRefsDir("cover"), "style-cover.png")),
+      existsSync(join(series.seriesRefsDir("cover"), "style-cover.png"))
     ).toBe(true);
   });
 
   it("throws when the series already exists", async () => {
     await series.createSeries({ name: "Dupe" });
     await expect(series.createSeries({ name: "Dupe" })).rejects.toThrow(
-      /already exists/,
+      /already exists/
     );
   });
 });
@@ -126,7 +128,7 @@ describe("loadSeries / saveSeries", () => {
     const reloaded = await series.loadSeries("roundtrip");
     expect(reloaded.stylePrompt).toBe("updated");
     expect(new Date(reloaded.updated).getTime()).toBeGreaterThanOrEqual(
-      new Date(before).getTime(),
+      new Date(before).getTime()
     );
   });
 
@@ -171,7 +173,7 @@ describe("addRef / removeRef / resolveRefs", () => {
     const resolved = series.resolveRefs(config);
     expect(resolved).toHaveLength(1);
     expect(resolved[0]).toBe(
-      join(series.seriesRefsDir("refs"), "character-luna.png"),
+      join(series.seriesRefsDir("refs"), "character-luna.png")
     );
     expect(existsSync(resolved[0] ?? "")).toBe(true);
   });
@@ -184,7 +186,7 @@ describe("addRef / removeRef / resolveRefs", () => {
     const config = await series.loadSeries("tagged");
     expect(series.resolveRefs(config, ["character"])).toHaveLength(1);
     expect(series.resolveRefs(config, ["character", "location"])).toHaveLength(
-      2,
+      2
     );
     expect(series.resolveRefs(config, ["missing"])).toHaveLength(0);
 
@@ -192,14 +194,14 @@ describe("addRef / removeRef / resolveRefs", () => {
     const after = await series.loadSeries("tagged");
     expect(after.refs.map((r) => r.filename)).toEqual(["location-b.png"]);
     expect(
-      existsSync(join(series.seriesRefsDir("tagged"), "character-a.png")),
+      existsSync(join(series.seriesRefsDir("tagged"), "character-a.png"))
     ).toBe(false);
   });
 
   it("throws when removing a reference that does not exist", async () => {
     await series.createSeries({ name: "Empty" });
     await expect(series.removeRef("empty", "nope.png")).rejects.toThrow(
-      /Reference not found/,
+      /Reference not found/
     );
   });
 });
@@ -208,13 +210,13 @@ describe("recordOutput / buildSeriesPrompt", () => {
   it("appends outputs to the series config", async () => {
     await series.createSeries({ name: "Outputs" });
     await series.recordOutput("outputs", {
+      aspect: "1:1",
+      cost: 0.08,
       filename: "001-scene.png",
+      model: "banana",
       prompt: "a scene",
       refsUsed: ["character"],
-      model: "banana",
-      aspect: "1:1",
       resolution: "2K",
-      cost: 0.08,
       timestamp: new Date().toISOString(),
     });
 
@@ -241,7 +243,7 @@ describe("path traversal guards", () => {
     const image = makeImage("evil.png");
 
     await expect(
-      series.addRef("guarded", image, "../../escape", "x"),
+      series.addRef("guarded", image, "../../escape", "x")
     ).rejects.toThrow(/path traversal/);
 
     // Nothing escaped the refs directory.
@@ -260,15 +262,15 @@ describe("path traversal guards", () => {
 
     // Seed a malicious ref entry directly so removeRef reaches the guard.
     const maliciousRef: SeriesRef = {
+      added: new Date().toISOString(),
+      description: "",
       filename: "../escape.txt",
       tag: "x",
-      description: "",
-      added: new Date().toISOString(),
     };
     await series.saveSeries({ ...config, refs: [maliciousRef] });
 
     await expect(series.removeRef("escape", "../escape.txt")).rejects.toThrow(
-      /escapes series refs directory/,
+      /escapes series refs directory/
     );
     // The guard threw before unlink — the outside file is untouched.
     expect(existsSync(sentinel)).toBe(true);

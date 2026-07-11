@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { estimateCost } from "../src/cost";
 import { MODELS } from "../src/models";
 
@@ -30,7 +31,7 @@ describe("estimateCost", () => {
 
   it("multiplies by image count", () => {
     expect(estimateCost("banana2", "4K", 3)).toBeCloseTo(
-      price("banana2") * 2 * 3,
+      price("banana2") * 2 * 3
     );
   });
 

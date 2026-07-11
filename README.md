@@ -32,7 +32,10 @@ const dryRun = buildGenerateBody(options);
 const motif = new MotifServer(process.env.FAL_KEY!);
 const result = await motif.generate(options);
 
-console.log(dryRun.endpoint, result.isOk() ? result.value.images : result.error);
+console.log(
+  dryRun.endpoint,
+  result.isOk() ? result.value.images : result.error
+);
 ```
 
 ### CLI
@@ -173,7 +176,7 @@ Motif keeps two model views:
 ### Recommended Image Models
 
 | Need | Use | Why | Speed | fal price |
-| --- | --- | --- | --- | ---: |
+| --- | --- | --- | --- | --: |
 | Best overall quality | `gpt2` | #1 text-to-image on Artificial Analysis | Very slow | ~$0.211/image |
 | Best edits | `gpt` | #2 editing, strong reference fidelity, transparent PNGs | Slow | ~$0.133/image |
 | Best balanced choice | `banana2` | Top-3 quality, top-5 edits, web search, 1K/2K/4K | Varies | $0.08/image |
@@ -186,7 +189,7 @@ Motif keeps two model views:
 ### Runnable Image Registry
 
 | ID | Model | Best For | Edit Refs | Sizing | Estimate |
-| --- | --- | --- | ---: | --- | ---: |
+| --- | --- | --- | --: | --- | --: |
 | `gpt2` | GPT Image 2 | Frontier OpenAI generation, edits, transparent PNGs | 4 | Image size enum | ~$0.211 |
 | `gpt` | GPT Image 1.5 | OpenAI edits and transparent PNGs | 4 | GPT fixed sizes | ~$0.133 |
 | `banana2` | Nano Banana 2 | Balanced default, web search, strong edits | 4 | Aspect + 1K/2K/4K | $0.08 |
@@ -214,58 +217,58 @@ Motif validates model-specific options before spending credits where fal constra
 
 Text-to-image snapshot, 2026-05-12:
 
-| Rank | Model | Elo | Motif |
-| ---: | --- | ---: | --- |
-| 1 | GPT Image 2 (high) | 1337 | `gpt2` |
-| 2 | GPT Image 1.5 (high) | 1268 | `gpt` |
-| 3 | Nano Banana 2 | 1263 | `banana2` |
-| 4 | Riverflow 2.0 | 1256 | Not routed |
-| 5 | Nano Banana Pro | 1220 | `banana` |
-| 6 | Seedream 4.0 | 1198 | `seedream4` |
-| 7 | MAI-Image-2 | 1198 | Not routed |
-| 8 | FLUX.2 Max | 1197 | `flux2-max` |
-| 9 | Peanut | 1187 | Not routed |
-| 10 | FLUX.2 Pro | 1186 | `flux2-pro` |
-| 11 | Imagen 4 Ultra Preview 0606 | 1184 | Not routed |
-| 12 | grok-imagine-image | 1182 | `grok-image` |
-| 13 | FLUX.2 Flex | 1182 | `flux2-flex` |
-| 14 | ImagineArt 2.0 | 1181 | Not routed |
-| 15 | Imagen 4 Ultra | 1171 | Not routed |
-| 16 | Imagen 4 Preview 0606 | 1169 | Not routed |
-| 17 | Seedream 4.5 | 1167 | `seedream45` |
-| 18 | FLUX.2 Dev Turbo | 1161 | Not routed |
-| 19 | FLUX.2 Dev | 1160 | `flux2-dev` |
-| 20 | Qwen Image Max 2512 | 1158 | `qwen` |
+| Rank | Model                       |  Elo | Motif        |
+| ---: | --------------------------- | ---: | ------------ |
+|    1 | GPT Image 2 (high)          | 1337 | `gpt2`       |
+|    2 | GPT Image 1.5 (high)        | 1268 | `gpt`        |
+|    3 | Nano Banana 2               | 1263 | `banana2`    |
+|    4 | Riverflow 2.0               | 1256 | Not routed   |
+|    5 | Nano Banana Pro             | 1220 | `banana`     |
+|    6 | Seedream 4.0                | 1198 | `seedream4`  |
+|    7 | MAI-Image-2                 | 1198 | Not routed   |
+|    8 | FLUX.2 Max                  | 1197 | `flux2-max`  |
+|    9 | Peanut                      | 1187 | Not routed   |
+|   10 | FLUX.2 Pro                  | 1186 | `flux2-pro`  |
+|   11 | Imagen 4 Ultra Preview 0606 | 1184 | Not routed   |
+|   12 | grok-imagine-image          | 1182 | `grok-image` |
+|   13 | FLUX.2 Flex                 | 1182 | `flux2-flex` |
+|   14 | ImagineArt 2.0              | 1181 | Not routed   |
+|   15 | Imagen 4 Ultra              | 1171 | Not routed   |
+|   16 | Imagen 4 Preview 0606       | 1169 | Not routed   |
+|   17 | Seedream 4.5                | 1167 | `seedream45` |
+|   18 | FLUX.2 Dev Turbo            | 1161 | Not routed   |
+|   19 | FLUX.2 Dev                  | 1160 | `flux2-dev`  |
+|   20 | Qwen Image Max 2512         | 1158 | `qwen`       |
 
 Editing snapshot, 2026-05-12:
 
-| Rank | Model | Elo | Motif |
-| ---: | --- | ---: | --- |
-| 1 | Riverflow 2.0 | 1286 | Not routed |
-| 2 | GPT Image 1.5 (high) | 1262 | `gpt` |
-| 3 | GPT Image 2 (high) | 1249 | `gpt2` |
-| 4 | Nano Banana Pro | 1241 | `banana` |
-| 5 | Nano Banana 2 | 1231 | `banana2` |
-| 6 | HunyuanImage 3.0 Instruct (Fal) | 1222 | Not routed |
-| 7 | grok-imagine-image | 1213 | `grok-image` |
-| 8 | grok-imagine-image-pro | 1212 | Not routed |
-| 9 | Kling Image 3.0 Omni | 1207 | Not routed |
-| 10 | FLUX.2 Max | 1206 | `flux2-max` |
-| 11 | Wan 2.7 Pro | 1200 | Not routed |
-| 12 | Kling Image 3.0 | 1196 | Not routed |
-| 13 | Kling Image O1 | 1193 | Not routed |
-| 14 | Wan 2.6 Image | 1188 | Not routed |
-| 15 | Riverflow 1 | 1184 | Not routed |
-| 16 | Seedream 4.0 | 1184 | `seedream4` |
-| 17 | Seedream 4.5 | 1184 | `seedream45` |
-| 18 | Wan 2.7 | 1181 | Not routed |
-| 19 | Nano Banana | 1173 | `gemini` |
-| 20 | Reve V1 (December) | 1172 | Not routed |
+| Rank | Model                           |  Elo | Motif        |
+| ---: | ------------------------------- | ---: | ------------ |
+|    1 | Riverflow 2.0                   | 1286 | Not routed   |
+|    2 | GPT Image 1.5 (high)            | 1262 | `gpt`        |
+|    3 | GPT Image 2 (high)              | 1249 | `gpt2`       |
+|    4 | Nano Banana Pro                 | 1241 | `banana`     |
+|    5 | Nano Banana 2                   | 1231 | `banana2`    |
+|    6 | HunyuanImage 3.0 Instruct (Fal) | 1222 | Not routed   |
+|    7 | grok-imagine-image              | 1213 | `grok-image` |
+|    8 | grok-imagine-image-pro          | 1212 | Not routed   |
+|    9 | Kling Image 3.0 Omni            | 1207 | Not routed   |
+|   10 | FLUX.2 Max                      | 1206 | `flux2-max`  |
+|   11 | Wan 2.7 Pro                     | 1200 | Not routed   |
+|   12 | Kling Image 3.0                 | 1196 | Not routed   |
+|   13 | Kling Image O1                  | 1193 | Not routed   |
+|   14 | Wan 2.6 Image                   | 1188 | Not routed   |
+|   15 | Riverflow 1                     | 1184 | Not routed   |
+|   16 | Seedream 4.0                    | 1184 | `seedream4`  |
+|   17 | Seedream 4.5                    | 1184 | `seedream45` |
+|   18 | Wan 2.7                         | 1181 | Not routed   |
+|   19 | Nano Banana                     | 1173 | `gemini`     |
+|   20 | Reve V1 (December)              | 1172 | Not routed   |
 
 Built-in utility and video shortcuts:
 
 | ID | Model | Used By | Estimate |
-| --- | --- | --- | ---: |
+| --- | --- | --- | --: |
 | `clarity` | Clarity Upscaler | `--up` default | $0.02 |
 | `crystal` | Crystal Upscaler | Optional upscaler in config | $0.02 |
 | `rmbg` | BiRefNet Background Removal | `--rmbg` default | $0.02 |
@@ -305,43 +308,43 @@ Use `--dry-run` to see the estimated cost for a specific command. Per-megapixel 
 
 Text-to-video snapshot, 2026-05-12:
 
-| Rank | Model | Elo | API pricing |
-| ---: | --- | ---: | ---: |
-| 1 | HappyHorse-1.0 | 1354 | $14.40/min |
-| 2 | Dreamina Seedance 2.0 720p | 1273 | No API |
-| 3 | Kling 3.0 1080p (Pro) | 1249 | $13.44/min |
-| 4 | Kling 3.0 Omni 1080p (Pro) | 1233 | $13.44/min |
-| 5 | grok-imagine-video | 1233 | $4.20/min |
-| 6 | Vidu Q3 Pro | 1225 | $9.60/min |
-| 7 | Bach-1.0 Preview | 1224 | $3.00/min |
-| 8 | Kling 3.0 Omni 720p (Standard) | 1224 | $10.08/min |
-| 9 | PixVerse V6 | 1222 | $5.40/min |
-| 10 | PixVerse V5.6 | 1221 | $9.00/min |
-| 11 | Runway Gen-4.5 | 1220 | No API |
-| 12 | Veo 3 | 1218 | $12.00/min |
-| 13 | Kling 3.0 720p (Standard) | 1215 | $10.08/min |
-| 14 | Veo 3.1 Lite | 1214 | $3.00/min |
-| 15 | Kling O1 Pro (January) | 1209 | $10.08/min |
+| Rank | Model                          |  Elo | API pricing |
+| ---: | ------------------------------ | ---: | ----------: |
+|    1 | HappyHorse-1.0                 | 1354 |  $14.40/min |
+|    2 | Dreamina Seedance 2.0 720p     | 1273 |      No API |
+|    3 | Kling 3.0 1080p (Pro)          | 1249 |  $13.44/min |
+|    4 | Kling 3.0 Omni 1080p (Pro)     | 1233 |  $13.44/min |
+|    5 | grok-imagine-video             | 1233 |   $4.20/min |
+|    6 | Vidu Q3 Pro                    | 1225 |   $9.60/min |
+|    7 | Bach-1.0 Preview               | 1224 |   $3.00/min |
+|    8 | Kling 3.0 Omni 720p (Standard) | 1224 |  $10.08/min |
+|    9 | PixVerse V6                    | 1222 |   $5.40/min |
+|   10 | PixVerse V5.6                  | 1221 |   $9.00/min |
+|   11 | Runway Gen-4.5                 | 1220 |      No API |
+|   12 | Veo 3                          | 1218 |  $12.00/min |
+|   13 | Kling 3.0 720p (Standard)      | 1215 |  $10.08/min |
+|   14 | Veo 3.1 Lite                   | 1214 |   $3.00/min |
+|   15 | Kling O1 Pro (January)         | 1209 |  $10.08/min |
 
 Image-to-video snapshot, 2026-05-12:
 
-| Rank | Model | Elo | API pricing |
-| ---: | --- | ---: | ---: |
-| 1 | HappyHorse-1.0 | 1395 | Coming soon |
-| 2 | Dreamina Seedance 2.0 720p | 1348 | No API |
-| 3 | grok-imagine-video | 1326 | $4.20/min |
-| 4 | PixVerse V6 | 1322 | $5.40/min |
-| 5 | Vidu Q3 Pro | 1287 | $9.60/min |
-| 6 | Kling 2.5 Turbo 1080p | 1283 | $4.20/min |
-| 7 | Kling 3.0 1080p (Pro) | 1280 | $13.44/min |
-| 8 | PixVerse V5.6 | 1279 | $9.00/min |
-| 9 | Kling 3.0 Omni 1080p (Pro) | 1277 | $13.44/min |
-| 10 | Kling 2.6 Standard (January) | 1271 | Coming soon |
-| 11 | PixVerse V5.5 | 1271 | $6.40/min |
-| 12 | Veo 3.1 Fast | 1268 | $6.00/min |
-| 13 | Runway Gen-4.5 | 1263 | No API |
-| 14 | Kling 3.0 Omni 720p (Standard) | 1263 | $10.08/min |
-| 15 | Kling 3.0 720p (Standard) | 1263 | $10.08/min |
+| Rank | Model                          |  Elo | API pricing |
+| ---: | ------------------------------ | ---: | ----------: |
+|    1 | HappyHorse-1.0                 | 1395 | Coming soon |
+|    2 | Dreamina Seedance 2.0 720p     | 1348 |      No API |
+|    3 | grok-imagine-video             | 1326 |   $4.20/min |
+|    4 | PixVerse V6                    | 1322 |   $5.40/min |
+|    5 | Vidu Q3 Pro                    | 1287 |   $9.60/min |
+|    6 | Kling 2.5 Turbo 1080p          | 1283 |   $4.20/min |
+|    7 | Kling 3.0 1080p (Pro)          | 1280 |  $13.44/min |
+|    8 | PixVerse V5.6                  | 1279 |   $9.00/min |
+|    9 | Kling 3.0 Omni 1080p (Pro)     | 1277 |  $13.44/min |
+|   10 | Kling 2.6 Standard (January)   | 1271 | Coming soon |
+|   11 | PixVerse V5.5                  | 1271 |   $6.40/min |
+|   12 | Veo 3.1 Fast                   | 1268 |   $6.00/min |
+|   13 | Runway Gen-4.5                 | 1263 |      No API |
+|   14 | Kling 3.0 Omni 720p (Standard) | 1263 |  $10.08/min |
+|   15 | Kling 3.0 720p (Standard)      | 1263 |  $10.08/min |
 
 ## Common Commands
 
@@ -371,10 +374,7 @@ motif "compare current product packaging trends" --model banana2 --google-search
 
 ## Creative Direction
 
-Creative direction appends predefined clauses to the prompt before the fal request
-is built. Eight fields are available — `recipe`, `shot`, `lighting`, `genre`,
-`camera`, `color`, `material`, and `motion` — each set with a matching CLI flag or
-a key in the SDK `creative` option.
+Creative direction appends predefined clauses to the prompt before the fal request is built. Eight fields are available — `recipe`, `shot`, `lighting`, `genre`, `camera`, `color`, `material`, and `motion` — each set with a matching CLI flag or a key in the SDK `creative` option.
 
 ```bash
 motif "a ceramic desk lamp" --model banana2 --shot close-up --lighting rim
@@ -391,9 +391,7 @@ const result = await motif.generate({
 });
 ```
 
-An unknown option id fails validation with a structured `INVALID_OPTION` error.
-Option ids are versioned with the taxonomy; read the current ids from
-`motif --describe --format json`.
+An unknown option id fails validation with a structured `INVALID_OPTION` error. Option ids are versioned with the taxonomy; read the current ids from `motif --describe --format json`.
 
 ## Post-Processing
 
@@ -453,19 +451,19 @@ Motif stores the queue endpoint returned by fal and validates the output path be
 
 ## Presets
 
-| Preset | Aspect | Resolution | Use |
-| --- | --- | --- | --- |
-| `--cover` | `2:3` | `2K` | Kindle/eBook covers |
-| `--square` | `1:1` | Default | Icons, avatars, square posts |
-| `--landscape` | `16:9` | Default | Desktop and presentation images |
-| `--portrait` | `2:3` | Default | Portrait images |
-| `--story` | `9:16` | Default | Stories and vertical social media |
-| `--reel` | `9:16` | Default | Reels and vertical video inputs |
-| `--feed` | `4:5` | Default | Instagram feed portraits |
-| `--og` | `16:9` | Default | Open Graph/social share images |
-| `--wallpaper` | `9:16` | `2K` | Phone wallpapers |
-| `--wide` | `21:9` | Default | Cinematic wide images |
-| `--ultra` | `21:9` | `2K` | Ultra-wide banners |
+| Preset        | Aspect | Resolution | Use                               |
+| ------------- | ------ | ---------- | --------------------------------- |
+| `--cover`     | `2:3`  | `2K`       | Kindle/eBook covers               |
+| `--square`    | `1:1`  | Default    | Icons, avatars, square posts      |
+| `--landscape` | `16:9` | Default    | Desktop and presentation images   |
+| `--portrait`  | `2:3`  | Default    | Portrait images                   |
+| `--story`     | `9:16` | Default    | Stories and vertical social media |
+| `--reel`      | `9:16` | Default    | Reels and vertical video inputs   |
+| `--feed`      | `4:5`  | Default    | Instagram feed portraits          |
+| `--og`        | `16:9` | Default    | Open Graph/social share images    |
+| `--wallpaper` | `9:16` | `2K`       | Phone wallpapers                  |
+| `--wide`      | `21:9` | Default    | Cinematic wide images             |
+| `--ultra`     | `21:9` | `2K`       | Ultra-wide banners                |
 
 Supported aspect ratios: `auto`, `1:1`, `4:3`, `3:4`, `16:9`, `9:16`, `3:2`, `2:3`, `4:5`, `5:4`, `21:9`, `4:1`, `1:4`, `8:1`, `1:8`.
 
@@ -611,11 +609,9 @@ Motif reads configuration in this order:
 1. Built-in defaults.
 2. Global config at `~/.motif/config.json`.
 3. Project config at `.motifrc`.
-4. `FAL_KEY` from the environment for the API key, which takes precedence over
-   any `apiKey` saved in config.
+4. `FAL_KEY` from the environment for the API key, which takes precedence over any `apiKey` saved in config.
 
-Environment values are parsed through `@howells/envy`; an empty `FAL_KEY` is
-treated as missing so dry runs and config fallback keep working.
+Environment values are parsed through `@howells/envy`; an empty `FAL_KEY` is treated as missing so dry runs and config fallback keep working.
 
 Example:
 

@@ -1,5 +1,5 @@
 /**
- * @howells/motif-mcp
+ * motif-mcp entry point.
  *
  * MCP server exposing Motif image generation as tools.
  * Communicates over stdin/stdout using the MCP protocol.
@@ -9,6 +9,7 @@
 
 import { getFalKeyFromEnv, MotifServer } from "@howells/motif-sdk";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
 import { createMotifMcpServer } from "./create-server.js";
 
 // ─── Bootstrap ──────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ import { createMotifMcpServer } from "./create-server.js";
 const falKey = getFalKeyFromEnv();
 if (!falKey) {
   process.stderr.write(
-    "[motif-mcp] Fatal: FAL_KEY environment variable is not set.\n",
+    "[motif-mcp] Fatal: FAL_KEY environment variable is not set.\n"
   );
   process.exit(1);
 }

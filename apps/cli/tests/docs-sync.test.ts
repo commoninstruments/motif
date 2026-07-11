@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+
 import { GENERATION_MODELS } from "@howells/motif-sdk";
 import { describe, expect, it } from "vitest";
+
 import { ERROR_CATALOG } from "../src/utils/error-catalog";
 
-const testDir = dirname(fileURLToPath(import.meta.url));
+const testDir = import.meta.dirname;
 const repoRoot = resolve(testDir, "../../..");
 
 const cliAgentsPath = resolve(testDir, "../AGENTS.md");
@@ -13,7 +14,7 @@ const readmePath = resolve(repoRoot, "README.md");
 const mcpReadmePath = resolve(repoRoot, "packages/motif-mcp/README.md");
 
 function read(path: string): string {
-  return readFileSync(path, "utf8");
+  return readFileSync(path, "utf-8");
 }
 
 describe("docs sync", () => {
@@ -32,7 +33,7 @@ describe("docs sync", () => {
   });
 
   it("mentions creative direction in the user-facing docs", () => {
-    const docs: Array<[string, string]> = [
+    const docs: [string, string][] = [
       ["README.md", readmePath],
       ["apps/cli/AGENTS.md", cliAgentsPath],
       ["packages/motif-mcp/README.md", mcpReadmePath],
@@ -40,7 +41,7 @@ describe("docs sync", () => {
     for (const [label, path] of docs) {
       expect(
         read(path).toLowerCase(),
-        `missing creative in ${label}`,
+        `missing creative in ${label}`
       ).toContain("creative");
     }
   });

@@ -1,6 +1,7 @@
 import { MODELS } from "@howells/motif-sdk";
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
+
 import type { History } from "../../utils/config";
 import { openImage } from "../../utils/image";
 
@@ -86,10 +87,10 @@ export function GalleryScreen({ history, onBack }: GalleryScreenProps) {
       {pageItems.map((gen, index) => {
         const isSelected = index === selectedIndex;
         const date = new Date(gen.timestamp);
-        const timeStr =
-          date.toLocaleDateString() +
-          " " +
-          date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        const timeStr = `${date.toLocaleDateString()} ${date.toLocaleTimeString(
+          [],
+          { hour: "2-digit", minute: "2-digit" }
+        )}`;
 
         return (
           <Box key={gen.id} marginLeft={1}>

@@ -2,8 +2,11 @@ import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type EmitOptions, emitStream } from "../src/utils/output";
+
+import { emitStream } from "../src/utils/output";
+import type { EmitOptions } from "../src/utils/output";
 
 describe("emitStream", () => {
   let writtenData: string;
@@ -27,7 +30,7 @@ describe("emitStream", () => {
         { id: 1, name: "a" },
         { id: 2, name: "b" },
       ],
-      opts,
+      opts
     );
 
     const lines = writtenData.split("\n").filter(Boolean);
@@ -37,14 +40,14 @@ describe("emitStream", () => {
   });
 
   it("applies the field mask to every item", () => {
-    const opts: EmitOptions = { format: "human", fields: "id" };
+    const opts: EmitOptions = { fields: "id", format: "human" };
     emitStream(
       [
         { id: 1, secret: "x" },
         { id: 2, secret: "y" },
         { id: 3, secret: "z" },
       ],
-      opts,
+      opts
     );
 
     const lines = writtenData.split("\n").filter(Boolean);
@@ -79,7 +82,7 @@ function tempHome(): string {
 /** Seed a ~/.motif/history.json with the given generations under a temp HOME. */
 function seedHistory(
   home: string,
-  generations: Array<Record<string, unknown>>,
+  generations: Record<string, unknown>[]
 ): void {
   const motifDir = join(home, ".motif");
   mkdirSync(motifDir, { recursive: true });
@@ -87,13 +90,13 @@ function seedHistory(
     join(motifDir, "history.json"),
     JSON.stringify({
       generations,
-      totalCost: { session: 0, today: 0, allTime: 0 },
       lastSessionDate: new Date().toISOString().split("T")[0],
-    }),
+      totalCost: { allTime: 0, session: 0, today: 0 },
+    })
   );
 }
 
-function runMotif(args: string[], home: string): Promise<CliResult> {
+async function runMotif(args: string[], home: string): Promise<CliResult> {
   const child = spawn(
     process.execPath,
     ["--import", "tsx", "src/index.ts", ...args],
@@ -107,13 +110,13 @@ function runMotif(args: string[], home: string): Promise<CliResult> {
         NO_COLOR: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
-    },
+    }
   );
 
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
+  child.stdout.setEncoding("utf-8");
+  child.stderr.setEncoding("utf-8");
   child.stdout.on("data", (chunk) => {
     stdout += chunk;
   });
@@ -122,10 +125,10 @@ function runMotif(args: string[], home: string): Promise<CliResult> {
   });
   child.stdin.end("");
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ code: code ?? 0, stdout, stderr });
+      resolve({ code: code ?? 0, stderr, stdout });
     });
   });
 }
@@ -144,23 +147,23 @@ describe("history --format ndjson (spawned CLI)", () => {
     const home = tempHome();
     seedHistory(home, [
       {
-        id: "gen-one",
-        prompt: "a cat",
-        model: "banana",
         aspect: "1:1",
-        resolution: "2K",
-        output: "/tmp/one.png",
         cost: 0.08,
+        id: "gen-one",
+        model: "banana",
+        output: "/tmp/one.png",
+        prompt: "a cat",
+        resolution: "2K",
         timestamp: "2026-07-01T00:00:00.000Z",
       },
       {
-        id: "gen-two",
-        prompt: "a dog",
-        model: "flux",
         aspect: "1:1",
-        resolution: "2K",
-        output: "/tmp/two.png",
         cost: 0.06,
+        id: "gen-two",
+        model: "flux",
+        output: "/tmp/two.png",
+        prompt: "a dog",
+        resolution: "2K",
         timestamp: "2026-07-02T00:00:00.000Z",
       },
     ]);

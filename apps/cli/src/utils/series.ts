@@ -20,7 +20,9 @@ import {
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
+
 import type { AspectRatio, Resolution } from "@howells/motif-sdk";
+
 import { atomicWrite } from "./config";
 import { validateEditPath, validateResourceId } from "./input";
 
@@ -87,14 +89,14 @@ export interface SeriesConfig {
 export function slugify(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "")
     .slice(0, 64);
 }
 
 function ensureSeriesDir(): void {
   if (!existsSync(SERIES_DIR)) {
-    mkdirSync(SERIES_DIR, { recursive: true, mode: 0o700 });
+    mkdirSync(SERIES_DIR, { mode: 0o700, recursive: true });
   }
 }
 
@@ -134,21 +136,21 @@ export async function createSeries(options: {
     throw new Error(`Series "${options.name}" already exists (slug: ${slug})`);
   }
 
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  mkdirSync(dir, { mode: 0o700, recursive: true });
   mkdirSync(join(dir, "refs"), { recursive: true });
   mkdirSync(join(dir, "outputs"), { recursive: true });
 
   const config: SeriesConfig = {
-    id: randomUUID(),
-    name: options.name,
-    slug,
-    stylePrompt: options.stylePrompt ?? "",
-    model: options.model ?? "banana",
+    created: new Date().toISOString(),
     defaultAspect: options.defaultAspect ?? "1:1",
     defaultResolution: options.defaultResolution ?? "2K",
-    refs: [],
+    id: randomUUID(),
+    model: options.model ?? "banana",
+    name: options.name,
     outputs: [],
-    created: new Date().toISOString(),
+    refs: [],
+    slug,
+    stylePrompt: options.stylePrompt ?? "",
     updated: new Date().toISOString(),
   };
 
@@ -158,10 +160,10 @@ export async function createSeries(options: {
     const filename = `style-${basename(sourcePath)}`;
     cpSync(sourcePath, join(dir, "refs", filename));
     config.refs.push({
+      added: config.created,
+      description: "Initial style reference (from series creation)",
       filename,
       tag: "style",
-      description: "Initial style reference (from series creation)",
-      added: config.created,
     });
   }
 
@@ -182,7 +184,7 @@ export async function saveSeries(config: SeriesConfig): Promise<void> {
   const updated = { ...config, updated: new Date().toISOString() };
   await atomicWrite(
     seriesConfigPath(config.slug),
-    JSON.stringify(updated, null, 2),
+    JSON.stringify(updated, null, 2)
   );
 }
 
@@ -203,7 +205,7 @@ export async function listSeries(): Promise<SeriesConfig[]> {
   }
 
   return series.sort(
-    (a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime(),
+    (a, b) => new Date(b.updated).getTime() - new Date(a.updated).getTime()
   );
 }
 
@@ -212,7 +214,7 @@ export async function deleteSeries(slug: string): Promise<void> {
   if (!existsSync(dir)) {
     throw new Error(`Series not found: ${slug}`);
   }
-  rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, { force: true, recursive: true });
 }
 
 // -- Reference management --
@@ -221,7 +223,7 @@ export async function addRef(
   slug: string,
   imagePath: string,
   tag: string,
-  description: string,
+  description: string
 ): Promise<SeriesRef> {
   validateResourceId(tag, "ref tag");
   const config = await loadSeries(slug);
@@ -240,10 +242,10 @@ export async function addRef(
   cpSync(sourcePath, destPath);
 
   const ref: SeriesRef = {
+    added: new Date().toISOString(),
+    description,
     filename,
     tag,
-    description,
-    added: new Date().toISOString(),
   };
 
   config.refs.push(ref);
@@ -295,7 +297,7 @@ export function resolveRefs(config: SeriesConfig, tags?: string[]): string[] {
 
 export async function recordOutput(
   slug: string,
-  output: SeriesOutput,
+  output: SeriesOutput
 ): Promise<void> {
   const config = await loadSeries(slug);
   config.outputs.push(output);
@@ -305,7 +307,7 @@ export async function recordOutput(
 /** Build the full prompt by prepending the series style prompt */
 export function buildSeriesPrompt(
   config: SeriesConfig,
-  scenePrompt: string,
+  scenePrompt: string
 ): string {
   if (!config.stylePrompt) {
     return scenePrompt;

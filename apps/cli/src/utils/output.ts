@@ -7,13 +7,14 @@
  */
 
 import chalk from "chalk";
+
 import { getErrorMetadata } from "./error-catalog";
 
 export type OutputFormat = "human" | "json" | "ndjson";
 
 /** Detect if stdout is an interactive terminal */
 export function isInteractive(): boolean {
-  return process.stdout.isTTY === true;
+  return process.stdout.isTTY;
 }
 
 /** Resolve the output format from explicit flag or TTY detection */
@@ -27,7 +28,7 @@ export function resolveFormat(explicit?: string): OutputFormat {
 /** Filter an object to only include specified fields */
 function applyFieldMask(
   data: Record<string, unknown>,
-  fields: string[],
+  fields: string[]
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const field of fields) {
@@ -46,8 +47,11 @@ function sanitizeValue(value: unknown): unknown {
   if (typeof value === "string") {
     // Strip common prompt injection patterns from API response data
     return value
-      .replace(/\b(SYSTEM|INSTRUCTION|IGNORE PREVIOUS)\b.*$/gim, "[FILTERED]")
-      .replace(/<\/?(?:system|instruction|prompt)[^>]*>/gi, "[FILTERED]");
+      .replaceAll(
+        /\b(SYSTEM|INSTRUCTION|IGNORE PREVIOUS)\b.*$/gim,
+        "[FILTERED]"
+      )
+      .replaceAll(/<\/?(?:system|instruction|prompt)[^>]*>/gi, "[FILTERED]");
   }
   if (Array.isArray(value)) {
     return value.map(sanitizeValue);
@@ -78,7 +82,7 @@ export interface EmitOptions {
 /** Emit a single structured result */
 export function emit(
   data: Record<string, unknown>,
-  options: EmitOptions,
+  options: EmitOptions
 ): void {
   let output = options.sanitize ? sanitizeObject(data) : data;
 
@@ -96,7 +100,7 @@ export function emit(
 /** Emit multiple items as NDJSON (one JSON object per line) */
 export function emitStream(
   items: Record<string, unknown>[],
-  options: EmitOptions,
+  options: EmitOptions
 ): void {
   for (const item of items) {
     emit(item, { ...options, format: "ndjson" });
@@ -135,14 +139,14 @@ function deriveRfc7807(
     type?: string;
     title?: string;
     status?: number;
-  },
+  }
 ): { doc_uri: string; type: string; title: string; status: number } {
   const metadata = getErrorMetadata(code);
   return {
     doc_uri: overrides?.doc_uri ?? metadata.docUri,
-    type: overrides?.type ?? metadata.type,
-    title: overrides?.title ?? metadata.title,
     status: overrides?.status ?? metadata.status,
+    title: overrides?.title ?? metadata.title,
+    type: overrides?.type ?? metadata.type,
   };
 }
 
@@ -160,13 +164,13 @@ export function emitError(
     title?: string;
     status?: number;
   },
-  format: OutputFormat,
+  format: OutputFormat
 ): void {
   const rfc = deriveRfc7807(error.code, {
     doc_uri: error.doc_uri,
-    type: error.type,
-    title: error.title,
     status: error.status,
+    title: error.title,
+    type: error.type,
   });
   const metadata = getErrorMetadata(error.code);
 
@@ -189,7 +193,7 @@ export function emitError(
     process.stderr.write(`${JSON.stringify(structured)}\n`);
   } else {
     process.stderr.write(
-      `${chalk.red(`Error [${error.code}]: ${error.message}`)}\n`,
+      `${chalk.red(`Error [${error.code}]: ${error.message}`)}\n`
     );
   }
 }

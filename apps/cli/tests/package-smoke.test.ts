@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 interface PackFile {
@@ -19,12 +19,12 @@ interface RunResult {
   stdout: string;
 }
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const repoRoot = resolve(import.meta.dirname, "../../..");
 
-function runCommand(
+async function runCommand(
   command: string,
   args: string[],
-  cwd: string,
+  cwd: string
 ): Promise<RunResult> {
   const child = spawn(command, args, {
     cwd,
@@ -39,8 +39,8 @@ function runCommand(
 
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
+  child.stdout.setEncoding("utf-8");
+  child.stderr.setEncoding("utf-8");
   child.stdout.on("data", (chunk) => {
     stdout += chunk;
   });
@@ -48,7 +48,7 @@ function runCommand(
     stderr += chunk;
   });
 
-  return new Promise((resolveResult, reject) => {
+  return await new Promise((resolveResult, reject) => {
     child.on("error", reject);
     child.on("close", (code) => {
       resolveResult({ code: code ?? 0, stderr, stdout });
@@ -60,15 +60,15 @@ async function npmPackDryRun(packagePath: string): Promise<PackResult> {
   const result = await runCommand(
     "npm",
     ["pack", "--dry-run", "--json", "--ignore-scripts"],
-    packagePath,
+    packagePath
   );
   expect(result.code, result.stderr).toBe(0);
   return JSON.parse(result.stdout)[0] as PackResult;
 }
 
 function expectPublicPackage(pack: PackResult, expectedFiles: string[]) {
-  const files = pack.files.map((file) => file.path).sort();
-  expect(files).toEqual(expectedFiles.sort());
+  const files = pack.files.map((file) => file.path).toSorted();
+  expect(files).toEqual(expectedFiles.toSorted());
   expect(files.some((file) => file.includes("apps/web"))).toBe(false);
   expect(files.some((file) => file.includes(".env"))).toBe(false);
   expect(files.some((file) => file.includes("src/"))).toBe(false);
@@ -78,8 +78,8 @@ function expectPublicPackage(pack: PackResult, expectedFiles: string[]) {
         file === "package.json" ||
         file === "README.md" ||
         file.startsWith("dist/") ||
-        file.startsWith("bin/"),
-    ),
+        file.startsWith("bin/")
+    )
   ).toBe(true);
 }
 
@@ -98,7 +98,7 @@ describe("package smoke", () => {
     const help = await runCommand(
       process.execPath,
       [cliBin, "--help"],
-      repoRoot,
+      repoRoot
     );
     expect(help.code).toBe(0);
     expect(help.stdout).toContain("Usage:");
@@ -121,7 +121,7 @@ describe("package smoke", () => {
         "--format",
         "json",
       ],
-      repoRoot,
+      repoRoot
     );
     expect(dryRun.code).toBe(0);
     const payload = JSON.parse(dryRun.stdout) as Record<string, unknown>;
@@ -130,15 +130,15 @@ describe("package smoke", () => {
       valid: true,
     });
     expect(payload.body).toMatchObject({
-      image_size: "1536x1024",
       background: "transparent",
+      image_size: "1536x1024",
       quality: "medium",
     });
   });
 
   it("keeps public package tarballs limited to allowlisted files", async () => {
     const sdkPack = await npmPackDryRun(
-      resolve(repoRoot, "packages/motif-sdk"),
+      resolve(repoRoot, "packages/motif-sdk")
     );
     expectPublicPackage(sdkPack, [
       "README.md",
@@ -158,7 +158,7 @@ describe("package smoke", () => {
     ]);
 
     const mcpPack = await npmPackDryRun(
-      resolve(repoRoot, "packages/motif-mcp"),
+      resolve(repoRoot, "packages/motif-mcp")
     );
     expectPublicPackage(mcpPack, [
       "README.md",
@@ -168,7 +168,7 @@ describe("package smoke", () => {
     ]);
 
     const serverPack = await npmPackDryRun(
-      resolve(repoRoot, "packages/motif-server"),
+      resolve(repoRoot, "packages/motif-server")
     );
     expectPublicPackage(serverPack, [
       "README.md",

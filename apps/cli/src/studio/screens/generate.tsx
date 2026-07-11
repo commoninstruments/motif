@@ -1,23 +1,20 @@
 import { resolve } from "node:path";
+
 import {
   ASPECT_RATIOS,
-  type AspectRatio,
   estimateCost,
   GENERATION_MODELS,
   MODELS,
-  type ModelConfig,
   RESOLUTIONS,
-  type Resolution,
 } from "@howells/motif-sdk";
+import type { AspectRatio, ModelConfig, Resolution } from "@howells/motif-sdk";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useState } from "react";
+
 import { generate } from "../../api/fal";
-import {
-  addGeneration,
-  generateId,
-  type MotifConfig,
-} from "../../utils/config";
+import { addGeneration, generateId } from "../../utils/config";
+import type { MotifConfig } from "../../utils/config";
 import {
   downloadImage,
   generateFilename,
@@ -48,33 +45,33 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
-  { key: "square", label: "Square", description: "1:1", aspect: "1:1" },
-  { key: "landscape", label: "Landscape", description: "16:9", aspect: "16:9" },
-  { key: "portrait", label: "Portrait", description: "2:3", aspect: "2:3" },
+  { aspect: "1:1", description: "1:1", key: "square", label: "Square" },
+  { aspect: "16:9", description: "16:9", key: "landscape", label: "Landscape" },
+  { aspect: "2:3", description: "2:3", key: "portrait", label: "Portrait" },
   {
+    aspect: "9:16",
+    description: "9:16 vertical",
     key: "story",
     label: "Story/Reel",
-    description: "9:16 vertical",
-    aspect: "9:16",
   },
   {
+    aspect: "21:9",
+    description: "21:9 ultra-wide",
     key: "wide",
     label: "Cinematic",
-    description: "21:9 ultra-wide",
-    aspect: "21:9",
   },
   {
+    aspect: "2:3",
+    description: "2:3 @ 2K",
     key: "cover",
     label: "Book Cover",
-    description: "2:3 @ 2K",
-    aspect: "2:3",
     resolution: "2K",
   },
   {
+    aspect: "16:9",
+    description: "16:9 OG image",
     key: "og",
     label: "Social Share",
-    description: "16:9 OG image",
-    aspect: "16:9",
   },
 ];
 
@@ -89,21 +86,21 @@ type PostAction =
 
 const POST_ACTIONS: { key: PostAction; label: string; description: string }[] =
   [
-    { key: "edit", label: "Edit", description: "Modify with a new prompt" },
+    { description: "Modify with a new prompt", key: "edit", label: "Edit" },
     {
+      description: "Generate similar images",
       key: "variations",
       label: "Variations",
-      description: "Generate similar images",
     },
-    { key: "upscale", label: "Upscale", description: "Enhance resolution" },
-    { key: "rmbg", label: "Remove Background", description: "Transparent PNG" },
+    { description: "Enhance resolution", key: "upscale", label: "Upscale" },
+    { description: "Transparent PNG", key: "rmbg", label: "Remove Background" },
     {
+      description: "Same prompt, pick model",
       key: "regenerate",
       label: "Regenerate",
-      description: "Same prompt, pick model",
     },
-    { key: "new", label: "New Prompt", description: "Start fresh" },
-    { key: "home", label: "Done", description: "Back to home" },
+    { description: "Start fresh", key: "new", label: "New Prompt" },
+    { description: "Back to home", key: "home", label: "Done" },
   ];
 
 function modelRankSummary(config: ModelConfig | undefined): string {
@@ -134,12 +131,16 @@ function modelUseCase(config: ModelConfig | undefined): string {
 }
 
 function modelListSummary(config: ModelConfig | undefined): string {
-  if (!config) return "";
+  if (!config) {
+    return "";
+  }
   return [modelRankSummary(config), config.pricing].filter(Boolean).join(" · ");
 }
 
 function selectedModelSummary(config: ModelConfig | undefined): string {
-  if (!config) return "";
+  if (!config) {
+    return "";
+  }
   return [modelListSummary(config), modelTierSummary(config)]
     .filter(Boolean)
     .join(" · ");
@@ -163,7 +164,7 @@ export function GenerateScreen({
   const [model, setModel] = useState(config.defaultModel);
   const [aspect, setAspect] = useState<AspectRatio>(config.defaultAspect);
   const [resolution, setResolution] = useState<Resolution>(
-    config.defaultResolution,
+    config.defaultResolution
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [confirmField, setConfirmField] = useState<ConfirmField | null>(null);
@@ -181,7 +182,7 @@ export function GenerateScreen({
   const handleListNavigation = <T extends string>(
     items: readonly T[],
     onSelect: (item: T) => void,
-    key: { upArrow?: boolean; downArrow?: boolean; return?: boolean },
+    key: { upArrow?: boolean; downArrow?: boolean; return?: boolean }
   ) => {
     if (key.upArrow) {
       setSelectedIndex((i) => (i > 0 ? i - 1 : items.length - 1));
@@ -273,7 +274,7 @@ export function GenerateScreen({
         setConfirmField(null);
         setStep(MODELS[m]?.supportsAspect ? "aspect" : "confirm");
       },
-      key,
+      key
     );
   };
 
@@ -317,12 +318,12 @@ export function GenerateScreen({
     handleListNavigation(
       RESOLUTIONS,
       (r) => {
-        setResolution(r as Resolution);
+        setResolution(r);
         setConfirmIndex(0);
         setConfirmField(null);
         setStep("confirm");
       },
-      key,
+      key
     );
   };
 
@@ -343,27 +344,27 @@ export function GenerateScreen({
           setConfirmField(null);
           setSelectedIndex(0);
         },
-        key,
+        key
       );
     } else if (confirmField === "aspect") {
       handleListNavigation(
-        [...ASPECT_RATIOS] as string[] as readonly string[],
+        [...ASPECT_RATIOS] as string[],
         (a) => {
           setAspect(a as AspectRatio);
           setConfirmField(null);
           setSelectedIndex(0);
         },
-        key,
+        key
       );
     } else if (confirmField === "resolution") {
       handleListNavigation(
         RESOLUTIONS,
         (r) => {
-          setResolution(r as Resolution);
+          setResolution(r);
           setConfirmField(null);
           setSelectedIndex(0);
         },
-        key,
+        key
       );
     }
   };
@@ -375,8 +376,8 @@ export function GenerateScreen({
 
   const getFieldSelectedIndex = (field: ConfirmField): number => {
     const indexMap: Record<ConfirmField, number> = {
-      model: (GENERATION_MODELS as readonly string[]).indexOf(model),
       aspect: ASPECT_RATIOS.indexOf(aspect),
+      model: (GENERATION_MODELS as readonly string[]).indexOf(model),
       resolution: RESOLUTIONS.indexOf(resolution),
     };
     return indexMap[field];
@@ -384,7 +385,7 @@ export function GenerateScreen({
 
   const handleConfirmInput = (
     input: string,
-    key: { upArrow?: boolean; downArrow?: boolean; return?: boolean },
+    key: { upArrow?: boolean; downArrow?: boolean; return?: boolean }
   ) => {
     if (confirmField) {
       handleConfirmFieldEdit(key);
@@ -424,24 +425,29 @@ export function GenerateScreen({
         case "edit":
         case "variations":
         case "upscale":
-        case "rmbg":
+        case "rmbg": {
           onComplete("edit");
           break;
-        case "regenerate":
+        }
+        case "regenerate": {
           setStep("model");
           setSelectedIndex(0);
           break;
-        case "new":
+        }
+        case "new": {
           setPrompt("");
           setResult(null);
           setStep("prompt");
           setSelectedIndex(0);
           break;
-        case "home":
+        }
+        case "home": {
           onComplete("home");
           break;
-        default:
+        }
+        default: {
           break;
+        }
       }
     }
   };
@@ -473,11 +479,11 @@ export function GenerateScreen({
 
     try {
       const result = await generate({
-        prompt,
-        model,
         aspect,
-        resolution,
+        model,
         numImages: 1,
+        prompt,
+        resolution,
       });
 
       setStatus("Downloading...");
@@ -490,21 +496,21 @@ export function GenerateScreen({
 
       // Record generation
       await addGeneration({
-        id: generateId(),
-        prompt,
-        model,
         aspect,
-        resolution,
-        output: resolve(outputPath),
         cost,
+        id: generateId(),
+        model,
+        output: resolve(outputPath),
+        prompt,
+        resolution,
         timestamp: new Date().toISOString(),
       });
 
       const fullPath = resolve(outputPath);
 
       setResult({
-        path: fullPath,
         dims: dims ? `${dims.width}x${dims.height}` : "?",
+        path: fullPath,
         size,
       });
 
@@ -514,8 +520,8 @@ export function GenerateScreen({
 
       setSelectedIndex(0);
       setStep("done");
-    } catch (err) {
-      onError(err as Error);
+    } catch (error) {
+      onError(error as Error);
       onBack();
     }
   };

@@ -7,6 +7,7 @@ import {
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useState } from "react";
+
 import type { MotifConfig } from "../../utils/config";
 
 interface SettingItem {
@@ -20,32 +21,32 @@ const SETTINGS: SettingItem[] = [
   {
     key: "defaultModel",
     label: "Default Model",
-    type: "select",
     options: GENERATION_MODELS,
+    type: "select",
   },
   {
     key: "defaultAspect",
     label: "Default Aspect",
-    type: "select",
     options: ASPECT_RATIOS,
+    type: "select",
   },
   {
     key: "defaultResolution",
     label: "Default Resolution",
-    type: "select",
     options: RESOLUTIONS,
+    type: "select",
   },
   {
     key: "upscaler",
     label: "Upscaler",
-    type: "select",
     options: ["clarity", "crystal"],
+    type: "select",
   },
   {
     key: "backgroundRemover",
     label: "Background Remover",
-    type: "select",
     options: ["rmbg", "bria"],
+    type: "select",
   },
   { key: "openAfterGenerate", label: "Open After Generate", type: "toggle" },
   { key: "apiKey", label: "API Key", type: "text" },

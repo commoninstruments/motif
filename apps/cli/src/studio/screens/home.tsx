@@ -1,12 +1,13 @@
 import { MODELS } from "@howells/motif-sdk";
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
+
 import type { History } from "../../utils/config";
 import type { Screen } from "../app";
 
 function getMenuItemColor(
   isDisabled: boolean,
-  isSelected: boolean,
+  isSelected: boolean
 ): string | undefined {
   if (isDisabled) {
     return "gray";
@@ -26,24 +27,24 @@ interface MenuItem {
 
 const MENU_ITEMS: MenuItem[] = [
   {
+    description: "Create new image from prompt",
     key: "generate",
     label: "Generate",
-    description: "Create new image from prompt",
   },
   {
+    description: "Modify, upscale, or remove background",
     key: "edit",
     label: "Edit",
-    description: "Modify, upscale, or remove background",
   },
   {
+    description: "Browse generation history",
     key: "gallery",
     label: "Gallery",
-    description: "Browse generation history",
   },
   {
+    description: "Model, aspect, defaults",
     key: "settings",
     label: "Settings",
-    description: "Model, aspect, defaults",
   },
 ];
 

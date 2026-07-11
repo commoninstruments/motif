@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
-  type EmitOptions,
   emit,
   emitError,
   isStructured,
   resolveFormat,
 } from "../src/utils/output";
+import type { EmitOptions } from "../src/utils/output";
 
 describe("resolveFormat", () => {
   it("returns explicit json format", () => {
@@ -22,7 +23,7 @@ describe("resolveFormat", () => {
 
   it("falls back to TTY detection when no explicit format", () => {
     // In test environment, stdout.isTTY is typically undefined (non-TTY)
-    const result = resolveFormat(undefined);
+    const result = resolveFormat();
     expect(["human", "json"]).toContain(result);
   });
 
@@ -63,14 +64,14 @@ describe("emit", () => {
 
   it("emits JSON to stdout in json mode", () => {
     const opts: EmitOptions = { format: "json" };
-    emit({ foo: "bar", count: 42 }, opts);
+    emit({ count: 42, foo: "bar" }, opts);
 
     const parsed = JSON.parse(writtenData.trim());
-    expect(parsed).toEqual({ foo: "bar", count: 42 });
+    expect(parsed).toEqual({ count: 42, foo: "bar" });
   });
 
   it("applies field mask", () => {
-    const opts: EmitOptions = { format: "json", fields: "foo" };
+    const opts: EmitOptions = { fields: "foo", format: "json" };
     emit({ foo: "bar", secret: "hidden" }, opts);
 
     const parsed = JSON.parse(writtenData.trim());
@@ -79,7 +80,7 @@ describe("emit", () => {
   });
 
   it("applies multi-field mask", () => {
-    const opts: EmitOptions = { format: "json", fields: "a, c" };
+    const opts: EmitOptions = { fields: "a, c", format: "json" };
     emit({ a: 1, b: 2, c: 3 }, opts);
 
     const parsed = JSON.parse(writtenData.trim());
@@ -149,11 +150,11 @@ describe("emitError", () => {
     const parsed = JSON.parse(writtenData.trim());
     // Core fields
     expect(parsed).toMatchObject({
-      error: true,
       code: "TEST_ERR",
-      message: "test failed",
       doc_uri: "motif://describe/errors#test-err",
+      error: true,
       is_retriable: false,
+      message: "test failed",
       status: 500,
       type: "urn:motif:error:test-err",
     });
@@ -172,7 +173,7 @@ describe("emitError", () => {
     expect(parsed.status).toBe(400);
     expect(parsed.doc_uri).toBe("motif://describe/errors#unknown-model");
     expect(parsed.suggestions).toContain(
-      "Run 'motif --describe generate --format json' to inspect valid models",
+      "Run 'motif --describe generate --format json' to inspect valid models"
     );
   });
 
@@ -180,10 +181,10 @@ describe("emitError", () => {
     emitError(
       {
         code: "UNKNOWN_MODEL",
-        message: "bad model",
         details: { available: ["gpt", "banana"] },
+        message: "bad model",
       },
-      "json",
+      "json"
     );
 
     const parsed = JSON.parse(writtenData.trim());

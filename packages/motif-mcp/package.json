@@ -9,13 +9,8 @@
     "url": "git+https://github.com/howells/motif.git",
     "directory": "packages/motif-mcp"
   },
-  "type": "module",
   "bin": {
     "motif-mcp": "./bin/motif-mcp"
-  },
-  "main": "./dist/index.js",
-  "exports": {
-    ".": "./dist/index.js"
   },
   "files": [
     "bin",
@@ -23,14 +18,19 @@
     "README.md",
     "LICENSE"
   ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --target node22",
     "dev": "tsx src/index.ts",
-    "lint": "howells-lint",
-    "format": "howells-format",
+    "lint": "howells-check .",
+    "lint:fix": "howells-fix .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepack": "pnpm build"
@@ -40,7 +40,7 @@
     "@modelcontextprotocol/sdk": "^1.0.0"
   },
   "devDependencies": {
-    "@howells/lint": "^0.1.6",
+    "@howells/lint": "^1.1.0",
     "@howells/typescript-config": "^0.1.2",
     "@types/node": "^25.6.0",
     "tsup": "^8.0.0",

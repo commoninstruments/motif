@@ -1,8 +1,11 @@
-import { err, ok, type Result } from "neverthrow";
+import { err, ok } from "neverthrow";
+import type { Result } from "neverthrow";
+
 import { estimateCost, estimateVideoCost } from "./cost";
 import { buildGenerateBody } from "./generate";
 import { GENERATION_MODELS, MODELS, UTILITY_MODELS } from "./models";
-import { buildFalToolRequest, FAL_TOOLS, type FalToolRequest } from "./tools";
+import { buildFalToolRequest, FAL_TOOLS } from "./tools";
+import type { FalToolRequest } from "./tools";
 import type {
   GenerateOptions,
   JobStatus,
@@ -26,12 +29,14 @@ const FAL_REST_URL = "https://rest.alpha.fal.ai";
 
 function endpointFromQueueUrl(
   url: string | undefined,
-  fallback: string,
+  fallback: string
 ): string {
-  if (!url) return fallback;
+  if (!url) {
+    return fallback;
+  }
   try {
     const parsed = new URL(url);
-    const match = parsed.pathname.match(/^\/(.+)\/requests\//);
+    const match = /^\/(.+)\/requests\//.exec(parsed.pathname);
     return match?.[1] ?? fallback;
   } catch {
     return fallback;
@@ -83,11 +88,11 @@ export class MotifServer {
 
   /** Generate images synchronously (blocks until fal.ai returns). */
   async generate(
-    options: GenerateOptions,
+    options: GenerateOptions
   ): Promise<Result<MotifResponse, MotifError>> {
     const config = MODELS[options.model];
     if (config?.useQueue) {
-      return this.generateQueued(options);
+      return await this.generateQueued(options);
     }
 
     let built: ReturnType<typeof buildGenerateBody>;
@@ -98,9 +103,9 @@ export class MotifServer {
     }
     const { endpoint, body } = built;
     const response = await this.request(`${FAL_BASE_URL}/${endpoint}`, {
-      method: "POST",
       body: JSON.stringify(body),
       headers: this.ephemeralHeaders(options),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -111,7 +116,7 @@ export class MotifServer {
   }
 
   private async generateQueued(
-    options: GenerateOptions,
+    options: GenerateOptions
   ): Promise<Result<MotifResponse, MotifError>> {
     const job = await this.submitGeneration(options);
     if (job.isErr()) {
@@ -124,19 +129,19 @@ export class MotifServer {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const status = await this.getJobStatus(
         job.value.endpoint,
-        job.value.requestId,
+        job.value.requestId
       );
       if (status.isErr()) {
         return err(status.error);
       }
 
       if (status.value.status === "completed") {
-        return this.getJobResult(job.value.endpoint, job.value.requestId);
+        return await this.getJobResult(job.value.endpoint, job.value.requestId);
       }
 
       if (status.value.status === "failed") {
         return err(
-          new MotifError(status.value.error ?? "Queued generation failed", 0),
+          new MotifError(status.value.error ?? "Queued generation failed", 0)
         );
       }
 
@@ -150,7 +155,7 @@ export class MotifServer {
 
   /** Submit a generation to the fal.ai queue (returns immediately). */
   async submitGeneration(
-    options: GenerateOptions,
+    options: GenerateOptions
   ): Promise<Result<QueuedJob, MotifError>> {
     let built: ReturnType<typeof buildGenerateBody>;
     try {
@@ -161,9 +166,9 @@ export class MotifServer {
     const { endpoint, body } = built;
 
     const response = await this.request(`${FAL_QUEUE_URL}/${endpoint}`, {
-      method: "POST",
       body: JSON.stringify(body),
       headers: this.ephemeralHeaders(options),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -175,20 +180,20 @@ export class MotifServer {
     };
 
     return ok({
-      requestId: data.request_id,
       endpoint: endpointFromQueueUrl(data.response_url, endpoint),
       estimatedCost: estimateCost(
         options.model,
         options.resolution,
-        options.numImages,
+        options.numImages
       ),
+      requestId: data.request_id,
     });
   }
 
   /** Check the status of a queued generation. */
   async getJobStatus(
     endpoint: string,
-    requestId: string,
+    requestId: string
   ): Promise<Result<JobStatus, MotifError>> {
     const url = `${FAL_QUEUE_URL}/${endpoint}/requests/${requestId}/status?logs=1`;
     const response = await this.request(url);
@@ -201,7 +206,7 @@ export class MotifServer {
       error?: string;
       status: string;
       queue_position?: number;
-      logs?: Array<{ message: string; timestamp: string }>;
+      logs?: { message: string; timestamp: string }[];
     };
 
     let status: JobStatus["status"];
@@ -222,17 +227,17 @@ export class MotifServer {
     }
 
     return ok({
-      status,
       error: data.error ?? data.detail,
-      queuePosition: data.queue_position,
       logs: data.logs,
+      queuePosition: data.queue_position,
+      status,
     });
   }
 
   /** Fetch the completed result from the queue. */
   async getJobResult(
     endpoint: string,
-    requestId: string,
+    requestId: string
   ): Promise<Result<MotifResponse, MotifError>> {
     const url = `${FAL_QUEUE_URL}/${endpoint}/requests/${requestId}`;
     const response = await this.request(url);
@@ -248,7 +253,7 @@ export class MotifServer {
 
   /** Upscale an image using clarity or crystal upscaler. */
   async upscale(
-    options: UpscaleOptions,
+    options: UpscaleOptions
   ): Promise<Result<MotifResponse, MotifError>> {
     const {
       imageUrl,
@@ -270,23 +275,40 @@ export class MotifServer {
     const body: Record<string, unknown> = { image_url: imageUrl };
 
     if (model === "crystal") {
-      if (scaleFactor !== undefined) body.scale_factor = scaleFactor;
-      if (creativity !== undefined) body.creativity = creativity;
+      if (scaleFactor !== undefined) {
+        body.scale_factor = scaleFactor;
+      }
+      if (creativity !== undefined) {
+        body.creativity = creativity;
+      }
     } else {
       // clarity (default)
-      if (scaleFactor !== undefined) body.upscale_factor = scaleFactor;
-      if (creativity !== undefined) body.creativity = creativity;
-      if (resemblance !== undefined) body.resemblance = resemblance;
-      if (upscalePrompt) body.prompt = upscalePrompt;
-      if (negativePrompt) body.negative_prompt = negativePrompt;
-      if (numInferenceSteps !== undefined)
+      if (scaleFactor !== undefined) {
+        body.upscale_factor = scaleFactor;
+      }
+      if (creativity !== undefined) {
+        body.creativity = creativity;
+      }
+      if (resemblance !== undefined) {
+        body.resemblance = resemblance;
+      }
+      if (upscalePrompt) {
+        body.prompt = upscalePrompt;
+      }
+      if (negativePrompt) {
+        body.negative_prompt = negativePrompt;
+      }
+      if (numInferenceSteps !== undefined) {
         body.num_inference_steps = numInferenceSteps;
-      if (guidanceScale !== undefined) body.guidance_scale = guidanceScale;
+      }
+      if (guidanceScale !== undefined) {
+        body.guidance_scale = guidanceScale;
+      }
     }
 
     const response = await this.request(`${FAL_BASE_URL}/${config.endpoint}`, {
-      method: "POST",
       body: JSON.stringify(body),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -298,7 +320,7 @@ export class MotifServer {
 
   /** Remove the background from an image. */
   async removeBackground(
-    options: RemoveBackgroundOptions,
+    options: RemoveBackgroundOptions
   ): Promise<Result<MotifResponse, MotifError>> {
     const {
       imageUrl,
@@ -313,25 +335,33 @@ export class MotifServer {
     const config = MODELS[model];
     if (!config) {
       return err(
-        new MotifError(`Invalid background removal model: ${model}`, 0),
+        new MotifError(`Invalid background removal model: ${model}`, 0)
       );
     }
 
     const rbBody: Record<string, unknown> = { image_url: imageUrl };
     if (model === "rmbg") {
       // birefnet model supports these extra params
-      if (variant) rbBody.model = variant;
-      if (operatingResolution)
+      if (variant) {
+        rbBody.model = variant;
+      }
+      if (operatingResolution) {
         rbBody.operating_resolution = operatingResolution;
-      if (outputFormat) rbBody.output_format = outputFormat;
-      if (refineForeground !== undefined)
+      }
+      if (outputFormat) {
+        rbBody.output_format = outputFormat;
+      }
+      if (refineForeground !== undefined) {
         rbBody.refine_foreground = refineForeground;
-      if (outputMask !== undefined) rbBody.output_mask = outputMask;
+      }
+      if (outputMask !== undefined) {
+        rbBody.output_mask = outputMask;
+      }
     }
 
     const response = await this.request(`${FAL_BASE_URL}/${config.endpoint}`, {
-      method: "POST",
       body: JSON.stringify(rbBody),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -349,7 +379,7 @@ export class MotifServer {
    * Returns immediately with a job — poll with getJobStatus/getVideoResult.
    */
   async submitVideo(
-    options: VideoOptions,
+    options: VideoOptions
   ): Promise<Result<QueuedJob, MotifError>> {
     const {
       imageUrl,
@@ -367,21 +397,25 @@ export class MotifServer {
     }
 
     const body: Record<string, unknown> = {
-      start_image_url: imageUrl,
-      prompt,
       duration: String(duration),
       generate_audio: generateAudio,
+      prompt,
+      start_image_url: imageUrl,
     };
 
     if (endImageUrl) {
       body.end_image_url = endImageUrl;
     }
-    if (negativePrompt) body.negative_prompt = negativePrompt;
-    if (cfgScale !== undefined) body.cfg_scale = cfgScale;
+    if (negativePrompt) {
+      body.negative_prompt = negativePrompt;
+    }
+    if (cfgScale !== undefined) {
+      body.cfg_scale = cfgScale;
+    }
 
     const response = await this.request(`${FAL_QUEUE_URL}/${config.endpoint}`, {
-      method: "POST",
       body: JSON.stringify(body),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -393,16 +427,16 @@ export class MotifServer {
     };
 
     return ok({
-      requestId: data.request_id,
       endpoint: endpointFromQueueUrl(data.response_url, config.endpoint),
       estimatedCost: estimateVideoCost(duration, generateAudio),
+      requestId: data.request_id,
     });
   }
 
   /** Fetch the completed video result from the queue. */
   async getVideoResult(
     endpoint: string,
-    requestId: string,
+    requestId: string
   ): Promise<Result<VideoResponse, MotifError>> {
     const url = `${FAL_QUEUE_URL}/${endpoint}/requests/${requestId}`;
     const response = await this.request(url);
@@ -424,10 +458,10 @@ export class MotifServer {
     }
 
     return ok({
-      url: data.video.url,
       contentType: data.video.content_type,
       fileName: data.video.file_name,
       fileSize: data.video.file_size,
+      url: data.video.url,
     });
   }
 
@@ -439,17 +473,17 @@ export class MotifServer {
    */
   async uploadToFalCdn(
     file: ArrayBuffer | Uint8Array,
-    options: { contentType: string; fileName: string },
+    options: { contentType: string; fileName: string }
   ): Promise<Result<string, MotifError>> {
     const initiateResponse = await this.request(
       `${FAL_REST_URL}/storage/upload/initiate?storage_type=fal-cdn-v3`,
       {
-        method: "POST",
         body: JSON.stringify({
           content_type: options.contentType,
           file_name: options.fileName,
         }),
-      },
+        method: "POST",
+      }
     );
     if (initiateResponse.isErr()) {
       return err(initiateResponse.error);
@@ -463,19 +497,19 @@ export class MotifServer {
     let putResponse: Response;
     try {
       const body = Buffer.from(
-        file instanceof Uint8Array ? file : new Uint8Array(file),
+        file instanceof Uint8Array ? file : new Uint8Array(file)
       );
       putResponse = await fetch(upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": options.contentType },
         body,
+        headers: { "Content-Type": options.contentType },
+        method: "PUT",
       });
     } catch (error) {
       return err(
         new MotifError(
           `Upload PUT failed: ${error instanceof Error ? error.message : String(error)}`,
-          0,
-        ),
+          0
+        )
       );
     }
 
@@ -483,8 +517,8 @@ export class MotifServer {
       return err(
         new MotifError(
           `Upload PUT failed: ${putResponse.status}`,
-          putResponse.status,
-        ),
+          putResponse.status
+        )
       );
     }
 
@@ -495,7 +529,7 @@ export class MotifServer {
 
   /** Run a registered fal utility/tool endpoint. */
   async runTool(
-    options: ToolRunOptions,
+    options: ToolRunOptions
   ): Promise<Result<ToolResponse, MotifError>> {
     let request: FalToolRequest;
     try {
@@ -504,14 +538,14 @@ export class MotifServer {
       return err(
         new MotifError(
           error instanceof Error ? error.message : String(error),
-          0,
-        ),
+          0
+        )
       );
     }
 
     const response = await this.request(`${FAL_BASE_URL}/${request.endpoint}`, {
-      method: "POST",
       body: JSON.stringify(request.body),
+      method: "POST",
     });
     if (response.isErr()) {
       return err(response.error);
@@ -530,19 +564,19 @@ export class MotifServer {
   async deletePayloads(requestId: string): Promise<Result<void, MotifError>> {
     const response = await this.request(
       `${FAL_API_URL}/v1/models/requests/${encodeURIComponent(requestId)}/payloads`,
-      { method: "DELETE" },
+      { method: "DELETE" }
     );
     if (response.isErr()) {
       return err(response.error);
     }
-    return ok(undefined);
+    return ok();
   }
 
   /** Estimate cost for a generation (no API call). */
   estimateCost(
     model: string,
     resolution?: Resolution,
-    numImages?: number,
+    numImages?: number
   ): number {
     return estimateCost(model, resolution, numImages);
   }
@@ -580,23 +614,25 @@ export class MotifServer {
   /** Authenticated fetch to fal.ai APIs with retry logic. */
   private async request(
     url: string,
-    options: RequestInit = {},
+    options: RequestInit = {}
   ): Promise<Result<Response, MotifError>> {
     let lastError: MotifError | null = null;
 
     for (let attempt = 0; attempt <= this.retries; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, this.timeout);
 
       try {
         const response = await fetch(url, {
           ...options,
-          signal: controller.signal,
           headers: {
             Authorization: `Key ${this.apiKey}`,
             "Content-Type": "application/json",
             ...options.headers,
           },
+          signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
@@ -616,8 +652,8 @@ export class MotifServer {
           return err(
             new MotifError(
               `Request failed: ${response.status} ${text}`,
-              response.status,
-            ),
+              response.status
+            )
           );
         }
 
@@ -631,7 +667,7 @@ export class MotifServer {
 
         lastError = new MotifError(
           error instanceof Error ? error.message : String(error),
-          0,
+          0
         );
 
         // Retry on network errors
@@ -655,7 +691,7 @@ export class MotifServer {
    */
   private normalizeResponse(
     data: unknown,
-    fallbackRequestId?: string,
+    fallbackRequestId?: string
   ): Result<MotifResponse, MotifError> {
     const obj = data as Record<string, unknown>;
     const requestId =
@@ -665,16 +701,16 @@ export class MotifServer {
 
     if ("detail" in obj) {
       return err(
-        new MotifError((obj as { detail: string }).detail, 0, "FAL_ERROR"),
+        new MotifError((obj as { detail: string }).detail, 0, "FAL_ERROR")
       );
     }
 
     if ("image" in obj && !("images" in obj)) {
       return ok({
         images: [obj.image as MotifImage],
-        seed: obj.seed as number | undefined,
         prompt: obj.prompt as string | undefined,
         requestId,
+        seed: obj.seed as number | undefined,
       });
     }
 

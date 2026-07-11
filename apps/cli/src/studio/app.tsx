@@ -1,5 +1,6 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useState } from "react";
+
 import type { History, MotifConfig } from "../utils/config";
 import { EditScreen } from "./screens/edit";
 import { GalleryScreen } from "./screens/gallery";
@@ -38,18 +39,23 @@ export function App({
 
   const handleError = (err: Error) => {
     setError(err.message);
-    setTimeout(() => setError(null), 5000);
+    setTimeout(() => {
+      setError(null);
+    }, 5000);
   };
 
   const renderScreen = () => {
     switch (screen) {
-      case "home":
+      case "home": {
         return <HomeScreen history={history} onNavigate={setScreen} />;
-      case "generate":
+      }
+      case "generate": {
         return (
           <GenerateScreen
             config={config}
-            onBack={() => setScreen("home")}
+            onBack={() => {
+              setScreen("home");
+            }}
             onComplete={(nextScreen?: Screen) => {
               onHistoryChange();
               if (nextScreen === "edit") {
@@ -60,7 +66,8 @@ export function App({
             onError={handleError}
           />
         );
-      case "edit":
+      }
+      case "edit": {
         return (
           <EditScreen
             config={config}
@@ -77,23 +84,34 @@ export function App({
             skipToOperation={editFromGenerate}
           />
         );
-      case "gallery":
+      }
+      case "gallery": {
         return (
-          <GalleryScreen history={history} onBack={() => setScreen("home")} />
+          <GalleryScreen
+            history={history}
+            onBack={() => {
+              setScreen("home");
+            }}
+          />
         );
-      case "settings":
+      }
+      case "settings": {
         return (
           <SettingsScreen
             config={config}
-            onBack={() => setScreen("home")}
+            onBack={() => {
+              setScreen("home");
+            }}
             onSave={async (newConfig) => {
               await onConfigChange(newConfig);
               setScreen("home");
             }}
           />
         );
-      default:
+      }
+      default: {
         return <HomeScreen history={history} onNavigate={setScreen} />;
+      }
     }
   };
 

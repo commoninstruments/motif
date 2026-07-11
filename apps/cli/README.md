@@ -27,4 +27,3 @@ pnpm --filter @howells/motif-cli build
 ```
 
 See `apps/cli/AGENTS.md` for the detailed agent integration guide.
-

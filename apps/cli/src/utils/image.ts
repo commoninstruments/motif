@@ -12,15 +12,15 @@ const SIPS_WIDTH_REGEX = /pixelWidth:\s*(\d+)/;
 const SAFE_ENV = { PATH: process.env.PATH ?? "" };
 
 /** Run a command and return { stdout, exitCode } */
-function exec(
+async function exec(
   cmd: string,
-  args: string[],
+  args: string[]
 ): Promise<{ stdout: string; exitCode: number }> {
-  return new Promise((resolve) => {
+  return await new Promise((resolve) => {
     execFile(cmd, args, { env: SAFE_ENV }, (error, stdout) => {
       resolve({
-        stdout: stdout ?? "",
         exitCode: error ? ((error.code as number) ?? 1) : 0,
+        stdout: stdout ?? "",
       });
     });
   });
@@ -28,7 +28,7 @@ function exec(
 
 function detectImageExtension(
   buffer: Buffer,
-  contentType: string | null,
+  contentType: string | null
 ): ".gif" | ".jpg" | ".png" | ".webp" | null {
   if (buffer[0] === 0xff && buffer[1] === 0xd8) {
     return ".jpg";
@@ -101,7 +101,7 @@ function withDetectedExtension(outputPath: string, extension: string | null) {
 /** Download an image from a URL and save it to a file */
 export async function downloadImage(
   url: string,
-  outputPath: string,
+  outputPath: string
 ): Promise<string> {
   if (!url.startsWith("https://")) {
     throw new Error(`Refusing to download from non-HTTPS URL: ${url}`);
@@ -115,7 +115,7 @@ export async function downloadImage(
   const buffer = Buffer.from(await response.arrayBuffer());
   const actualPath = withDetectedExtension(
     outputPath,
-    detectImageExtension(buffer, response.headers.get("content-type")),
+    detectImageExtension(buffer, response.headers.get("content-type"))
   );
   await writeFile(actualPath, buffer);
   return actualPath;
@@ -153,7 +153,7 @@ export async function imageToDataUrl(imagePath: string): Promise<string> {
  */
 export async function resizeImage(
   imagePath: string,
-  maxSize = 1024,
+  maxSize = 1024
 ): Promise<string> {
   const tempPath = `/tmp/motif-resize-${randomUUID()}.png`;
 
@@ -178,7 +178,7 @@ export async function resizeImage(
 
 /** Get image dimensions from a file */
 export async function getImageDimensions(
-  imagePath: string,
+  imagePath: string
 ): Promise<{ width: number; height: number } | null> {
   try {
     const result = await exec("sips", [
@@ -188,13 +188,13 @@ export async function getImageDimensions(
       "pixelHeight",
       imagePath,
     ]);
-    const width = result.stdout.match(SIPS_WIDTH_REGEX)?.[1];
-    const height = result.stdout.match(SIPS_HEIGHT_REGEX)?.[1];
+    const width = SIPS_WIDTH_REGEX.exec(result.stdout)?.[1];
+    const height = SIPS_HEIGHT_REGEX.exec(result.stdout)?.[1];
 
     if (result.exitCode === 0 && width && height) {
       return {
-        width: Number.parseInt(width, 10),
         height: Number.parseInt(height, 10),
+        width: Number.parseInt(width, 10),
       };
     }
   } catch {
@@ -208,8 +208,8 @@ export async function getImageDimensions(
 
     if (match?.[1] && match[2]) {
       return {
-        width: Number.parseInt(match[1], 10),
         height: Number.parseInt(match[2], 10),
+        width: Number.parseInt(match[1], 10),
       };
     }
   } catch {
@@ -241,7 +241,7 @@ export function indexedOutputPath(outputPath: string, index: number): string {
 /** Generate a timestamped filename */
 export function generateFilename(prefix = "motif"): string {
   const now = new Date();
-  const timestamp = now.toISOString().slice(0, 19).replace(/[-:T]/g, "");
+  const timestamp = now.toISOString().slice(0, 19).replaceAll(/[-:T]/g, "");
   return `${prefix}-${timestamp}.png`;
 }
 

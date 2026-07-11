@@ -1,9 +1,6 @@
 # motif CLI — Agent Integration Guide
 
-> **Security posture**: The agent is not a trusted operator.
-> All inputs are validated. Generate output paths are sandboxed to CWD.
-> Post-processing (`--up`, `--rmbg`) writes alongside the source image by default.
-> Always use `--dry-run` before mutating commands.
+> **Security posture**: The agent is not a trusted operator. All inputs are validated. Generate output paths are sandboxed to CWD. Post-processing (`--up`, `--rmbg`) writes alongside the source image by default. Always use `--dry-run` before mutating commands.
 
 ## Quick Start
 
@@ -31,36 +28,62 @@ motif --history --limit 5 --fields id,prompt,cost
 
 motif auto-detects the output context:
 
-| Context | Default Format | Override |
-|---------|---------------|----------|
-| Interactive terminal (TTY) | `human` (colored, spinners) | `--format json` |
-| Piped / redirected | `json` (one JSON object) | `--format human` |
-| Streaming large results | n/a | `--format ndjson` |
+| Context                    | Default Format              | Override          |
+| -------------------------- | --------------------------- | ----------------- |
+| Interactive terminal (TTY) | `human` (colored, spinners) | `--format json`   |
+| Piped / redirected         | `json` (one JSON object)    | `--format human`  |
+| Streaming large results    | n/a                         | `--format ndjson` |
 
 **Always structured errors**: In JSON mode, errors are written to stderr as:
+
 ```json
-{"error":true,"code":"UNKNOWN_MODEL","message":"Unknown model: foo","is_retriable":false,"details":{"available":["gpt2","gpt","banana2","banana","gemini","gemini3","seedream4","seedream45","seedream5","seedream5-lite","flux2-max","flux2-pro","flux2-flex","flux2-dev","flux2-turbo","flux","flux-fast","recraft","recraft4","ideogram","ideogram4","grok-image","qwen"]}}
+{
+  "error": true,
+  "code": "UNKNOWN_MODEL",
+  "message": "Unknown model: foo",
+  "is_retriable": false,
+  "details": {
+    "available": [
+      "gpt2",
+      "gpt",
+      "banana2",
+      "banana",
+      "gemini",
+      "gemini3",
+      "seedream4",
+      "seedream45",
+      "seedream5",
+      "seedream5-lite",
+      "flux2-max",
+      "flux2-pro",
+      "flux2-flex",
+      "flux2-dev",
+      "flux2-turbo",
+      "flux",
+      "flux-fast",
+      "recraft",
+      "recraft4",
+      "ideogram",
+      "ideogram4",
+      "grok-image",
+      "qwen"
+    ]
+  }
+}
 ```
 
-Error codes are grouped below. Every code the CLI can emit is listed; the live
-catalog is available from `motif --describe --format json`.
+Error codes are grouped below. Every code the CLI can emit is listed; the live catalog is available from `motif --describe --format json`.
 
-- General: `MISSING_API_KEY`, `UNKNOWN_MODEL`, `INVALID_MODEL_ID`, `INVALID_OPTION`,
-  `INVALID_OUTPUT_PATH`, `INVALID_EDIT_PATH`, `INVALID_IMAGE_PATH`, `INVALID_STDIN`,
-  `EMPTY_PROMPT`, `TOO_MANY_REFERENCES`, `NO_PREVIOUS`, `GENERATION_FAILED`,
-  `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `DESCRIBE_FAILED`.
+- General: `MISSING_API_KEY`, `UNKNOWN_MODEL`, `INVALID_MODEL_ID`, `INVALID_OPTION`, `INVALID_OUTPUT_PATH`, `INVALID_EDIT_PATH`, `INVALID_IMAGE_PATH`, `INVALID_STDIN`, `EMPTY_PROMPT`, `TOO_MANY_REFERENCES`, `NO_PREVIOUS`, `GENERATION_FAILED`, `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `DESCRIBE_FAILED`.
 - Tools: `UNKNOWN_TOOL`, `INVALID_TOOL_ID`, `TOOL_FAILED`.
-- Series: `SERIES_CREATE_FAILED`, `SERIES_NOT_FOUND`, `SERIES_REF_ADD_FAILED`,
-  `SERIES_REF_REMOVE_FAILED`, `SERIES_GENERATE_FAILED`, `SERIES_DELETE_FAILED`.
+- Series: `SERIES_CREATE_FAILED`, `SERIES_NOT_FOUND`, `SERIES_REF_ADD_FAILED`, `SERIES_REF_REMOVE_FAILED`, `SERIES_GENERATE_FAILED`, `SERIES_DELETE_FAILED`.
 
 ### Exit Codes
 
-Structured failures exit with a semantic process code derived from the error's
-RFC 7807 `status` field. Agents can branch on the exit code without parsing
-stderr. The mapping is:
+Structured failures exit with a semantic process code derived from the error's RFC 7807 `status` field. Agents can branch on the exit code without parsing stderr. The mapping is:
 
 | Exit | Meaning | Status | Example error codes |
-|------|---------|--------|---------------------|
+| --- | --- | --- | --- |
 | `0` | Success | — | — |
 | `1` | Unknown / unmapped | — | Unstructured crashes; any status outside the ranges below |
 | `2` | Invalid input or usage | `4xx` (except `401`/`403`/`404`) | `UNKNOWN_MODEL`, `UNKNOWN_TOOL`, `INVALID_MODEL_ID`, `INVALID_TOOL_ID`, `INVALID_OPTION`, `INVALID_OUTPUT_PATH`, `INVALID_EDIT_PATH`, `INVALID_IMAGE_PATH`, `INVALID_STDIN`, `EMPTY_PROMPT`, `TOO_MANY_REFERENCES` |
@@ -68,23 +91,24 @@ stderr. The mapping is:
 | `4` | Resource not found | `404` | `NO_PREVIOUS`, `SERIES_NOT_FOUND` |
 | `5` | Upstream (fal) failure | `5xx` | `GENERATION_FAILED`, `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `TOOL_FAILED`, `DESCRIBE_FAILED`, `SERIES_CREATE_FAILED`, `SERIES_REF_ADD_FAILED`, `SERIES_REF_REMOVE_FAILED`, `SERIES_GENERATE_FAILED`, `SERIES_DELETE_FAILED` |
 
-Every structured error still carries the machine-readable `status` field, so the
-exit code and the JSON envelope always agree. Unstructured crashes (unexpected
-exceptions the CLI did not classify) still exit `1`.
+Every structured error still carries the machine-readable `status` field, so the exit code and the JSON envelope always agree. Unstructured crashes (unexpected exceptions the CLI did not classify) still exit `1`.
 
 ## Input Modes
 
 ### 1. CLI Flags (human-friendly)
+
 ```bash
 motif "a cat" -m gpt --landscape -r 2K -n 2
 ```
 
 ### 2. Stdin JSON (agent-friendly)
+
 ```bash
 echo '{"prompt":"a cat","model":"gpt","aspect":"16:9","resolution":"2K","numImages":2}' | motif
 ```
 
 ### 3. Combined (stdin base + flag overrides)
+
 ```bash
 echo '{"prompt":"a cat","model":"gpt"}' | motif --landscape -r 4K
 ```
@@ -118,19 +142,18 @@ Flag values override stdin JSON values for the same field.
 
 ## Creative Direction
 
-Creative direction enriches the prompt with predefined clauses before the request
-body is built. There are eight fields, applied in this canonical order:
+Creative direction enriches the prompt with predefined clauses before the request body is built. There are eight fields, applied in this canonical order:
 
-| Field | CLI flag | Purpose |
-|-------|----------|---------|
-| `recipe` | `--recipe <id>` | Overall creative recipe |
-| `shot` | `--shot <id>` | Shot and framing |
-| `lighting` | `--lighting <id>` | Lighting treatment |
-| `genre` | `--genre <id>` | Genre and mood |
-| `camera` | `--camera <id>` | Camera and lens language |
-| `color` | `--color <id>` | Color treatment |
-| `material` | `--material <id>` | Material or texture |
-| `motion` | `--motion <id>` | Motion treatment |
+| Field      | CLI flag          | Purpose                  |
+| ---------- | ----------------- | ------------------------ |
+| `recipe`   | `--recipe <id>`   | Overall creative recipe  |
+| `shot`     | `--shot <id>`     | Shot and framing         |
+| `lighting` | `--lighting <id>` | Lighting treatment       |
+| `genre`    | `--genre <id>`    | Genre and mood           |
+| `camera`   | `--camera <id>`   | Camera and lens language |
+| `color`    | `--color <id>`    | Color treatment          |
+| `material` | `--material <id>` | Material or texture      |
+| `motion`   | `--motion <id>`   | Motion treatment         |
 
 Pass fields as CLI flags or as a `creative` object in stdin JSON:
 
@@ -142,18 +165,13 @@ motif "a ceramic desk lamp" -m banana2 --shot close-up --lighting rim
 echo '{"prompt":"a ceramic desk lamp","model":"banana2","creative":{"shot":"close-up","lighting":"rim"}}' | motif
 ```
 
-Per-field flags override the matching key in the stdin `creative` object. Only the
-fields you set are applied; the rest are left untouched.
+Per-field flags override the matching key in the stdin `creative` object. Only the fields you set are applied; the rest are left untouched.
 
-An unknown option id fails before any fal request with a structured `INVALID_OPTION`
-error whose details include the field and the available ids for that field.
+An unknown option id fails before any fal request with a structured `INVALID_OPTION` error whose details include the field and the available ids for that field.
 
-Option ids are versioned with the taxonomy. Do not hardcode them; read the live
-ids from `motif --describe --format json`.
+Option ids are versioned with the taxonomy. Do not hardcode them; read the live ids from `motif --describe --format json`.
 
-The `generate` and `vary` commands both accept creative direction. Vary operates on
-the edit-capable model subset (`EDIT_CAPABLE_MODELS`) — the generation models whose
-fal endpoints support image editing.
+The `generate` and `vary` commands both accept creative direction. Vary operates on the edit-capable model subset (`EDIT_CAPABLE_MODELS`) — the generation models whose fal endpoints support image editing.
 
 ## Schema Introspection
 
@@ -170,6 +188,7 @@ echo '{"command":"describe"}' | motif
 ```
 
 The schema includes:
+
 - All command input/output types with JSON Schema
 - All model capabilities (aspect, resolution, edit support, pricing)
 - All enum values (aspect ratios, resolutions, model names)
@@ -180,44 +199,34 @@ The schema includes:
 
 **ALWAYS do these things:**
 
-1. **Always use `--dry-run` first** for any mutating command (generate, upscale, rmbg, vary).
-   Generations cost real money ($0.02–$0.30 per image). Validate before spending.
+1. **Always use `--dry-run` first** for any mutating command (generate, upscale, rmbg, vary). Generations cost real money ($0.02–$0.30 per image). Validate before spending.
 
-2. **Always use `--fields`** when you only need specific output fields.
-   Full output includes paths, dimensions, costs, timestamps — most calls only need `id` and `path`.
+2. **Always use `--fields`** when you only need specific output fields. Full output includes paths, dimensions, costs, timestamps — most calls only need `id` and `path`.
 
-3. **Always specify `--model`** explicitly. Don't rely on defaults — they're user-configured
-   and may change between sessions.
+3. **Always specify `--model`** explicitly. Don't rely on defaults — they're user-configured and may change between sessions.
 
-4. **Always use `--no-open`** in automated pipelines. The default opens images in Preview.app,
-   which will interrupt the agent.
+4. **Always use `--no-open`** in automated pipelines. The default opens images in Preview.app, which will interrupt the agent.
 
-5. **Always validate model names** against `motif --describe` output. Model names are short
-   aliases (`gpt`, `banana`, `gemini`, `gemini3`), not full fal.ai endpoint names.
+5. **Always validate model names** against `motif --describe` output. Model names are short aliases (`gpt`, `banana`, `gemini`, `gemini3`), not full fal.ai endpoint names.
 
 **NEVER do these things:**
 
 1. **Never pass fal.ai endpoint strings as model names.** Use `gpt`, not `fal-ai/gpt-image-1.5`.
 
-2. **Never use `../` or `%2e` in output paths.** Output is sandboxed to CWD. Traversal attempts
-   are rejected with `INVALID_OUTPUT_PATH`.
+2. **Never use `../` or `%2e` in output paths.** Output is sandboxed to CWD. Traversal attempts are rejected with `INVALID_OUTPUT_PATH`.
 
-3. **Never assume the last generation exists.** Always handle `NO_PREVIOUS` errors when using
-   `--vary`, `--up`, or `--rmbg`.
+3. **Never assume the last generation exists.** Always handle `NO_PREVIOUS` errors when using `--vary`, `--up`, or `--rmbg`.
 
-4. **Never parse human-formatted output.** Always use `--format json` or pipe the command.
-   Human output contains ANSI color codes, spinner animations, and emoji.
+4. **Never parse human-formatted output.** Always use `--format json` or pipe the command. Human output contains ANSI color codes, spinner animations, and emoji.
 
-5. **Never send prompts with control characters.** They are stripped during sanitization,
-   which may change the intended meaning.
+5. **Never send prompts with control characters.** They are stripped during sanitization, which may change the intended meaning.
 
 ## Recommended Field Masks
 
-Use `--fields` to limit output to what you need. This protects your context window
-and reduces token usage in multi-step workflows.
+Use `--fields` to limit output to what you need. This protects your context window and reduces token usage in multi-step workflows.
 
 | Workflow | Command | Recommended `--fields` |
-|----------|---------|----------------------|
+| --- | --- | --- |
 | Generate and confirm | `generate` | `id,path,cost` |
 | Batch exploration | `generate` | `id,path` |
 | Cost tracking | `generate` | `id,cost,model` |
@@ -246,7 +255,7 @@ motif --history --limit 20 --fields model,cost
 ### Image Generation
 
 | Model | Per Image | Notes |
-|-------|-----------|-------|
+| --- | --- | --- |
 | `flux-fast` | $0.003 | Near-instant, great for iterations |
 | `flux2-turbo` | $0.008/MP | Fastest FLUX.2, ~6s at 1MP |
 | `flux2-dev` | ~$0.012 | Open FLUX.2, billed per compute second ($0.00167/sec) |
@@ -273,22 +282,21 @@ motif --history --limit 20 --fields model,cost
 
 ### Processing
 
-| Model | Per Use | Notes |
-|-------|---------|-------|
-| `clarity` (upscale) | $0.03/MP | Default upscaler |
-| `crystal` (upscale) | $0.02 | Alternative upscaler |
-| `rmbg` | $0.02 | Background removal |
-| `bria` | $0.02 | Alternative background removal |
+| Model               | Per Use  | Notes                          |
+| ------------------- | -------- | ------------------------------ |
+| `clarity` (upscale) | $0.03/MP | Default upscaler               |
+| `crystal` (upscale) | $0.02    | Alternative upscaler           |
+| `rmbg`              | $0.02    | Background removal             |
+| `bria`              | $0.02    | Alternative background removal |
 
 ### Video
 
-| Model | Per Second | Notes |
-|-------|-----------|-------|
+| Model               | Per Second | Notes           |
+| ------------------- | ---------- | --------------- |
 | `kling` (audio off) | $0.112/sec | 5s clip = $0.56 |
-| `kling` (audio on) | $0.168/sec | 5s clip = $0.84 |
+| `kling` (audio on)  | $0.168/sec | 5s clip = $0.84 |
 
-**Tip**: Use `--dry-run` to see the exact estimated cost before committing.
-**Warning**: Video is 5-10x more expensive than images. Always dry-run first.
+**Tip**: Use `--dry-run` to see the exact estimated cost before committing. **Warning**: Video is 5-10x more expensive than images. Always dry-run first.
 
 ## Video Generation
 
@@ -408,14 +416,12 @@ motif series delete <slug>
 
 ## Response Sanitization
 
-All API response data is sanitized before output to defend against prompt injection
-embedded in image metadata or API responses. Patterns matching known injection
-formats (SYSTEM, INSTRUCTION, etc.) are replaced with `[FILTERED]`.
+All API response data is sanitized before output to defend against prompt injection embedded in image metadata or API responses. Patterns matching known injection formats (SYSTEM, INSTRUCTION, etc.) are replaced with `[FILTERED]`.
 
 ## Environment
 
 | Variable | Required | Description |
-|----------|----------|-------------|
+| --- | --- | --- |
 | `FAL_KEY` | Yes | fal.ai API key. Also configurable in `~/.motif/config.json` |
 
 ## Auth

@@ -1,7 +1,6 @@
 # Motif
 
-Read `AGENTS.md` first. It is the cross-tool source of truth for commands,
-package boundaries, permission rules, and verification expectations.
+Read `AGENTS.md` first. It is the cross-tool source of truth for commands, package boundaries, permission rules, and verification expectations.
 
 Claude-specific additions:
 

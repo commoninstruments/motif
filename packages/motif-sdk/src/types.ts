@@ -35,7 +35,10 @@ export type FalImageSizePreset =
   | "portrait_16_9"
   | "landscape_4_3"
   | "landscape_16_9";
-export type CustomImageSize = { height: number; width: number };
+export interface CustomImageSize {
+  height: number;
+  width: number;
+}
 export type ImageSize = GptImageSize | FalImageSizePreset | CustomImageSize;
 
 /** How the model accepts image dimensions */
@@ -287,7 +290,7 @@ export interface QueuedJob {
 
 export interface JobStatus {
   error?: string;
-  logs?: Array<{ message: string; timestamp: string }>;
+  logs?: { message: string; timestamp: string }[];
   queuePosition?: number;
   status: "queued" | "processing" | "completed" | "failed";
 }

@@ -32,4 +32,3 @@ Do not connect Motif MCP to untrusted clients if local history or generated medi
 ## Live Fal Calls
 
 Live generation spends money. Agents should use `--dry-run` or mocked tests by default. Run `RUN_FAL_CANARY=1` tests only when explicitly requested.
-

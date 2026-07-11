@@ -5,7 +5,7 @@ import type { Resolution } from "./types";
 export function estimateCost(
   model: string,
   resolution?: Resolution,
-  numImages = 1,
+  numImages = 1
 ): number {
   const configuredPrice = MODELS[model]?.pricePerImageUsd;
   if (configuredPrice !== undefined) {
@@ -33,40 +33,50 @@ export function estimateCost(
   }
 
   switch (model) {
-    case "gpt2":
+    case "gpt2": {
       // Blended estimate: fal bills gpt-image-2 on a $0.005–$0.401 tiered scale
       // (by size/quality); 0.211 is a representative mid-point per image.
       return 0.211 * numImages;
-    case "gpt":
+    }
+    case "gpt": {
       return 0.133 * numImages;
+    }
     case "banana":
-    case "gemini3":
+    case "gemini3": {
       return (resolution === "4K" ? 0.3 : 0.15) * numImages;
-    case "gemini":
+    }
+    case "gemini": {
       return 0.039 * numImages;
+    }
     case "flux":
-    case "ideogram":
+    case "ideogram": {
       return 0.06 * numImages;
-    case "recraft":
+    }
+    case "recraft": {
       return 0.04 * numImages;
-    case "flux-fast":
+    }
+    case "flux-fast": {
       return 0.003 * numImages;
-    case "clarity":
+    }
+    case "clarity": {
       // fal bills clarity-upscaler at $0.03/MP.
       return 0.03 * numImages;
+    }
     case "crystal":
     case "rmbg":
-    case "bria":
+    case "bria": {
       return 0.02 * numImages;
-    default:
+    }
+    default: {
       return 0.1 * numImages;
+    }
   }
 }
 
 /** Estimate cost for video generation */
 export function estimateVideoCost(
   durationSeconds = 5,
-  generateAudio = true,
+  generateAudio = true
 ): number {
   const perSecond = generateAudio ? 0.168 : 0.112;
   return perSecond * durationSeconds;

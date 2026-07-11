@@ -1,13 +1,10 @@
-import {
-  CREATIVE_FIELDS,
-  type CreativeDirection,
-  type CreativeField,
-} from "@howells/motif-sdk";
+import { CREATIVE_FIELDS } from "@howells/motif-sdk";
+import type { CreativeDirection, CreativeField } from "@howells/motif-sdk";
 
 /** Merge per-field CLI flags over a base creative direction (flags win). */
 export function resolveCreativeDirection(
   flags: Partial<Record<CreativeField, string>>,
-  base?: CreativeDirection,
+  base?: CreativeDirection
 ): CreativeDirection | undefined {
   const creative: CreativeDirection = {};
   for (const field of CREATIVE_FIELDS) {

@@ -1,17 +1,13 @@
 import { render } from "ink";
 import React from "react";
+
 import { setApiKey } from "./api/fal";
 import { runCli } from "./cli";
 import { runSeries } from "./commands/series";
 import { runTools } from "./commands/tools";
 import { App } from "./studio/app";
-import {
-  getApiKey,
-  loadConfig,
-  loadHistory,
-  type MotifConfig,
-  saveConfig,
-} from "./utils/config";
+import { getApiKey, loadConfig, loadHistory, saveConfig } from "./utils/config";
+import type { MotifConfig } from "./utils/config";
 
 async function main() {
   // Load config and set API key
@@ -64,7 +60,7 @@ async function launchStudio() {
         history,
         onConfigChange: handleConfigChange,
         onHistoryChange: handleHistoryChange,
-      }),
+      })
     );
   };
 
@@ -74,13 +70,13 @@ async function launchStudio() {
       history,
       onConfigChange: handleConfigChange,
       onHistoryChange: handleHistoryChange,
-    }),
+    })
   );
 
   await waitUntilExit();
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });

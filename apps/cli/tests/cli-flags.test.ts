@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
 
 /**
@@ -24,7 +25,7 @@ function tempHome(): string {
   return dir;
 }
 
-function runMotif(args: string[]): Promise<CliResult> {
+async function runMotif(args: string[]): Promise<CliResult> {
   const child = spawn(
     process.execPath,
     ["--import", "tsx", "src/index.ts", ...args],
@@ -38,13 +39,13 @@ function runMotif(args: string[]): Promise<CliResult> {
         NO_COLOR: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
-    },
+    }
   );
 
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
+  child.stdout.setEncoding("utf-8");
+  child.stderr.setEncoding("utf-8");
   child.stdout.on("data", (chunk) => {
     stdout += chunk;
   });
@@ -53,17 +54,17 @@ function runMotif(args: string[]): Promise<CliResult> {
   });
   child.stdin.end("");
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ code: code ?? 0, stdout, stderr });
+      resolve({ code: code ?? 0, stderr, stdout });
     });
   });
 }
 
 async function dryRunBody(
   model: string,
-  flags: string[],
+  flags: string[]
 ): Promise<Record<string, unknown>> {
   const result = await runMotif([
     "a test prompt",

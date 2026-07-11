@@ -66,8 +66,14 @@ const job = await motif.submitGeneration({
 });
 
 if (job.isOk()) {
-  const status = await motif.getJobStatus(job.value.endpoint, job.value.requestId);
-  const completed = await motif.getJobResult(job.value.endpoint, job.value.requestId);
+  const status = await motif.getJobStatus(
+    job.value.endpoint,
+    job.value.requestId
+  );
+  const completed = await motif.getJobResult(
+    job.value.endpoint,
+    job.value.requestId
+  );
 }
 
 const uploaded = await motif.uploadToFalCdn(fileBytes, {

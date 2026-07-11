@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -22,8 +23,8 @@ vi.mock("../src/utils/image", async (importActual) => {
   return {
     ...actual,
     downloadImage: vi.fn(),
-    getImageDimensions: vi.fn(),
     getFileSize: vi.fn(),
+    getImageDimensions: vi.fn(),
     openImage: vi.fn(),
   };
 });
@@ -60,18 +61,16 @@ afterEach(() => {
 
 describe("buildSeriesRunStylePrompt", () => {
   it("prefers an explicit style over the generated fallback", async () => {
-    const { buildSeriesRunStylePrompt } = await import(
-      "../src/commands/series"
-    );
+    const { buildSeriesRunStylePrompt } =
+      await import("../src/commands/series");
     expect(buildSeriesRunStylePrompt("towers", "brutalist concrete")).toBe(
-      "brutalist concrete",
+      "brutalist concrete"
     );
   });
 
   it("synthesizes a cohesive style prompt from the theme", async () => {
-    const { buildSeriesRunStylePrompt } = await import(
-      "../src/commands/series"
-    );
+    const { buildSeriesRunStylePrompt } =
+      await import("../src/commands/series");
     const prompt = buildSeriesRunStylePrompt("towers");
     expect(prompt).toContain("Cohesive visual series about towers");
     expect(prompt).toContain("consistent tone");
@@ -174,11 +173,11 @@ describe("runSeries full generate flow (mocked fal)", () => {
       images: [{ url: `https://cdn.example/generated-${counter++}.png` }],
     }));
     vi.mocked(image.downloadImage).mockImplementation(
-      async (_url, outputPath) => outputPath,
+      async (_url, outputPath) => outputPath
     );
     vi.mocked(image.getImageDimensions).mockResolvedValue({
-      width: 1024,
       height: 1024,
+      width: 1024,
     });
     vi.mocked(image.getFileSize).mockReturnValue("1.0 KB");
 

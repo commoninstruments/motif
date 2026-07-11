@@ -21,7 +21,7 @@ const FAL_IMAGE_SIZE_PRESETS = [
 
 function normalizeImageSize(
   imageSize: ImageSize | undefined,
-  sizeMode: SizeMode,
+  sizeMode: SizeMode
 ): ImageSize | undefined {
   if (imageSize === undefined) {
     return undefined;
@@ -37,7 +37,7 @@ function normalizeImageSize(
   if (sizeMode === "gpt_size") {
     if (!GPT_IMAGE_SIZES.includes(imageSize)) {
       throw new Error(
-        `GPT Image 1.5 image_size must be one of ${GPT_IMAGE_SIZES.join(", ")}`,
+        `GPT Image 1.5 image_size must be one of ${GPT_IMAGE_SIZES.join(", ")}`
       );
     }
     return imageSize;
@@ -47,15 +47,15 @@ function normalizeImageSize(
     return imageSize;
   }
 
-  const match = imageSize.match(/^(\d+)x(\d+)$/);
+  const match = /^(\d+)x(\d+)$/.exec(imageSize);
   if (match) {
     const width = Number(match[1]);
     const height = Number(match[2]);
-    return { width, height };
+    return { height, width };
   }
 
   throw new Error(
-    `fal image_size must be one of ${FAL_IMAGE_SIZE_PRESETS.join(", ")} or WIDTHxHEIGHT`,
+    `fal image_size must be one of ${FAL_IMAGE_SIZE_PRESETS.join(", ")} or WIDTHxHEIGHT`
   );
 }
 
@@ -67,7 +67,7 @@ function validateGenerateOptions(
   options: GenerateOptions,
   config: ModelConfig,
   sizeMode: SizeMode,
-  hasEditImages: boolean,
+  hasEditImages: boolean
 ): void {
   if (
     options.editImageUrls?.length &&
@@ -75,7 +75,7 @@ function validateGenerateOptions(
     options.editImageUrls.length > config.maxReferenceImages
   ) {
     throw new Error(
-      `${config.name} supports at most ${config.maxReferenceImages} reference images`,
+      `${config.name} supports at most ${config.maxReferenceImages} reference images`
     );
   }
 
@@ -262,9 +262,9 @@ export function buildGenerateBody(options: GenerateOptions): {
     throw new Error(`Unknown model: ${model}`);
   }
 
-  let endpoint = config.endpoint;
+  let { endpoint } = config;
   const enrichedPrompt = creative
-    ? enrichPrompt({ prompt, creative }).prompt
+    ? enrichPrompt({ creative, prompt }).prompt
     : prompt;
   const body: Record<string, unknown> = { prompt: enrichedPrompt };
   const hasEditImages = Boolean(editImageUrls?.length);
@@ -277,17 +277,19 @@ export function buildGenerateBody(options: GenerateOptions): {
   const normalizedImageSize = normalizeImageSize(imageSize, sizeMode);
 
   switch (sizeMode) {
-    case "gpt_size":
+    case "gpt_size": {
       body.image_size =
         normalizedImageSize ??
         (hasEditImages && !explicitAspect ? "auto" : aspectToGptSize(aspect));
       break;
+    }
 
-    case "image_size_enum":
+    case "image_size_enum": {
       body.image_size = normalizedImageSize ?? aspectToFalImageSize(aspect);
       break;
+    }
 
-    case "aspect_ratio":
+    case "aspect_ratio": {
       if (config.supportsAspect) {
         body.aspect_ratio = aspect;
       }
@@ -296,6 +298,7 @@ export function buildGenerateBody(options: GenerateOptions): {
           model === "grok-image" ? resolution.toLowerCase() : resolution;
       }
       break;
+    }
   }
 
   if (config.supportsQuality) {
@@ -329,7 +332,7 @@ export function buildGenerateBody(options: GenerateOptions): {
       !config.supportedOutputFormats.includes(outputFormat)
     ) {
       throw new Error(
-        `${config.name} supports output formats: ${config.supportedOutputFormats.join(", ")}`,
+        `${config.name} supports output formats: ${config.supportedOutputFormats.join(", ")}`
       );
     }
     body.output_format = outputFormat;
@@ -345,7 +348,9 @@ export function buildGenerateBody(options: GenerateOptions): {
     body.image_prompt_strength = imagePromptStrength;
   }
   if (model === "flux") {
-    if (safetyTolerance) body.safety_tolerance = safetyTolerance;
+    if (safetyTolerance) {
+      body.safety_tolerance = safetyTolerance;
+    }
   }
 
   if (config.supportsGuidanceScale && guidanceScale !== undefined) {
@@ -357,10 +362,14 @@ export function buildGenerateBody(options: GenerateOptions): {
 
   // ── Shared safety / web-search controls ────────────────────────────
   if (config.supportsSafetyTolerance) {
-    if (safetyTolerance) body.safety_tolerance = safetyTolerance;
+    if (safetyTolerance) {
+      body.safety_tolerance = safetyTolerance;
+    }
   }
   if (config.supportsWebSearch) {
-    if (enableWebSearch !== undefined) body.enable_web_search = enableWebSearch;
+    if (enableWebSearch !== undefined) {
+      body.enable_web_search = enableWebSearch;
+    }
   }
   if (config.supportsGoogleSearch) {
     if (enableGoogleSearch !== undefined) {
@@ -378,7 +387,9 @@ export function buildGenerateBody(options: GenerateOptions): {
     }
   }
   if (config.supportsThinkingLevel) {
-    if (thinkingLevel) body.thinking_level = thinkingLevel;
+    if (thinkingLevel) {
+      body.thinking_level = thinkingLevel;
+    }
   }
 
   // ── Recraft: style ────────────────────────────────────────────────
@@ -388,16 +399,24 @@ export function buildGenerateBody(options: GenerateOptions): {
 
   // ── Ideogram: negative_prompt, style, rendering_speed, expand_prompt
   if (config.supportsNegativePrompt) {
-    if (negativePrompt) body.negative_prompt = negativePrompt;
+    if (negativePrompt) {
+      body.negative_prompt = negativePrompt;
+    }
   }
   if (model === "ideogram") {
-    if (style) body.style = style;
+    if (style) {
+      body.style = style;
+    }
   }
   if (config.supportsRenderingSpeed) {
-    if (renderingSpeed) body.rendering_speed = renderingSpeed;
+    if (renderingSpeed) {
+      body.rendering_speed = renderingSpeed;
+    }
   }
   if (config.supportsExpandPrompt) {
-    if (expandPrompt !== undefined) body.expand_prompt = expandPrompt;
+    if (expandPrompt !== undefined) {
+      body.expand_prompt = expandPrompt;
+    }
   }
 
   // FLUX Pro Ultra reference image
@@ -436,5 +455,5 @@ export function buildGenerateBody(options: GenerateOptions): {
     body.mask_image_url = maskImageUrl;
   }
 
-  return { endpoint, body };
+  return { body, endpoint };
 }

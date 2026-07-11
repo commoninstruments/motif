@@ -1,41 +1,46 @@
 import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
+
 import {
   FAL_TOOLS,
-  type GenerateOptions,
   getFalKeyFromEnv,
   isFalToolId,
-  type MotifError,
-  type MotifResponse,
   MotifServer,
-  type RemoveBackgroundOptions,
-  type Result,
-  type ToolResponse,
-  type ToolRunOptions,
-  type UpscaleOptions,
-  type VideoOptions,
-  type VideoResponse,
+} from "@howells/motif-sdk";
+import type {
+  GenerateOptions,
+  MotifError,
+  MotifResponse,
+  RemoveBackgroundOptions,
+  Result,
+  ToolResponse,
+  ToolRunOptions,
+  UpscaleOptions,
+  VideoOptions,
+  VideoResponse,
 } from "@howells/motif-sdk";
 
 export type { GenerateOptions, MotifResponse } from "@howells/motif-sdk";
 
 /** CLI-specific generate options that accept local file paths */
-export interface CliGenerateOptions
-  extends Omit<GenerateOptions, "editImageUrls"> {
+export interface CliGenerateOptions extends Omit<
+  GenerateOptions,
+  "editImageUrls"
+> {
   editImages?: string[];
 }
 
 const MIME_TYPES: Record<string, string> = {
   ".avif": "image/avif",
   ".gif": "image/gif",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
   ".m4v": "video/x-m4v",
   ".mov": "video/quicktime",
   ".mp4": "video/mp4",
   ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
   ".webm": "video/webm",
+  ".webp": "image/webp",
 };
 
 function getMimeType(filePath: string): string {
@@ -72,7 +77,7 @@ export function getApiKey(): string {
   }
 
   throw new Error(
-    "FAL_KEY not found. Set FAL_KEY environment variable or configure in ~/.motif/config.json",
+    "FAL_KEY not found. Set FAL_KEY environment variable or configure in ~/.motif/config.json"
   );
 }
 
@@ -85,7 +90,7 @@ function getMotif(): MotifServer {
 
 /** Generate an image (CLI-specific: handles local file uploads for edit mode) */
 export async function generate(
-  options: CliGenerateOptions,
+  options: CliGenerateOptions
 ): Promise<MotifResponse> {
   const { editImages, ...rest } = options;
 
@@ -93,9 +98,11 @@ export async function generate(
   let editImageUrls: string[] | undefined;
   if (editImages?.length) {
     editImageUrls = await Promise.all(
-      editImages.map((img) =>
-        img.startsWith("http") ? Promise.resolve(img) : uploadFile(img),
-      ),
+      editImages.map(async (img) =>
+        img.startsWith("http")
+          ? await Promise.resolve(img)
+          : await uploadFile(img)
+      )
     );
   }
 
@@ -114,7 +121,7 @@ export async function upscale(options: UpscaleOptions): Promise<MotifResponse> {
 
 /** Remove background from an image */
 export async function removeBackground(
-  options: RemoveBackgroundOptions,
+  options: RemoveBackgroundOptions
 ): Promise<MotifResponse> {
   return unwrap(await getMotif().removeBackground(options));
 }
@@ -125,26 +132,28 @@ export async function runTool(options: ToolRunOptions): Promise<ToolResponse> {
     throw new Error(`Unknown fal tool: ${options.tool}`);
   }
   const tool = FAL_TOOLS[options.tool];
-  const upload = (value: string) =>
+  const upload = async (value: string) =>
     value.startsWith("http") || value.startsWith("data:")
-      ? Promise.resolve(value)
-      : uploadFile(value);
+      ? await Promise.resolve(value)
+      : await uploadFile(value);
 
   const values = options.inputs ?? (options.input ? [options.input] : []);
-  const uploaded = await Promise.all(values.map((value) => upload(value)));
+  const uploaded = await Promise.all(
+    values.map(async (value) => await upload(value))
+  );
 
   return unwrap(
     await getMotif().runTool({
       ...options,
       input: tool.inputKind === "images" ? undefined : uploaded[0],
       inputs: tool.inputKind === "images" ? uploaded : undefined,
-    }),
+    })
   );
 }
 
 /** Submit a video generation job (returns immediately, poll for result) */
 export async function submitVideo(
-  options: Omit<VideoOptions, "imageUrl"> & { imageUrl: string },
+  options: Omit<VideoOptions, "imageUrl"> & { imageUrl: string }
 ): Promise<{ requestId: string; endpoint: string; estimatedCost: number }> {
   // Upload local file if needed
   const imageUrl = options.imageUrl.startsWith("http")
@@ -158,7 +167,7 @@ export async function submitVideo(
 export async function waitForVideo(
   endpoint: string,
   requestId: string,
-  onProgress?: (status: string, position?: number) => void,
+  onProgress?: (status: string, position?: number) => void
 ): Promise<VideoResponse> {
   const motif = getMotif();
   const pollInterval = 3000;
@@ -190,6 +199,6 @@ export async function uploadFile(filePath: string): Promise<string> {
   const buffer = await readFile(filePath);
 
   return unwrap(
-    await getMotif().uploadToFalCdn(buffer, { contentType, fileName }),
+    await getMotif().uploadToFalCdn(buffer, { contentType, fileName })
   );
 }

@@ -1,11 +1,12 @@
 {
   "name": "motif",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "turbo run dev --filter=@howells/motif-cli",
     "dev:cli": "turbo run dev --filter=@howells/motif-cli",
     "build": "turbo run build",
-    "lint": "turbo run lint",
+    "lint": "turbo run lint && howells-workspace-check",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:fal-canary": "RUN_FAL_CANARY=1 pnpm --filter @howells/motif-sdk test -- tests/fal-canary.test.ts",
@@ -15,23 +16,22 @@
     "check": "pnpm build && pnpm typecheck && pnpm lint && pnpm test",
     "check:affected": "turbo run build lint typecheck test --affected"
   },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "howells-biome check --write",
-      "howells-ultracite fix"
-    ],
-    "*.{js,json}": [
-      "howells-biome check --write"
-    ]
-  },
   "devDependencies": {
-    "@howells/lint": "^0.1.6",
+    "@howells/lint": "^1.1.0",
     "@howells/typescript-config": "^0.1.2",
     "husky": "^9.1.7",
     "knip": "^6.12.0",
     "lint-staged": "^17.0.2",
     "turbo": "2.9.9",
     "typescript": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,json,jsonc,css,graphql}": [
+      "howells-fix"
+    ]
+  },
+  "engines": {
+    "node": ">=24.15.0"
   },
   "packageManager": "pnpm@10.23.0"
 }

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { EDIT_CAPABLE_MODELS } from "@howells/motif-sdk";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -19,10 +20,10 @@ function tempHome(): string {
   return dir;
 }
 
-function runMotif(
+async function runMotif(
   args: string[],
   stdin = "",
-  home = tempHome(),
+  home = tempHome()
 ): Promise<CliResult> {
   const child = spawn(
     process.execPath,
@@ -37,13 +38,13 @@ function runMotif(
         NO_COLOR: "1",
       },
       stdio: ["pipe", "pipe", "pipe"],
-    },
+    }
   );
 
   let stdout = "";
   let stderr = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
+  child.stdout.setEncoding("utf-8");
+  child.stderr.setEncoding("utf-8");
   child.stdout.on("data", (chunk) => {
     stdout += chunk;
   });
@@ -53,10 +54,10 @@ function runMotif(
 
   child.stdin.end(stdin);
 
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ code: code ?? 0, stdout, stderr });
+      resolve({ code: code ?? 0, stderr, stdout });
     });
   });
 }
@@ -147,18 +148,16 @@ describe("CLI contract", () => {
     expect(result.stderr).toBe("");
 
     const generate = parseJsonLine(result.stdout);
-    const properties = (
-      generate.input as {
-        properties: Record<
-          string,
-          {
-            enum?: string[];
-            enumDescriptions?: Record<string, unknown>;
-            type?: string;
-          }
-        >;
-      }
-    ).properties;
+    const { properties } = generate.input as {
+      properties: Record<
+        string,
+        {
+          enum?: string[];
+          enumDescriptions?: Record<string, unknown>;
+          type?: string;
+        }
+      >;
+    };
     expect(properties.recipe).toMatchObject({
       enum: ["cinematic"],
       type: "string",
@@ -267,7 +266,7 @@ describe("CLI contract", () => {
         "Image 1 of 2 in a cohesive visual series about luxury watch campaign; wide establishing composition; shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set; no text, no watermark, cinematic scene, rim lighting with defined edge highlights",
     });
     expect(String(firstScene?.prompt)).toContain(
-      "cinematic scene, rim lighting with defined edge highlights",
+      "cinematic scene, rim lighting with defined edge highlights"
     );
   });
 
@@ -286,7 +285,7 @@ describe("CLI contract", () => {
         "json",
       ],
       "",
-      home,
+      home
     );
     expect(created.code).toBe(0);
     const series = parseJsonLine(created.stdout);
@@ -306,7 +305,7 @@ describe("CLI contract", () => {
         "rim",
       ],
       "",
-      home,
+      home
     );
 
     expect(result.code).toBe(0);
@@ -328,7 +327,7 @@ describe("CLI contract", () => {
       scenePrompt: "hero watch on steel table",
     });
     expect(payload.prompt).toBe(
-      "editorial product language. hero watch on steel table, cinematic scene, rim lighting with defined edge highlights",
+      "editorial product language. hero watch on steel table, cinematic scene, rim lighting with defined edge highlights"
     );
   });
 
@@ -340,7 +339,7 @@ describe("CLI contract", () => {
         count: 3,
         dryRun: true,
         theme: "modular exhibition booths",
-      }),
+      })
     );
 
     expect(result.code).toBe(0);
@@ -365,9 +364,9 @@ describe("CLI contract", () => {
     const errors = schema.errors as Record<string, Record<string, unknown>>;
 
     expect(errors.UNKNOWN_MODEL).toMatchObject({
+      docUri: "motif://describe/errors#unknown-model",
       status: 400,
       type: "urn:motif:error:unknown-model",
-      docUri: "motif://describe/errors#unknown-model",
     });
     expect(errors.SERIES_NOT_FOUND).toMatchObject({
       status: 404,
@@ -436,7 +435,7 @@ describe("CLI contract", () => {
       valid: true,
     });
     expect((dryRun.body as Record<string, unknown>).prompt).toBe(
-      "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
+      "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights"
     );
   });
 
@@ -452,7 +451,7 @@ describe("CLI contract", () => {
         dryRun: true,
         model: "banana",
         prompt: "luxury watch on black marble",
-      }),
+      })
     );
 
     expect(result.code).toBe(0);
@@ -483,7 +482,7 @@ describe("CLI contract", () => {
         dryRun: true,
         model: "banana",
         prompt: "luxury watch on black marble",
-      }),
+      })
     );
 
     expect(result.code).toBe(0);
@@ -524,12 +523,12 @@ describe("CLI contract", () => {
     };
     expect(error).toMatchObject({
       code: "INVALID_OPTION",
-      error: true,
       details: {
         availableIds: ["rim"],
         field: "lighting",
         value: "rim-light",
       },
+      error: true,
     });
   });
 
@@ -588,8 +587,8 @@ describe("CLI contract", () => {
       valid: true,
     });
     expect(dryRun.body).toMatchObject({
-      image_size: "1536x1024",
       background: "transparent",
+      image_size: "1536x1024",
       quality: "medium",
       sync_mode: true,
     });
@@ -626,9 +625,9 @@ describe("CLI contract", () => {
     });
     expect(dryRun.body).toMatchObject({
       aspect_ratio: "auto",
-      resolution: "0.5K",
       enable_google_search: true,
       limit_generations: true,
+      resolution: "0.5K",
       thinking_level: "minimal",
     });
   });
@@ -654,7 +653,7 @@ describe("CLI contract", () => {
       status: 400,
     });
     expect(String(error.message)).toContain(
-      "FLUX Schnell does not support quality",
+      "FLUX Schnell does not support quality"
     );
   });
 
@@ -666,7 +665,7 @@ describe("CLI contract", () => {
         dryRun: true,
         model: "banana",
         prompt: "stdin cat",
-      }),
+      })
     );
 
     expect(result.code).toBe(0);
@@ -735,8 +734,8 @@ describe("CLI contract", () => {
     const payload = parseJsonLine(result.stdout);
     expect(payload).toMatchObject({
       command: "tool.describe",
-      id: "sam3-image",
       endpoint: "fal-ai/sam-3/image",
+      id: "sam3-image",
       pricing: "$0.005/request",
     });
   });
@@ -762,8 +761,8 @@ describe("CLI contract", () => {
     expect(payload).toMatchObject({
       command: "tool.run",
       dryRun: true,
-      tool: "sam3-image",
       endpoint: "fal-ai/sam-3/image",
+      tool: "sam3-image",
       valid: true,
     });
     expect(payload.body).toMatchObject({
@@ -783,7 +782,7 @@ describe("CLI contract", () => {
         options: { max_masks: 2 },
         prompt: "person",
         tool: "sam3-image",
-      }),
+      })
     );
 
     expect(result.code).toBe(0);
@@ -793,8 +792,8 @@ describe("CLI contract", () => {
     expect(payload).toMatchObject({
       command: "tool.run",
       dryRun: true,
-      tool: "sam3-image",
       endpoint: "fal-ai/sam-3/image",
+      tool: "sam3-image",
       valid: true,
     });
     expect(payload.body).toMatchObject({

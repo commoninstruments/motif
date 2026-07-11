@@ -9,11 +9,9 @@ import {
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import {
-  type AspectRatio,
-  getFalKeyFromEnv,
-  type Resolution,
-} from "@howells/motif-sdk";
+
+import { getFalKeyFromEnv } from "@howells/motif-sdk";
+import type { AspectRatio, Resolution } from "@howells/motif-sdk";
 
 const MOTIF_DIR = join(homedir(), ".motif");
 const CONFIG_PATH = join(MOTIF_DIR, "config.json");
@@ -53,27 +51,27 @@ export interface History {
 }
 
 const DEFAULT_CONFIG: MotifConfig = {
-  defaultModel: "banana",
+  backgroundRemover: "rmbg",
   defaultAspect: "1:1",
+  defaultModel: "banana",
   defaultResolution: "2K",
   openAfterGenerate: true,
   upscaler: "clarity",
-  backgroundRemover: "rmbg",
 };
 
 const DEFAULT_HISTORY: History = {
   generations: [],
+  lastSessionDate: new Date().toISOString().split("T")[0] ?? "",
   totalCost: {
+    allTime: 0,
     session: 0,
     today: 0,
-    allTime: 0,
   },
-  lastSessionDate: new Date().toISOString().split("T")[0] ?? "",
 };
 
 function ensureMotifDir(): void {
   if (!existsSync(MOTIF_DIR)) {
-    mkdirSync(MOTIF_DIR, { recursive: true, mode: 0o700 });
+    mkdirSync(MOTIF_DIR, { mode: 0o700, recursive: true });
   }
 }
 
@@ -83,7 +81,7 @@ function ensureMotifDir(): void {
  */
 export async function atomicWrite(
   filePath: string,
-  data: string,
+  data: string
 ): Promise<void> {
   const tempPath = `${filePath}.${randomUUID()}.tmp`;
   try {
@@ -91,7 +89,7 @@ export async function atomicWrite(
     writeFileSync(tempPath, data, { mode: 0o600 });
     // Atomic rename (on POSIX systems)
     renameSync(tempPath, filePath);
-  } catch (err) {
+  } catch (error) {
     // Clean up temp file on failure
     try {
       if (existsSync(tempPath)) {
@@ -100,7 +98,7 @@ export async function atomicWrite(
     } catch {
       // Ignore cleanup errors
     }
-    throw err;
+    throw error;
   }
 }
 
@@ -115,9 +113,9 @@ export async function loadConfig(): Promise<MotifConfig> {
       const raw = await readFile(CONFIG_PATH, "utf-8");
       const globalConfig = JSON.parse(raw);
       config = { ...config, ...globalConfig };
-    } catch (err) {
+    } catch (error) {
       console.error(
-        `Warning: Failed to parse ${CONFIG_PATH}: ${(err as Error).message}`,
+        `Warning: Failed to parse ${CONFIG_PATH}: ${(error as Error).message}`
       );
       console.error("Using default configuration.");
     }
@@ -129,9 +127,9 @@ export async function loadConfig(): Promise<MotifConfig> {
       const raw = await readFile(LOCAL_CONFIG_PATH, "utf-8");
       const localConfig = JSON.parse(raw);
       config = { ...config, ...localConfig };
-    } catch (err) {
+    } catch (error) {
       console.error(
-        `Warning: Failed to parse ${LOCAL_CONFIG_PATH}: ${(err as Error).message}`,
+        `Warning: Failed to parse ${LOCAL_CONFIG_PATH}: ${(error as Error).message}`
       );
     }
   }
@@ -176,9 +174,9 @@ export async function loadHistory(): Promise<History> {
     }
 
     return history;
-  } catch (err) {
+  } catch (error) {
     console.error(
-      `Warning: Failed to load history from ${HISTORY_PATH}: ${(err as Error).message}`,
+      `Warning: Failed to load history from ${HISTORY_PATH}: ${(error as Error).message}`
     );
     console.error("Starting with empty history.");
     return { ...DEFAULT_HISTORY };
@@ -237,7 +235,7 @@ export function getApiKey(config: MotifConfig): string {
   }
 
   throw new Error(
-    "FAL_KEY not found. Set FAL_KEY environment variable or add apiKey to ~/.motif/config.json",
+    "FAL_KEY not found. Set FAL_KEY environment variable or add apiKey to ~/.motif/config.json"
   );
 }
 

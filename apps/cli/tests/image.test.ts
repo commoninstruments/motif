@@ -1,7 +1,9 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { downloadImage, getImageDimensions } from "../src/utils/image";
 
 const JPEG_16X16_WITH_DENSITY =
@@ -23,8 +25,8 @@ describe("getImageDimensions", () => {
     writeFileSync(imagePath, Buffer.from(JPEG_16X16_WITH_DENSITY, "base64"));
 
     await expect(getImageDimensions(imagePath)).resolves.toEqual({
-      width: 16,
       height: 16,
+      width: 16,
     });
   });
 });
@@ -42,12 +44,12 @@ describe("downloadImage", () => {
         headers: new Headers({ "content-type": "image/jpeg" }),
         ok: true,
         statusText: "OK",
-      })),
+      }))
     );
 
     const actualPath = await downloadImage(
       "https://example.com/generated.jpg",
-      requestedPath,
+      requestedPath
     );
 
     expect(actualPath).toBe(join(testDir, "generated.jpg"));
