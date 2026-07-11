@@ -1,4 +1,5 @@
 import { getErrorMetadata } from "./error-catalog";
+import { validateOutputPath } from "./input";
 import { emitError } from "./output";
 import type { OutputFormat } from "./output";
 
@@ -70,6 +71,25 @@ function getStructuredDetails(err: unknown): unknown {
   }
 
   return undefined;
+}
+
+export function validateOption<T>(format: OutputFormat, fn: () => T): T {
+  try {
+    return fn();
+  } catch (error) {
+    handleError(error, "INVALID_OPTION", format);
+  }
+}
+
+export function validateOutput(
+  format: OutputFormat,
+  outputPath: string
+): string {
+  try {
+    return validateOutputPath(outputPath);
+  } catch (error) {
+    handleError(error, "INVALID_OUTPUT_PATH", format);
+  }
 }
 
 export function handleError(

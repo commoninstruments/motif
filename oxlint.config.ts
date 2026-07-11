@@ -156,7 +156,6 @@ export default {
       files: [
         "packages/motif-sdk/src/models.ts",
         "packages/motif-mcp/src/create-server.ts",
-        "apps/cli/src/cli.ts",
         "apps/cli/src/commands/describe.ts",
         "apps/cli/src/commands/series.ts",
         "apps/cli/src/studio/screens/generate.tsx",
