@@ -1,6 +1,6 @@
 {
   "name": "@howells/motif-sdk",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Public Node SDK for Motif fal.ai generation, editing, utility tools, and model metadata.",
   "license": "MIT",
   "author": "Daniel Howells",
