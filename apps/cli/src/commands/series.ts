@@ -117,7 +117,10 @@ function splitRefTags(refs: string | undefined): string[] | undefined {
     .filter(Boolean);
 }
 
-function buildSeriesRunStylePrompt(theme: string, style?: string): string {
+export function buildSeriesRunStylePrompt(
+  theme: string,
+  style?: string,
+): string {
   const base = style?.trim();
   if (base) {
     return base;
@@ -128,7 +131,7 @@ function buildSeriesRunStylePrompt(theme: string, style?: string): string {
   ].join(": ");
 }
 
-function buildSeriesRunScenes(theme: string, count: number): string[] {
+export function buildSeriesRunScenes(theme: string, count: number): string[] {
   return Array.from({ length: count }, (_, index) => {
     const focus = SERIES_RUN_SCENE_FOCI[index % SERIES_RUN_SCENE_FOCI.length];
     return [
@@ -140,7 +143,7 @@ function buildSeriesRunScenes(theme: string, count: number): string[] {
   });
 }
 
-async function loadOrCreateRunSeries(options: {
+export async function loadOrCreateRunSeries(options: {
   aspect: (typeof ASPECT_RATIOS)[number];
   model: string;
   resolution: (typeof RESOLUTIONS)[number];

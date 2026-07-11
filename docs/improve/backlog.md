@@ -21,19 +21,19 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 ## P2 — Agent-surface correctness
 
 ### IMP-3 MCP tool args are cast, not validated (cost guardrail missing)
-- **Status:** open · **Linear:** MOT-10
+- **Status:** shipped in motif-mcp 0.1.3 · **Linear:** MOT-10 (Done)
 - **Evidence:** `packages/motif-mcp/src/create-server.ts:664-709` destructures `args as {...}`; advertised `numImages` max of 4 (line 305-309) is unenforced — `numImages: 500` reaches fal. CLI enforces the identical bound (`apps/cli/src/cli.ts:1016`). Enum args (`model`, `aspect`, `preset`, …) also unchecked. Bonus bug: the universal `!args` guard (line 653-659) rejects spec-legal zero-argument `history` calls.
 - **Fix:** validate/clamp args in handlers using SDK-exported enums (mirror `validateEnumOption`); clamp `limit`/`offset` in `readHistory`; default `args` to `{}` instead of erroring when the tool has no required fields.
 - **Verify:** MCP tests: `numImages: 500` → structured error; `history` with no arguments → default page.
 
 ### IMP-4 Vary model enum drift — export `EDIT_CAPABLE_MODELS` from the SDK
-- **Status:** open · **Linear:** MOT-11
+- **Status:** shipped in sdk 0.4.0 / cli 1.2.5 / mcp 0.1.3 · **Linear:** MOT-11 (Done)
 - **Evidence:** `apps/cli/src/commands/describe.ts:409` advertises all 18 models for `vary`, but `recraft`, `ideogram`, `qwen`, `flux-fast` have `supportsEdit: false` → guaranteed runtime failure for agents trusting `--describe`. MCP's vary enum (`create-server.ts:459-477`) is a hand-typed 14-model literal that matches only by coincidence.
 - **Fix:** export `EDIT_CAPABLE_MODELS` (derived from `MODELS` filtered by `supportsEdit`) from the SDK; use in `describe.ts` and `create-server.ts`; test asserting both equal the derived set.
 - **Verify:** new test fails if a model's `supportsEdit` changes without enum updates.
 
 ### IMP-5 Agent docs drift: creative direction invisible, models/errors stale
-- **Status:** open · **Linear:** MOT-12
+- **Status:** shipped with the 0.4.0 release batch · **Linear:** MOT-12 (Done)
 - **Evidence:** zero mentions of `creative` in README.md, llms.txt, AGENTS.md, apps/cli/AGENTS.md, packages/motif-mcp/README.md, docs/surface/*. `apps/cli/AGENTS.md:42,73` list 9 of 18 models; error-code list (lines 45-47) has 14 of 24 codes — all 6 series codes missing despite the doc's own series section. Cost table also incomplete.
 - **Fix:** document creative direction in the three READMEs/guides; regenerate model + error-code lists; prefer a test asserting documented lists match SDK exports over one-off prose fixes. Refresh `docs/surface/scorecard.md` (stale since 2026-05-21) once done.
 - **Verify:** doc-sync test in CI; grep for `creative` hits in each doc surface.
@@ -46,7 +46,7 @@ Tracked in Linear (Motif team). Statuses here mirror Linear; update both when an
 - **Fix:** `series.test.ts` against temp HOME (incl. path-escape attempt); mocked-fal non-dry-run series tests; one `emitStream` unit + one `--format ndjson` e2e; migrate flag assertions onto the real program or dry-run contract tests.
 
 ### IMP-7 Deduplicate creative + sanitize logic (SDK canonical)
-- **Status:** open · **Linear:** MOT-14
+- **Status:** shipped in motif-cli 1.2.5 · **Linear:** MOT-14 (Done)
 - **Evidence:** `sanitizePrompt`/`CONTROL_CHAR_REGEX` byte-identical in `packages/motif-sdk/src/creative.ts:186-188` and `apps/cli/src/utils/input.ts:19-24`. `resolveCreativeDirection` duplicated verbatim (`cli.ts:167-183`, `series.ts:118-140`) with hand-listed field names; `describe.ts` correctly iterates `CREATIVE_FIELDS`. A 9th creative field would silently not be flag-selectable.
 - **Fix:** CLI re-exports `sanitizePrompt` from SDK; extract one `resolveCreativeDirection` into `apps/cli/src/utils/creative.ts` deriving fields from `CREATIVE_FIELDS`.
 
