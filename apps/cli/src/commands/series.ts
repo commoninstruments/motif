@@ -32,7 +32,7 @@ import {
   loadConfig,
 } from "../utils/config";
 import { resolveCreativeDirection } from "../utils/creative";
-import { handleError } from "../utils/errors";
+import { exitForErrorCode, handleError } from "../utils/errors";
 import {
   downloadImage,
   getFileSize,
@@ -415,7 +415,7 @@ async function cmdGenerate(
         { code: "EMPTY_PROMPT", message: "Prompt is empty after sanitization" },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("EMPTY_PROMPT");
     }
 
     const creative = resolveCreativeDirection(opts, opts.creative);
@@ -461,7 +461,7 @@ async function cmdGenerate(
         },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("UNKNOWN_MODEL");
     }
 
     // Check ref count against model limits
@@ -474,7 +474,7 @@ async function cmdGenerate(
         },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("TOO_MANY_REFERENCES");
     }
 
     const cost = estimateCost(modelId, resolution, numImages);
@@ -684,7 +684,7 @@ async function cmdRun(
         { code: "EMPTY_PROMPT", message: "Theme is empty after sanitization" },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("EMPTY_PROMPT");
     }
 
     const existingSeries = opts.series ? await loadSeries(opts.series) : null;
@@ -703,7 +703,7 @@ async function cmdRun(
         },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("UNKNOWN_MODEL");
     }
 
     const count = validateSeriesOption(emitOpts, () =>
@@ -738,7 +738,7 @@ async function cmdRun(
         },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("TOO_MANY_REFERENCES");
     }
 
     const creative = resolveCreativeDirection(opts, opts.creative);

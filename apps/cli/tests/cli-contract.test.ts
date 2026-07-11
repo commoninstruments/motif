@@ -512,7 +512,7 @@ describe("CLI contract", () => {
       "rim-light",
     ]);
 
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(2);
     const error = JSON.parse(result.stderr.trim()) as {
       code: string;
       details: {
@@ -645,7 +645,7 @@ describe("CLI contract", () => {
       "high",
     ]);
 
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(2);
     expect(result.stdout).toBe("");
 
     const error = parseJsonLine(result.stderr);
@@ -690,7 +690,7 @@ describe("CLI contract", () => {
       "missing-model",
     ]);
 
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(2);
     expect(result.stdout).toBe("");
 
     const error = parseJsonLine(result.stderr);
@@ -816,7 +816,7 @@ describe("CLI contract", () => {
       "json",
     ]);
 
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(2);
     expect(result.stdout).toBe("");
 
     const error = parseJsonLine(result.stderr);

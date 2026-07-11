@@ -48,7 +48,7 @@ import {
   loadHistory,
 } from "./utils/config";
 import { resolveCreativeDirection } from "./utils/creative";
-import { handleError } from "./utils/errors";
+import { exitForErrorCode, handleError } from "./utils/errors";
 import {
   downloadImage,
   generateFilename,
@@ -424,7 +424,7 @@ function resolveEditPaths(
       },
       format,
     );
-    process.exit(1);
+    exitForErrorCode("TOO_MANY_REFERENCES");
   }
 
   try {
@@ -604,7 +604,7 @@ async function generateImage(
       },
       emitOpts.format,
     );
-    process.exit(1);
+    exitForErrorCode("UNKNOWN_MODEL");
   }
 
   const editPaths = resolveEditPaths(
@@ -992,7 +992,7 @@ async function generateVariations(
       },
       emitOpts.format,
     );
-    process.exit(1);
+    exitForErrorCode("NO_PREVIOUS");
   }
 
   const prompt = customPrompt || stdinData?.prompt || last.prompt;
@@ -1051,7 +1051,7 @@ async function upscaleLast(
         { code: "NO_PREVIOUS", message: "No previous generation to upscale" },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("NO_PREVIOUS");
     }
     sourceImagePath = last.output;
     sourcePrompt = last.prompt;
@@ -1201,7 +1201,7 @@ async function removeBackgroundLast(
       },
       emitOpts.format,
     );
-    process.exit(1);
+    exitForErrorCode("NO_PREVIOUS");
   }
 
   const rawOutput = options.output || stdinData?.output;
@@ -1353,7 +1353,7 @@ async function generateVideo(
         },
         emitOpts.format,
       );
-      process.exit(1);
+      exitForErrorCode("NO_PREVIOUS");
     }
     sourceImagePath = last.output;
   }
@@ -1872,7 +1872,7 @@ export async function runCli(
         { code: "EMPTY_PROMPT", message: "Prompt is empty after sanitization" },
         format,
       );
-      process.exit(1);
+      exitForErrorCode("EMPTY_PROMPT");
     }
     await generateImage(sanitized, options, stdinData, config, emitOpts);
     return;

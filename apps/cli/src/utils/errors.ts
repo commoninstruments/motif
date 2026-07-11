@@ -1,6 +1,32 @@
 import { getErrorMetadata } from "./error-catalog";
 import { emitError, type OutputFormat } from "./output";
 
+/** Map a catalog HTTP-style status to a semantic process exit code. */
+export function exitCodeForStatus(status: number): number {
+  if (status === 401 || status === 403) {
+    return 3; // authentication / authorization
+  }
+  if (status === 404) {
+    return 4; // resource not found
+  }
+  if (status >= 400 && status < 500) {
+    return 2; // invalid input / usage
+  }
+  if (status >= 500) {
+    return 5; // upstream (fal) failure
+  }
+  return 1; // unknown
+}
+
+/**
+ * Exit the process with the semantic code for a known error code's catalog
+ * status. Use after emitting a structured error so exit codes stay aligned
+ * with the RFC 7807 `status` field agents already receive.
+ */
+export function exitForErrorCode(code: string): never {
+  process.exit(exitCodeForStatus(getErrorMetadata(code).status));
+}
+
 export function getErrorMessage(err: unknown): string {
   if (err instanceof Error) {
     return err.message;
@@ -65,5 +91,5 @@ export function handleError(
     },
     format,
   );
-  process.exit(1);
+  process.exit(exitCodeForStatus(metadata.status));
 }
