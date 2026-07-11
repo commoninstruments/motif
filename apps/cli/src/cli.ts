@@ -21,6 +21,7 @@ import {
   MODELS,
   RESOLUTIONS,
   type Resolution,
+  sanitizePrompt,
 } from "@howells/motif-sdk";
 import chalk from "chalk";
 import { Command } from "commander";
@@ -46,6 +47,7 @@ import {
   loadConfig,
   loadHistory,
 } from "./utils/config";
+import { resolveCreativeDirection } from "./utils/creative";
 import { handleError } from "./utils/errors";
 import {
   downloadImage,
@@ -60,7 +62,6 @@ import {
   parseIntegerOption,
   parseNumberOption,
   readStdinJson,
-  sanitizePrompt,
   validateEditPath,
   validateEnumOption,
   validateOutputPath,
@@ -163,24 +164,6 @@ function parseImageSizeOption(
     throw new Error("image size width and height must be positive");
   }
   return { height, width };
-}
-
-function resolveCreativeDirection(
-  options: CliOptions,
-  stdinData: StdinPayload | null,
-): CreativeDirection | undefined {
-  const creative: CreativeDirection = {
-    camera: options.camera ?? stdinData?.creative?.camera,
-    color: options.color ?? stdinData?.creative?.color,
-    genre: options.genre ?? stdinData?.creative?.genre,
-    lighting: options.lighting ?? stdinData?.creative?.lighting,
-    material: options.material ?? stdinData?.creative?.material,
-    motion: options.motion ?? stdinData?.creative?.motion,
-    recipe: options.recipe ?? stdinData?.creative?.recipe,
-    shot: options.shot ?? stdinData?.creative?.shot,
-  };
-
-  return Object.values(creative).some(Boolean) ? creative : undefined;
 }
 
 // -- Types --
@@ -696,7 +679,7 @@ async function generateImage(
     ? false
     : (options.safetyChecker ?? stdinData?.enableSafetyChecker);
   const syncMode = options.syncMode || stdinData?.syncMode;
-  const creative = resolveCreativeDirection(options, stdinData);
+  const creative = resolveCreativeDirection(options, stdinData?.creative);
   const creativeResult = creative
     ? validateOption(emitOpts.format, () => enrichPrompt({ prompt, creative }))
     : undefined;

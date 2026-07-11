@@ -18,6 +18,7 @@ import {
   GENERATION_MODELS,
   MODELS,
   RESOLUTIONS,
+  sanitizePrompt,
 } from "@howells/motif-sdk";
 import chalk from "chalk";
 import { Command } from "commander";
@@ -30,6 +31,7 @@ import {
   getApiKey,
   loadConfig,
 } from "../utils/config";
+import { resolveCreativeDirection } from "../utils/creative";
 import { handleError } from "../utils/errors";
 import {
   downloadImage,
@@ -41,7 +43,6 @@ import {
 import {
   parseIntegerOption,
   readStdinJson,
-  sanitizePrompt,
   validateEnumOption,
   validateOutputPath,
   validateResourceId,
@@ -114,31 +115,6 @@ function splitRefTags(refs: string | undefined): string[] | undefined {
     ?.split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
-}
-
-function resolveCreativeDirection(options: {
-  camera?: string;
-  color?: string;
-  creative?: CreativeDirection;
-  genre?: string;
-  lighting?: string;
-  material?: string;
-  motion?: string;
-  recipe?: string;
-  shot?: string;
-}): CreativeDirection | undefined {
-  const creative: CreativeDirection = {
-    camera: options.camera ?? options.creative?.camera,
-    color: options.color ?? options.creative?.color,
-    genre: options.genre ?? options.creative?.genre,
-    lighting: options.lighting ?? options.creative?.lighting,
-    material: options.material ?? options.creative?.material,
-    motion: options.motion ?? options.creative?.motion,
-    recipe: options.recipe ?? options.creative?.recipe,
-    shot: options.shot ?? options.creative?.shot,
-  };
-
-  return Object.values(creative).some(Boolean) ? creative : undefined;
 }
 
 function buildSeriesRunStylePrompt(theme: string, style?: string): string {
@@ -439,7 +415,7 @@ async function cmdGenerate(
       process.exit(1);
     }
 
-    const creative = resolveCreativeDirection(opts);
+    const creative = resolveCreativeDirection(opts, opts.creative);
     const creativeResult = creative
       ? validateSeriesOption(emitOpts, () =>
           enrichPrompt({ prompt: sanitized, creative }),
@@ -762,7 +738,7 @@ async function cmdRun(
       process.exit(1);
     }
 
-    const creative = resolveCreativeDirection(opts);
+    const creative = resolveCreativeDirection(opts, opts.creative);
     const baseScenePrompts = buildSeriesRunScenes(sanitizedTheme, count);
     const enrichedScenes = baseScenePrompts.map((baseScenePrompt) =>
       creative

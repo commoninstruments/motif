@@ -15,13 +15,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters for sanitization
 const CONTROL_CHAR_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 
-/** Sanitize a text prompt: strip control chars, normalize whitespace */
-export function sanitizePrompt(prompt: string): string {
-  return prompt
-    .replace(CONTROL_CHAR_REGEX, "")
-    .replace(/\r\n/g, "\n") // Normalize line endings
-    .trim();
-}
+export { sanitizePrompt } from "@howells/motif-sdk";
 
 // -- Path traversal defense --
 
