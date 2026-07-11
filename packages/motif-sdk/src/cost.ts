@@ -12,6 +12,11 @@ export function estimateCost(
     if ((model === "banana" || model === "gemini3") && resolution === "4K") {
       return configuredPrice * 2 * numImages;
     }
+    if (model === "seedream5" && (resolution === "2K" || resolution === "4K")) {
+      // fal tiers Seedream v5 Pro: $0.0675 up to 1536², $0.135 up to 2048²
+      // (2K/4K settings map to the larger, doubled tier).
+      return configuredPrice * 2 * numImages;
+    }
     if (model === "banana2") {
       // fal tiers nano-banana-2 by resolution: 0.5K $0.06, 1K $0.08, 2K $0.12, 4K $0.16
       const multiplier =
@@ -29,6 +34,8 @@ export function estimateCost(
 
   switch (model) {
     case "gpt2":
+      // Blended estimate: fal bills gpt-image-2 on a $0.005–$0.401 tiered scale
+      // (by size/quality); 0.211 is a representative mid-point per image.
       return 0.211 * numImages;
     case "gpt":
       return 0.133 * numImages;
@@ -45,6 +52,8 @@ export function estimateCost(
     case "flux-fast":
       return 0.003 * numImages;
     case "clarity":
+      // fal bills clarity-upscaler at $0.03/MP.
+      return 0.03 * numImages;
     case "crystal":
     case "rmbg":
     case "bria":

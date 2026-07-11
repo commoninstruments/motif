@@ -259,12 +259,147 @@ describe("buildGenerateBody", () => {
       num_images: 2,
     });
   });
+
+  it("maps Seedream 5.0 Pro aspect to a fal image_size preset", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "seedream5",
+      prompt: "editorial hero shot",
+      aspect: "16:9",
+      seed: 11,
+      syncMode: true,
+    });
+
+    expect(endpoint).toBe("bytedance/seedream/v5/pro/text-to-image");
+    expect(body).toMatchObject({
+      prompt: "editorial hero shot",
+      image_size: "landscape_16_9",
+      seed: 11,
+      sync_mode: true,
+      num_images: 1,
+    });
+  });
+
+  it("routes Seedream 5.0 Pro edits through the edit endpoint", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "seedream5",
+      prompt: "swap the background",
+      editImageUrls: ["https://example.com/a.png", "https://example.com/b.png"],
+    });
+
+    expect(endpoint).toBe("bytedance/seedream/v5/pro/edit");
+    expect(body).toMatchObject({
+      prompt: "swap the background",
+      image_urls: ["https://example.com/a.png", "https://example.com/b.png"],
+    });
+  });
+
+  it("maps Seedream 5.0 Lite to its text-to-image endpoint", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "seedream5-lite",
+      prompt: "sticker sheet",
+      aspect: "1:1",
+      numImages: 2,
+    });
+
+    expect(endpoint).toBe("fal-ai/bytedance/seedream/v5/lite/text-to-image");
+    expect(body).toMatchObject({
+      prompt: "sticker sheet",
+      image_size: "square_hd",
+      num_images: 2,
+    });
+  });
+
+  it("routes Seedream 5.0 Lite edits through the edit endpoint", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "seedream5-lite",
+      prompt: "recolor the logo",
+      editImageUrls: ["https://example.com/logo.png"],
+    });
+
+    expect(endpoint).toBe("fal-ai/bytedance/seedream/v5/lite/edit");
+    expect(body).toMatchObject({
+      image_urls: ["https://example.com/logo.png"],
+    });
+  });
+
+  it("normalizes FLUX.2 Turbo controls to fal field names", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "flux2-turbo",
+      prompt: "fast concept sketch",
+      aspect: "4:3",
+      guidanceScale: 2.5,
+      enableSafetyChecker: false,
+      outputFormat: "webp",
+      seed: 3,
+    });
+
+    expect(endpoint).toBe("fal-ai/flux-2/turbo");
+    expect(body).toMatchObject({
+      prompt: "fast concept sketch",
+      image_size: "landscape_4_3",
+      guidance_scale: 2.5,
+      enable_safety_checker: false,
+      output_format: "webp",
+      seed: 3,
+      num_images: 1,
+    });
+  });
+
+  it("maps Recraft V4 aspect and style to fal fields", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "recraft4",
+      prompt: "flat brand illustration",
+      aspect: "16:9",
+      style: "vector_illustration",
+    });
+
+    expect(endpoint).toBe("fal-ai/recraft/v4/text-to-image");
+    expect(body).toMatchObject({
+      prompt: "flat brand illustration",
+      image_size: "landscape_16_9",
+      style: "vector_illustration",
+    });
+    expect(body).not.toHaveProperty("num_images");
+  });
+
+  it("normalizes Ideogram V4 rendering speed and size", () => {
+    const { endpoint, body } = buildGenerateBody({
+      model: "ideogram4",
+      prompt: "bold typographic poster",
+      aspect: "2:3",
+      renderingSpeed: "QUALITY",
+      numImages: 2,
+      seed: 5,
+    });
+
+    expect(endpoint).toBe("ideogram/v4");
+    expect(body).toMatchObject({
+      prompt: "bold typographic poster",
+      image_size: "portrait_4_3",
+      rendering_speed: "QUALITY",
+      num_images: 2,
+      seed: 5,
+    });
+  });
 });
 
 describe("estimateCost", () => {
   it("uses registry fal pricing for newly added image models", () => {
     expect(estimateCost("seedream4", "2K", 3)).toBeCloseTo(0.09);
     expect(estimateCost("grok-image", "2K", 4)).toBeCloseTo(0.08);
+  });
+
+  it("tiers Seedream 5.0 Pro pricing by resolution", () => {
+    expect(estimateCost("seedream5", "1K", 1)).toBeCloseTo(0.0675);
+    expect(estimateCost("seedream5", "2K", 1)).toBeCloseTo(0.135);
+    expect(estimateCost("seedream5", "4K", 2)).toBeCloseTo(0.27);
+  });
+
+  it("prices the other July 2026 additions from the registry", () => {
+    expect(estimateCost("seedream5-lite", "4K", 2)).toBeCloseTo(0.07);
+    expect(estimateCost("flux2-turbo", "2K", 1)).toBeCloseTo(0.008);
+    expect(estimateCost("recraft4", "2K", 1)).toBeCloseTo(0.04);
+    expect(estimateCost("ideogram4", "2K", 3)).toBeCloseTo(0.09);
   });
 });
 
