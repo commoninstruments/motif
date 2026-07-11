@@ -1,6 +1,6 @@
 {
   "name": "@howells/motif-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "MCP server for Motif AI image generation and fal.ai utility tools.",
   "license": "MIT",
   "author": "Daniel Howells",
