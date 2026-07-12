@@ -62,14 +62,38 @@ async function runMotif(
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function parseJsonLine(text: string): Record<string, unknown> {
-  return JSON.parse(text.trim()) as Record<string, unknown>;
+  const value: unknown = JSON.parse(text.trim());
+  if (!isRecord(value)) {
+    throw new Error("expected a JSON object");
+  }
+  return value;
+}
+
+/** Narrow a nested JSON value to a keyed object for assertions. */
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    throw new Error("expected a JSON object");
+  }
+  return value;
+}
+
+/** Narrow a nested JSON value to an array for assertions. */
+function asArray(value: unknown): unknown[] {
+  if (!Array.isArray(value)) {
+    throw new TypeError("expected a JSON array");
+  }
+  return value;
 }
 
 afterEach(() => {
   while (tempHomes.length > 0) {
     const dir = tempHomes.pop();
-    if (dir) {
+    if (dir !== undefined && dir !== "") {
       rmSync(dir, { force: true, recursive: true });
     }
   }
@@ -106,12 +130,12 @@ describe("CLI contract", () => {
     expect(result.code).toBe(0);
 
     const schema = parseJsonLine(result.stdout);
-    const commands = schema.commands as Record<string, Record<string, unknown>>;
-    const vary = commands.vary as {
-      input: { properties: { model: { enum: string[] } } };
-    };
+    const commands = asRecord(schema.commands);
+    const varyModel = asRecord(
+      asRecord(asRecord(asRecord(commands.vary).input).properties).model
+    );
 
-    expect(vary.input.properties.model.enum).toEqual([...EDIT_CAPABLE_MODELS]);
+    expect(varyModel.enum).toEqual([...EDIT_CAPABLE_MODELS]);
   });
 
   it("advertises series commands in the primary schema", async () => {
@@ -120,15 +144,13 @@ describe("CLI contract", () => {
     expect(result.code).toBe(0);
 
     const schema = parseJsonLine(result.stdout);
-    const commands = schema.commands as Record<string, Record<string, unknown>>;
-    const describe = commands.describe as {
-      input: { properties: { command: { enum: string[] } } };
-    };
-    const series = commands.series as {
-      subcommands: string[];
-    };
+    const commands = asRecord(schema.commands);
+    const describeCommand = asRecord(
+      asRecord(asRecord(asRecord(commands.describe).input).properties).command
+    );
+    const series = asRecord(commands.series);
 
-    expect(describe.input.properties.command.enum).toContain("series");
+    expect(describeCommand.enum).toContain("series");
     expect(series).toMatchObject({
       command: "series",
       supports_dry_run: true,
@@ -148,21 +170,14 @@ describe("CLI contract", () => {
     expect(result.stderr).toBe("");
 
     const generate = parseJsonLine(result.stdout);
-    const { properties } = generate.input as {
-      properties: Record<
-        string,
-        {
-          enum?: string[];
-          enumDescriptions?: Record<string, unknown>;
-          type?: string;
-        }
-      >;
-    };
+    const properties = asRecord(asRecord(generate.input).properties);
     expect(properties.recipe).toMatchObject({
       enum: ["cinematic"],
       type: "string",
     });
-    expect(properties.recipe?.enumDescriptions.cinematic).toMatchObject({
+    expect(
+      asRecord(asRecord(properties.recipe).enumDescriptions).cinematic
+    ).toMatchObject({
       clause: "cinematic scene",
       label: "Cinematic",
     });
@@ -258,14 +273,14 @@ describe("CLI contract", () => {
         },
       },
     });
-    const firstScene = (payload.scenes as Record<string, unknown>[])[0];
+    const firstScene = asRecord(asArray(payload.scenes)[0]);
     expect(firstScene).toMatchObject({
       baseScenePrompt:
         "Image 1 of 2 in a cohesive visual series about luxury watch campaign; wide establishing composition; shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set; no text, no watermark",
       enrichedScenePrompt:
         "Image 1 of 2 in a cohesive visual series about luxury watch campaign; wide establishing composition; shared visual language, palette, lighting, lens, composition rhythm, and post-processing across the full set; no text, no watermark, cinematic scene, rim lighting with defined edge highlights",
     });
-    expect(String(firstScene?.prompt)).toContain(
+    expect(String(firstScene.prompt)).toContain(
       "cinematic scene, rim lighting with defined edge highlights"
     );
   });
@@ -361,7 +376,7 @@ describe("CLI contract", () => {
 
     expect(result.code).toBe(0);
     const schema = parseJsonLine(result.stdout);
-    const errors = schema.errors as Record<string, Record<string, unknown>>;
+    const errors = asRecord(schema.errors);
 
     expect(errors.UNKNOWN_MODEL).toMatchObject({
       docUri: "motif://describe/errors#unknown-model",
@@ -434,7 +449,7 @@ describe("CLI contract", () => {
         "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights",
       valid: true,
     });
-    expect((dryRun.body as Record<string, unknown>).prompt).toBe(
+    expect(asRecord(dryRun.body).prompt).toBe(
       "luxury watch on black marble, cinematic scene, rim lighting with defined edge highlights"
     );
   });
@@ -512,15 +527,7 @@ describe("CLI contract", () => {
     ]);
 
     expect(result.code).toBe(2);
-    const error = JSON.parse(result.stderr.trim()) as {
-      code: string;
-      details: {
-        availableIds: string[];
-        field: string;
-        value: string;
-      };
-      error: boolean;
-    };
+    const error = parseJsonLine(result.stderr);
     expect(error).toMatchObject({
       code: "INVALID_OPTION",
       details: {
@@ -710,7 +717,7 @@ describe("CLI contract", () => {
     expect(result.stderr).toBe("");
 
     const payload = parseJsonLine(result.stdout);
-    const tools = payload.tools as Record<string, Record<string, unknown>>;
+    const tools = asRecord(payload.tools);
     expect(tools["sam3-image"]).toMatchObject({
       endpoint: "fal-ai/sam-3/image",
       inputKind: "image",

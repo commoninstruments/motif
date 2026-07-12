@@ -30,6 +30,7 @@ import {
 import { ERROR_CATALOG } from "../utils/error-catalog";
 import { emit } from "../utils/output";
 import type { EmitOptions } from "../utils/output";
+import { hasText } from "../utils/text";
 import { PACKAGE_VERSION } from "../version";
 
 /**
@@ -777,7 +778,7 @@ function seriesSchema() {
   };
 }
 
-const COMMAND_SCHEMAS: Record<string, () => object> = {
+const COMMAND_SCHEMAS: Record<string, () => Record<string, unknown>> = {
   describe: describeSchema,
   errors: () => ({
     command: "errors",
@@ -887,14 +888,14 @@ export function runDescribe(
   commandName: string | undefined,
   options: EmitOptions
 ): void {
-  if (commandName) {
+  if (hasText(commandName)) {
     const schemaFn = COMMAND_SCHEMAS[commandName];
-    if (!schemaFn) {
+    if (schemaFn === undefined) {
       throw new Error(
         `Unknown command: ${commandName}. Available: ${Object.keys(COMMAND_SCHEMAS).join(", ")}`
       );
     }
-    emit(schemaFn() as Record<string, unknown>, options);
+    emit(schemaFn(), options);
   } else {
     emit(fullSchema(), options);
   }

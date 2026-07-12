@@ -128,8 +128,8 @@ export const ERROR_CATALOG = {
 export type KnownErrorCode = keyof typeof ERROR_CATALOG;
 
 export function getErrorMetadata(code: string): ErrorMetadata {
-  const known = ERROR_CATALOG[code as KnownErrorCode];
-  if (known) {
+  const known = (ERROR_CATALOG as Record<string, ErrorMetadata>)[code];
+  if (known !== undefined) {
     return known;
   }
   return metadata(code, 500);

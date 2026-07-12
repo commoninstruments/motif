@@ -14,7 +14,7 @@ describe("emitStream", () => {
   beforeEach(() => {
     writtenData = "";
     vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      writtenData += chunk;
+      writtenData += typeof chunk === "string" ? chunk : chunk.toString();
       return true;
     });
   });
@@ -53,7 +53,7 @@ describe("emitStream", () => {
     const lines = writtenData.split("\n").filter(Boolean);
     expect(lines).toHaveLength(3);
     for (const [index, line] of lines.entries()) {
-      const parsed = JSON.parse(line);
+      const parsed: unknown = JSON.parse(line);
       expect(parsed).toEqual({ id: index + 1 });
       expect(parsed).not.toHaveProperty("secret");
     }
@@ -136,7 +136,7 @@ async function runMotif(args: string[], home: string): Promise<CliResult> {
 afterEach(() => {
   while (tempHomes.length > 0) {
     const dir = tempHomes.pop();
-    if (dir) {
+    if (dir !== undefined && dir !== "") {
       rmSync(dir, { force: true, recursive: true });
     }
   }
@@ -176,7 +176,7 @@ describe("history --format ndjson (spawned CLI)", () => {
     const lines = result.stdout.split("\n").filter(Boolean);
     expect(lines).toHaveLength(2);
 
-    const records = lines.map((line) => JSON.parse(line));
+    const records = lines.map((line): unknown => JSON.parse(line));
     // History is newest-first.
     expect(records[0]).toMatchObject({
       id: "gen-two",

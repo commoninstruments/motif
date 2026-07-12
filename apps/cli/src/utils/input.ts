@@ -9,6 +9,8 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
+import { parseJsonAs } from "./json";
+
 // -- Control character filtering --
 
 /** Characters that should never appear in user prompts */
@@ -92,12 +94,13 @@ export function validateEnumOption<T extends string>(
   allowed: readonly T[],
   label: string
 ): T {
-  if (!allowed.includes(value as T)) {
+  const match = allowed.find((option) => option === value);
+  if (match === undefined) {
     throw new Error(
       `${label} must be one of ${allowed.join(", ")}: ${JSON.stringify(value)}`
     );
   }
-  return value as T;
+  return match;
 }
 
 /**
@@ -192,7 +195,9 @@ export async function readStdinJson<T>(): Promise<T | null> {
     let data = "";
     process.stdin.setEncoding("utf-8");
     process.stdin.on("data", (chunk) => {
-      data += chunk;
+      // setEncoding("utf-8") guarantees string chunks; toString() is a no-op
+      // for strings and a utf-8 decode for the Buffer half of the type.
+      data += chunk.toString();
     });
     process.stdin.on("end", () => {
       if (!data.trim()) {
@@ -200,7 +205,7 @@ export async function readStdinJson<T>(): Promise<T | null> {
         return;
       }
       try {
-        resolve(JSON.parse(data) as T);
+        resolve(parseJsonAs<T>(data));
       } catch (error) {
         reject(
           new Error(

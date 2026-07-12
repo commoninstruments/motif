@@ -22,6 +22,7 @@ import {
 } from "../utils/input";
 import { emit, isStructured, resolveFormat } from "../utils/output";
 import type { EmitOptions, OutputFormat } from "../utils/output";
+import { hasText } from "../utils/text";
 
 interface ToolOptions {
   applyMask?: boolean;
@@ -133,15 +134,20 @@ function parseOptionPairs(
   return result;
 }
 
+/** True when a value is a plain (non-array, non-null) JSON object. */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function parseJsonOptions(value: string | undefined): Record<string, unknown> {
-  if (!value) {
+  if (!hasText(value)) {
     return {};
   }
-  const parsed = JSON.parse(value) as unknown;
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+  const parsed: unknown = JSON.parse(value);
+  if (!isPlainRecord(parsed)) {
     throw new Error("--json must be a JSON object");
   }
-  return parsed as Record<string, unknown>;
+  return parsed;
 }
 
 function buildOptions(
@@ -153,9 +159,11 @@ function buildOptions(
       ...parseJsonOptions(options.json),
       ...parseOptionPairs(options.option),
       ...options.providerOptions,
-      ...(options.prompt ? { prompt: options.prompt } : {}),
-      ...(options.outputFormat ? { output_format: options.outputFormat } : {}),
-      ...(options.operatingResolution
+      ...(hasText(options.prompt) ? { prompt: options.prompt } : {}),
+      ...(hasText(options.outputFormat)
+        ? { output_format: options.outputFormat }
+        : {}),
+      ...(hasText(options.operatingResolution)
         ? { operating_resolution: options.operatingResolution }
         : {}),
       ...(options.applyMask === undefined
@@ -168,10 +176,12 @@ function buildOptions(
       ...(options.maskOnly === undefined
         ? {}
         : { mask_only: options.maskOnly }),
-      ...(options.returnMultipleMasks ? { return_multiple_masks: true } : {}),
-      ...(options.includeScores ? { include_scores: true } : {}),
-      ...(options.includeBoxes ? { include_boxes: true } : {}),
-      ...(options.maxMasks
+      ...(options.returnMultipleMasks === true
+        ? { return_multiple_masks: true }
+        : {}),
+      ...(options.includeScores === true ? { include_scores: true } : {}),
+      ...(options.includeBoxes === true ? { include_boxes: true } : {}),
+      ...(hasText(options.maxMasks)
         ? {
             max_masks: parseIntegerOption(options.maxMasks, "max masks", {
               max: 50,
@@ -179,7 +189,7 @@ function buildOptions(
             }),
           }
         : {}),
-      ...(options.scale
+      ...(hasText(options.scale)
         ? {
             upscale_factor: parseNumberOption(options.scale, "scale", {
               max: 8,
@@ -187,15 +197,17 @@ function buildOptions(
             }),
           }
         : {}),
-      ...(options.model ? { model: options.model } : {}),
-      ...(options.backgroundColor
+      ...(hasText(options.model) ? { model: options.model } : {}),
+      ...(hasText(options.backgroundColor)
         ? { background_color: options.backgroundColor }
         : {}),
-      ...(options.codec ? { output_container_and_codec: options.codec } : {}),
+      ...(hasText(options.codec)
+        ? { output_container_and_codec: options.codec }
+        : {}),
       ...(options.preserveAudio === undefined
         ? {}
         : { preserve_audio: options.preserveAudio }),
-      ...(options.detectionThreshold
+      ...(hasText(options.detectionThreshold)
         ? {
             detection_threshold: parseNumberOption(
               options.detectionThreshold,
@@ -204,7 +216,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.pointsPerSide
+      ...(hasText(options.pointsPerSide)
         ? {
             points_per_side: parseIntegerOption(
               options.pointsPerSide,
@@ -213,7 +225,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.predIouThresh
+      ...(hasText(options.predIouThresh)
         ? {
             pred_iou_thresh: parseNumberOption(
               options.predIouThresh,
@@ -222,7 +234,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.stabilityScoreThresh
+      ...(hasText(options.stabilityScoreThresh)
         ? {
             stability_score_thresh: parseNumberOption(
               options.stabilityScoreThresh,
@@ -231,7 +243,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.minMaskRegionArea
+      ...(hasText(options.minMaskRegionArea)
         ? {
             min_mask_region_area: parseIntegerOption(
               options.minMaskRegionArea,
@@ -240,7 +252,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.numInferenceSteps
+      ...(hasText(options.numInferenceSteps)
         ? {
             num_inference_steps: parseIntegerOption(
               options.numInferenceSteps,
@@ -249,7 +261,7 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.ensembleSize
+      ...(hasText(options.ensembleSize)
         ? {
             ensemble_size: parseIntegerOption(
               options.ensembleSize,
@@ -258,21 +270,36 @@ function buildOptions(
             ),
           }
         : {}),
-      ...(options.targetFps
+      ...(hasText(options.targetFps)
         ? {
             target_fps: parseIntegerOption(options.targetFps, "target FPS", {
               min: 1,
             }),
           }
         : {}),
-      ...(options.h264 ? { H264_output: true } : {}),
-      ...(options.videoOutputType
+      ...(options.h264 === true ? { H264_output: true } : {}),
+      ...(hasText(options.videoOutputType)
         ? { video_output_type: options.videoOutputType }
         : {}),
     };
   } catch (error) {
     handleError(error, "INVALID_OPTION", format);
   }
+}
+
+/** Extract a string `url` field from an object-shaped value, if present. */
+function extractUrl(value: unknown): string | undefined {
+  if (typeof value === "object" && value !== null && "url" in value) {
+    const { url } = value;
+    if (typeof url === "string") {
+      return url;
+    }
+  }
+  return undefined;
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
 }
 
 function primaryUrl(
@@ -284,19 +311,15 @@ function primaryUrl(
     if (typeof value === "string" && value.startsWith("https://")) {
       return value;
     }
-    if (value && typeof value === "object" && "url" in value) {
-      const { url } = value;
-      if (typeof url === "string") {
-        return url;
-      }
+    const directUrl = extractUrl(value);
+    if (directUrl !== undefined) {
+      return directUrl;
     }
-    if (Array.isArray(value)) {
+    if (isUnknownArray(value)) {
       for (const item of value) {
-        if (item && typeof item === "object" && "url" in item) {
-          const { url } = item as { url?: unknown };
-          if (typeof url === "string") {
-            return url;
-          }
+        const itemUrl = extractUrl(item);
+        if (itemUrl !== undefined) {
+          return itemUrl;
         }
       }
     }
@@ -338,7 +361,7 @@ function listTools(emitOpts: EmitOptions): void {
 }
 
 function describeTool(toolId: string | undefined, emitOpts: EmitOptions): void {
-  if (!toolId) {
+  if (!hasText(toolId)) {
     listTools(emitOpts);
     return;
   }
@@ -379,11 +402,12 @@ async function runFalTool(
     );
   }
 
-  const inputs = options.inputs?.length
-    ? options.inputs
-    : input
-      ? [input]
-      : undefined;
+  const inputs =
+    options.inputs !== undefined && options.inputs.length > 0
+      ? options.inputs
+      : hasText(input)
+        ? [input]
+        : undefined;
   const requestOptions = buildOptions(options, emitOpts.format);
   let request: FalToolRequest;
   try {
@@ -397,7 +421,7 @@ async function runFalTool(
     handleError(error, "INVALID_OPTION", emitOpts.format);
   }
 
-  if (options.dryRun) {
+  if (options.dryRun === true) {
     emit(
       {
         body: request.body,
@@ -422,10 +446,10 @@ async function runFalTool(
       tool: toolId,
     });
     let saved: { path: string; size: string } | undefined;
-    if (options.output) {
+    if (hasText(options.output)) {
       const outputPath = validateOutputPath(options.output);
       const url = primaryUrl(result, request.tool.outputKeys);
-      if (!url) {
+      if (!hasText(url)) {
         throw new Error(`No downloadable output found for ${toolId}`);
       }
       const actualOutputPath = await downloadImage(url, outputPath);
@@ -470,7 +494,7 @@ export async function runToolPayload(
     return;
   }
 
-  if (!payload.tool) {
+  if (!hasText(payload.tool)) {
     listTools(emitOpts);
     return;
   }
@@ -574,7 +598,8 @@ export async function runTools(args: string[]): Promise<void> {
     .option(
       "--option <key=value>",
       "Raw option pair; repeatable",
-      (value, previous: string[] = []) => [...previous, value]
+      (value: string, previous: string[]) => [...previous, value],
+      []
     )
     .action(
       async (

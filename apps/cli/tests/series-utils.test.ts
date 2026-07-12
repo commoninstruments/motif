@@ -122,7 +122,9 @@ describe("loadSeries / saveSeries", () => {
     expect(loaded.name).toBe("Roundtrip");
 
     const before = loaded.updated;
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 5);
+    });
     await series.saveSeries({ ...loaded, stylePrompt: "updated" });
 
     const reloaded = await series.loadSeries("roundtrip");

@@ -18,6 +18,7 @@ import {
   imageToDataUrl,
   openImage,
 } from "../../utils/image";
+import { hasText } from "../../utils/text";
 import { Spinner } from "../components/spinner";
 
 const IMAGE_EXT_REGEX = /\.(png|jpg|jpeg|webp)$/i;
@@ -37,10 +38,10 @@ function getModelForMode(
 }
 
 function getEditModel(config: MotifConfig, sourceModel: string): string {
-  if (MODELS[sourceModel]?.supportsEdit) {
+  if (MODELS[sourceModel]?.supportsEdit === true) {
     return sourceModel;
   }
-  if (MODELS[config.defaultModel]?.supportsEdit) {
+  if (MODELS[config.defaultModel]?.supportsEdit === true) {
     return config.defaultModel;
   }
   return "banana2";
@@ -110,8 +111,8 @@ export function EditScreen({
     model: string;
     aspect: AspectRatio;
     resolution: Resolution;
-  } => {
-    if (useCustomPath && customPath) {
+  } | null => {
+    if (useCustomPath && hasText(customPath)) {
       return {
         aspect: config.defaultAspect,
         model: config.defaultModel,
@@ -120,7 +121,7 @@ export function EditScreen({
         resolution: config.defaultResolution,
       };
     }
-    return selectedGen as Generation;
+    return selectedGen;
   };
 
   useEffect(() => {
@@ -137,7 +138,9 @@ export function EditScreen({
         }
       }
     };
-    loadGenerations();
+    // Fire-and-forget: useEffect callbacks cannot be async; errors are non-fatal
+    // (screen falls back to custom-path entry).
+    void loadGenerations();
   }, [skipToOperation]);
 
   const proceedFromSelect = () => {
@@ -166,7 +169,9 @@ export function EditScreen({
       setStep("prompt");
     } else if (selectedMode === "variations") {
       const source = getSourceImage();
-      setPrompt(source.prompt);
+      if (source !== null) {
+        setPrompt(source.prompt);
+      }
       setStep("confirm");
     } else if (selectedMode === "upscale") {
       setStep("scale");
@@ -201,24 +206,27 @@ export function EditScreen({
       meta?: boolean;
     }
   ) => {
-    if (key.upArrow && selectedIndex > 0) {
+    if (key.upArrow === true && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
       setSelectedGen(generations[selectedIndex - 1] ?? null);
-    } else if (key.downArrow && selectedIndex < generations.length - 1) {
+    } else if (
+      key.downArrow === true &&
+      selectedIndex < generations.length - 1
+    ) {
       setSelectedIndex(selectedIndex + 1);
       setSelectedGen(generations[selectedIndex + 1] ?? null);
-    } else if (key.tab) {
+    } else if (key.tab === true) {
       setUseCustomPath(true);
-    } else if (key.return) {
+    } else if (key.return === true) {
       proceedFromSelect();
-    } else if (input && !key.ctrl && !key.meta) {
+    } else if (hasText(input) && key.ctrl !== true && key.meta !== true) {
       setCustomPath(input);
       setUseCustomPath(true);
     }
   };
 
   const handleCustomPathInput = (key: { tab?: boolean }) => {
-    if (key.tab && generations.length > 0) {
+    if (key.tab === true && generations.length > 0) {
       setUseCustomPath(false);
     }
   };
@@ -246,11 +254,14 @@ export function EditScreen({
     downArrow?: boolean;
     return?: boolean;
   }) => {
-    if (key.upArrow && operationIndex > 0) {
+    if (key.upArrow === true && operationIndex > 0) {
       setOperationIndex(operationIndex - 1);
-    } else if (key.downArrow && operationIndex < OPERATIONS.length - 1) {
+    } else if (
+      key.downArrow === true &&
+      operationIndex < OPERATIONS.length - 1
+    ) {
       setOperationIndex(operationIndex + 1);
-    } else if (key.return) {
+    } else if (key.return === true) {
       proceedFromOperation();
     }
   };
@@ -260,18 +271,20 @@ export function EditScreen({
     downArrow?: boolean;
     return?: boolean;
   }) => {
-    if (key.upArrow && scale < 8) {
+    if (key.upArrow === true && scale < 8) {
       setScale(scale + 1);
-    } else if (key.downArrow && scale > 1) {
+    } else if (key.downArrow === true && scale > 1) {
       setScale(scale - 1);
-    } else if (key.return) {
+    } else if (key.return === true) {
       setStep("confirm");
     }
   };
 
   const handleConfirmInput = (input: string, key: { return?: boolean }) => {
-    if (key.return || input === "y") {
-      runProcess();
+    if (key.return === true || input === "y") {
+      // Fire-and-forget: useInput handlers cannot be async; runProcess drives its
+      // own status/error UI and calls onError on failure.
+      void runProcess();
     } else if (input === "n") {
       setStep("operation");
     }
@@ -305,7 +318,7 @@ export function EditScreen({
 
   const runProcess = async () => {
     const source = getSourceImage();
-    if (!(source && mode)) {
+    if (source === null || mode === null) {
       return;
     }
 
@@ -385,7 +398,7 @@ export function EditScreen({
       setStatus("Saving...");
 
       const dims = await getImageDimensions(outputPath);
-      const size = await getFileSize(outputPath);
+      const size = getFileSize(outputPath);
 
       await addGeneration({
         aspect: source.aspect,
@@ -408,12 +421,12 @@ export function EditScreen({
       });
 
       if (config.openAfterGenerate) {
-        await openImage(fullPath);
+        openImage(fullPath);
       }
 
       setStep("done");
     } catch (error) {
-      onError(error as Error);
+      onError(error instanceof Error ? error : new Error(String(error)));
       onBack();
     }
   };

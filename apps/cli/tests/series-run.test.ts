@@ -37,6 +37,10 @@ vi.mock("../src/utils/input", async (importActual) => {
   };
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 const originalHome = process.env.HOME;
 const originalUserProfile = process.env.USERPROFILE;
 const originalFalKey = process.env.FAL_KEY;
@@ -207,10 +211,10 @@ describe("runSeries full generate flow (mocked fal)", () => {
     expect(secondEdit).toHaveLength(1);
     expect(secondEdit?.[0]).toMatch(/-01\.png$/);
 
-    const payload = JSON.parse(writes.join("").trim()) as Record<
-      string,
-      unknown
-    >;
+    const payload: unknown = JSON.parse(writes.join("").trim());
+    if (!isRecord(payload)) {
+      throw new Error("expected a JSON object");
+    }
     expect(payload).toMatchObject({
       command: "series-run",
       dryRun: false,

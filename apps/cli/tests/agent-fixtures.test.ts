@@ -71,22 +71,38 @@ async function runMotif(
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 function parseJsonLine(text: string): Record<string, unknown> {
-  return JSON.parse(text.trim());
+  const value: unknown = JSON.parse(text.trim());
+  if (!isRecord(value)) {
+    throw new Error("expected a JSON object");
+  }
+  return value;
 }
 
 interface GenerateDescribeSchema {
   input: { properties: Record<string, { enum?: string[] }> };
 }
 
+function isGenerateSchema(value: unknown): value is GenerateDescribeSchema {
+  return typeof value === "object" && value !== null && "input" in value;
+}
+
 function parseGenerateSchema(text: string): GenerateDescribeSchema {
-  return JSON.parse(text.trim());
+  const value: unknown = JSON.parse(text.trim());
+  if (!isGenerateSchema(value)) {
+    throw new Error("expected a generate describe schema");
+  }
+  return value;
 }
 
 afterEach(() => {
   while (tempHomes.length > 0) {
     const dir = tempHomes.pop();
-    if (dir) {
+    if (dir !== undefined && dir !== "") {
       rmSync(dir, { force: true, recursive: true });
     }
   }

@@ -13,6 +13,9 @@ import { join } from "node:path";
 import { getFalKeyFromEnv } from "@howells/motif-sdk";
 import type { AspectRatio, Resolution } from "@howells/motif-sdk";
 
+import { parseJsonAs } from "./json";
+import { hasText } from "./text";
+
 const MOTIF_DIR = join(homedir(), ".motif");
 const CONFIG_PATH = join(MOTIF_DIR, "config.json");
 const HISTORY_PATH = join(MOTIF_DIR, "history.json");
@@ -111,11 +114,11 @@ export async function loadConfig(): Promise<MotifConfig> {
   if (existsSync(CONFIG_PATH)) {
     try {
       const raw = await readFile(CONFIG_PATH, "utf-8");
-      const globalConfig = JSON.parse(raw);
+      const globalConfig = parseJsonAs<Partial<MotifConfig>>(raw);
       config = { ...config, ...globalConfig };
     } catch (error) {
       console.error(
-        `Warning: Failed to parse ${CONFIG_PATH}: ${(error as Error).message}`
+        `Warning: Failed to parse ${CONFIG_PATH}: ${error instanceof Error ? error.message : String(error)}`
       );
       console.error("Using default configuration.");
     }
@@ -125,11 +128,11 @@ export async function loadConfig(): Promise<MotifConfig> {
   if (existsSync(LOCAL_CONFIG_PATH)) {
     try {
       const raw = await readFile(LOCAL_CONFIG_PATH, "utf-8");
-      const localConfig = JSON.parse(raw);
+      const localConfig = parseJsonAs<Partial<MotifConfig>>(raw);
       config = { ...config, ...localConfig };
     } catch (error) {
       console.error(
-        `Warning: Failed to parse ${LOCAL_CONFIG_PATH}: ${(error as Error).message}`
+        `Warning: Failed to parse ${LOCAL_CONFIG_PATH}: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
@@ -144,7 +147,7 @@ export async function saveConfig(config: Partial<MotifConfig>): Promise<void> {
   if (existsSync(CONFIG_PATH)) {
     try {
       const raw = await readFile(CONFIG_PATH, "utf-8");
-      existing = JSON.parse(raw);
+      existing = parseJsonAs<MotifConfig>(raw);
     } catch {
       // Use defaults if existing config is corrupted
     }
@@ -163,7 +166,7 @@ export async function loadHistory(): Promise<History> {
 
   try {
     const raw = await readFile(HISTORY_PATH, "utf-8");
-    const history: History = JSON.parse(raw);
+    const history = parseJsonAs<History>(raw);
 
     // Reset session/daily costs if it's a new day
     const today = new Date().toISOString().split("T")[0] ?? "";
@@ -176,7 +179,7 @@ export async function loadHistory(): Promise<History> {
     return history;
   } catch (error) {
     console.error(
-      `Warning: Failed to load history from ${HISTORY_PATH}: ${(error as Error).message}`
+      `Warning: Failed to load history from ${HISTORY_PATH}: ${error instanceof Error ? error.message : String(error)}`
     );
     console.error("Starting with empty history.");
     return { ...DEFAULT_HISTORY };
@@ -219,18 +222,18 @@ export async function addGenerations(generations: Generation[]): Promise<void> {
 export async function getLastGeneration(): Promise<Generation | null> {
   const history = await loadHistory();
   // Generations are stored oldest-first, so last element is most recent
-  return history.generations.at(-1) || null;
+  return history.generations.at(-1) ?? null;
 }
 
 export function getApiKey(config: MotifConfig): string {
   // Environment variable takes precedence
   const envKey = getFalKeyFromEnv();
-  if (envKey) {
+  if (hasText(envKey)) {
     return envKey;
   }
 
   // Fall back to config
-  if (config.apiKey) {
+  if (hasText(config.apiKey)) {
     return config.apiKey;
   }
 

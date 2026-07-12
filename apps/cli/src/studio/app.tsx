@@ -2,6 +2,7 @@ import { Box, Text, useApp, useInput } from "ink";
 import { useState } from "react";
 
 import type { History, MotifConfig } from "../utils/config";
+import { hasText } from "../utils/text";
 import { EditScreen } from "./screens/edit";
 import { GalleryScreen } from "./screens/gallery";
 import { GenerateScreen } from "./screens/generate";
@@ -57,11 +58,13 @@ export function App({
               setScreen("home");
             }}
             onComplete={(nextScreen?: Screen) => {
-              onHistoryChange();
+              // Fire-and-forget history reload; the screen transition below does
+              // not depend on it and this callback cannot be async.
+              void onHistoryChange();
               if (nextScreen === "edit") {
                 setEditFromGenerate(true);
               }
-              setScreen(nextScreen || "home");
+              setScreen(nextScreen ?? "home");
             }}
             onError={handleError}
           />
@@ -77,7 +80,9 @@ export function App({
             }}
             onComplete={() => {
               setEditFromGenerate(false);
-              onHistoryChange();
+              // Fire-and-forget history reload; screen transition does not depend
+              // on it and this callback cannot be async.
+              void onHistoryChange();
               setScreen("home");
             }}
             onError={handleError}
@@ -130,7 +135,7 @@ export function App({
         </Text>
       </Box>
 
-      {error && (
+      {hasText(error) && (
         <Box marginBottom={1}>
           <Text color="red">✗ {error}</Text>
         </Box>

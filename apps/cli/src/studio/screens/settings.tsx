@@ -9,6 +9,7 @@ import TextInput from "ink-text-input";
 import { useState } from "react";
 
 import type { MotifConfig } from "../../utils/config";
+import { firstText } from "../../utils/text";
 
 interface SettingItem {
   key: keyof MotifConfig;
@@ -100,14 +101,16 @@ export function SettingsScreen({
         // Toggle boolean value
         setLocalConfig((c) => ({
           ...c,
-          [setting.key]: !c[setting.key],
+          [setting.key]: c[setting.key] !== true,
         }));
       } else if (setting.type === "text") {
-        setEditValue((localConfig[setting.key] as string) || "");
+        const raw = localConfig[setting.key];
+        setEditValue(typeof raw === "string" ? raw : "");
         setEditing(true);
       } else if (setting.type === "select" && setting.options) {
         // Cycle through options
-        const currentValue = localConfig[setting.key] as string;
+        const rawValue = localConfig[setting.key];
+        const currentValue = typeof rawValue === "string" ? rawValue : "";
         const currentIdx = setting.options.indexOf(currentValue);
         const nextIdx = (currentIdx + 1) % setting.options.length;
         setLocalConfig((c) => ({
@@ -118,8 +121,9 @@ export function SettingsScreen({
     }
 
     if (input === "s") {
-      // Save settings
-      onSave(localConfig);
+      // Save settings — fire-and-forget; useInput handlers cannot be async and
+      // the save result is surfaced via onSave's own effects.
+      void onSave(localConfig);
     }
   });
 
@@ -134,16 +138,18 @@ export function SettingsScreen({
   const formatValue = (setting: SettingItem): string => {
     const value = localConfig[setting.key];
     if (setting.type === "toggle") {
-      return value ? "Yes" : "No";
+      return value === true ? "Yes" : "No";
     }
-    if (setting.key === "apiKey" && value) {
-      const str = value as string;
-      return `${str.slice(0, 8)}...${str.slice(-4)}`;
+    if (typeof value !== "string" || value === "") {
+      return "Not set";
     }
-    if (setting.key === "defaultModel" && value) {
-      return MODELS[value as string]?.name || (value as string);
+    if (setting.key === "apiKey") {
+      return `${value.slice(0, 8)}...${value.slice(-4)}`;
     }
-    return String(value || "Not set");
+    if (setting.key === "defaultModel") {
+      return firstText(MODELS[value]?.name) ?? value;
+    }
+    return value;
   };
 
   return (

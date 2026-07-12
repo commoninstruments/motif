@@ -9,6 +9,12 @@
 import chalk from "chalk";
 
 import { getErrorMetadata } from "./error-catalog";
+import { hasText } from "./text";
+
+/** Narrow an unknown value to a plain (non-array) object. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export type OutputFormat = "human" | "json" | "ndjson";
 
@@ -56,8 +62,8 @@ function sanitizeValue(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(sanitizeValue);
   }
-  if (value !== null && typeof value === "object") {
-    return sanitizeObject(value as Record<string, unknown>);
+  if (isRecord(value)) {
+    return sanitizeObject(value);
   }
   return value;
 }
@@ -84,9 +90,9 @@ export function emit(
   data: Record<string, unknown>,
   options: EmitOptions
 ): void {
-  let output = options.sanitize ? sanitizeObject(data) : data;
+  let output = options.sanitize === true ? sanitizeObject(data) : data;
 
-  if (options.fields) {
+  if (hasText(options.fields)) {
     const fieldList = options.fields.split(",").map((f) => f.trim());
     output = applyFieldMask(output, fieldList);
   }
@@ -174,6 +180,10 @@ export function emitError(
   });
   const metadata = getErrorMetadata(error.code);
 
+  // Presence check matches the original truthiness: falsy details (undefined,
+  // null, "", 0, false) are omitted from the envelope.
+  const hasDetails = Boolean(error.details);
+
   const structured: StructuredError = {
     type: rfc.type,
     title: rfc.title,
@@ -182,7 +192,7 @@ export function emitError(
     error: true,
     code: error.code,
     message: error.message,
-    ...(error.details ? { details: error.details } : {}),
+    ...(hasDetails ? { details: error.details } : {}),
     is_retriable: error.is_retriable ?? metadata.isRetriable,
     ...(error.suggestions || metadata.suggestions
       ? { suggestions: error.suggestions ?? metadata.suggestions }

@@ -12,6 +12,7 @@ import { exitForErrorCode, handleError } from "./errors";
 import { validateEditPath, validateEnumOption } from "./input";
 import { emitError } from "./output";
 import type { OutputFormat } from "./output";
+import { hasText } from "./text";
 
 // -- Constants --
 
@@ -34,6 +35,13 @@ const IMAGE_SIZE_STRINGS = [
   "1024x1536",
 ] as const;
 
+/** Narrow a raw string to a known preset image-size keyword. */
+function isImageSizeString(
+  value: string
+): value is (typeof IMAGE_SIZE_STRINGS)[number] {
+  return (IMAGE_SIZE_STRINGS as readonly string[]).includes(value);
+}
+
 export function parseImageSizeOption(
   value: StdinPayload["imageSize"] | string | undefined
 ): ImageSize | undefined {
@@ -52,10 +60,8 @@ export function parseImageSizeOption(
     return { height, width };
   }
 
-  if (
-    IMAGE_SIZE_STRINGS.includes(value as (typeof IMAGE_SIZE_STRINGS)[number])
-  ) {
-    return value as ImageSize;
+  if (isImageSizeString(value)) {
+    return value;
   }
 
   const match = /^(\d+)x(\d+)$/.exec(value);
@@ -81,19 +87,21 @@ export function resolvePreset(
   defaultAspect: AspectRatio,
   defaultResolution: Resolution
 ): { aspect: AspectRatio; resolution: Resolution } {
-  const cliPreset =
-    (options.cover && "cover") ||
-    (options.story && "story") ||
-    (options.reel && "reel") ||
-    (options.feed && "feed") ||
-    (options.og && "og") ||
-    (options.wallpaper && "wallpaper") ||
-    (options.ultra && "ultra") ||
-    (options.wide && "wide") ||
-    (options.square && "square") ||
-    (options.landscape && "landscape") ||
-    (options.portrait && "portrait");
-  const preset = cliPreset || stdinPreset;
+  const PRESET_FLAGS = [
+    "cover",
+    "story",
+    "reel",
+    "feed",
+    "og",
+    "wallpaper",
+    "ultra",
+    "wide",
+    "square",
+    "landscape",
+    "portrait",
+  ] as const;
+  const cliPreset = PRESET_FLAGS.find((flag) => options[flag] === true);
+  const preset = cliPreset ?? stdinPreset;
 
   const PRESET_MAP: Record<
     string,
@@ -112,7 +120,7 @@ export function resolvePreset(
     wide: { aspect: "21:9" },
   };
 
-  if (preset && preset in PRESET_MAP) {
+  if (hasText(preset) && preset in PRESET_MAP) {
     // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed to exist due to the `in` check
     const p = PRESET_MAP[preset]!;
     return {
@@ -120,29 +128,27 @@ export function resolvePreset(
       resolution: p.resolution ?? defaultResolution,
     };
   }
-  if (preset) {
+  if (hasText(preset)) {
     throw new Error(
       `preset must be one of ${Object.keys(PRESET_MAP).join(", ")}: ${JSON.stringify(preset)}`
     );
   }
 
   return {
-    aspect:
-      (options.aspect ?? stdinAspect)
-        ? validateEnumOption(
-            options.aspect ?? stdinAspect ?? "",
-            ASPECT_RATIOS,
-            "aspect"
-          )
-        : defaultAspect,
-    resolution:
-      (options.resolution ?? stdinResolution)
-        ? validateEnumOption(
-            options.resolution ?? stdinResolution ?? "",
-            RESOLUTIONS,
-            "resolution"
-          )
-        : defaultResolution,
+    aspect: hasText(options.aspect ?? stdinAspect)
+      ? validateEnumOption(
+          options.aspect ?? stdinAspect ?? "",
+          ASPECT_RATIOS,
+          "aspect"
+        )
+      : defaultAspect,
+    resolution: hasText(options.resolution ?? stdinResolution)
+      ? validateEnumOption(
+          options.resolution ?? stdinResolution ?? "",
+          RESOLUTIONS,
+          "resolution"
+        )
+      : defaultResolution,
   };
 }
 
@@ -151,11 +157,15 @@ export function resolveEditPaths(
   modelConfig: { maxReferenceImages?: number; name: string },
   format: OutputFormat
 ): string[] | undefined {
-  if (!editFiles?.length) {
+  if (editFiles === undefined || editFiles.length === 0) {
     return undefined;
   }
 
-  const maxRef = modelConfig.maxReferenceImages || 1;
+  const maxRef =
+    modelConfig.maxReferenceImages !== undefined &&
+    modelConfig.maxReferenceImages !== 0
+      ? modelConfig.maxReferenceImages
+      : 1;
   if (editFiles.length > maxRef) {
     emitError(
       {

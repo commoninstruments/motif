@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import type { History } from "../../utils/config";
 import { openImage } from "../../utils/image";
+import { firstText } from "../../utils/text";
 
 interface GalleryScreenProps {
   history: History;
@@ -38,7 +39,7 @@ export function GalleryScreen({ history, onBack }: GalleryScreenProps) {
     }
   };
 
-  useInput(async (_input, key) => {
+  useInput((_input, key) => {
     if (key.escape) {
       onBack();
       return;
@@ -57,9 +58,10 @@ export function GalleryScreen({ history, onBack }: GalleryScreenProps) {
       setPage(page + 1);
       setSelectedIndex(0);
     }
-    if (key.return && pageItems[selectedIndex]) {
+    const selected = pageItems[selectedIndex];
+    if (key.return && selected) {
       try {
-        await openImage(pageItems[selectedIndex].output);
+        openImage(selected.output);
       } catch {
         // Image may have been deleted; silently ignore
       }
@@ -105,7 +107,7 @@ export function GalleryScreen({ history, onBack }: GalleryScreenProps) {
             </Box>
             <Box width={18}>
               <Text dimColor>
-                {MODELS[gen.model]?.name?.slice(0, 15) || gen.model}
+                {firstText(MODELS[gen.model]?.name?.slice(0, 15)) ?? gen.model}
               </Text>
             </Box>
             <Text dimColor>{timeStr}</Text>

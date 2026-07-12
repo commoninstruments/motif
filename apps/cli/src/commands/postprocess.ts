@@ -38,6 +38,7 @@ import {
 } from "../utils/input";
 import { emit, emitError, isStructured } from "../utils/output";
 import type { EmitOptions } from "../utils/output";
+import { firstText, hasText } from "../utils/text";
 import { generateImage } from "./generate";
 
 // -- Constants --
@@ -75,7 +76,7 @@ export async function generateVariations(
     exitForErrorCode("NO_PREVIOUS");
   }
 
-  const prompt = customPrompt || stdinData?.prompt || last.prompt;
+  const prompt = firstText(customPrompt, stdinData?.prompt) ?? last.prompt;
   const numImages = validateOption(emitOpts.format, () =>
     parseIntegerOption(stdinData?.numImages ?? options.num ?? 4, "num images", {
       max: 4,
@@ -92,11 +93,11 @@ export async function generateVariations(
     prompt,
     {
       ...options,
-      aspect: options.aspect || stdinData?.aspect || last.aspect,
-      model: options.model || stdinData?.model || last.model,
+      aspect: firstText(options.aspect, stdinData?.aspect) ?? last.aspect,
+      model: firstText(options.model, stdinData?.model) ?? last.model,
       num: String(numImages),
       resolution:
-        options.resolution || stdinData?.resolution || last.resolution,
+        firstText(options.resolution, stdinData?.resolution) ?? last.resolution,
     },
     null, // Don't pass stdinData again (already merged into options)
     config,
@@ -116,15 +117,9 @@ export async function upscaleLast(
   let sourceAspect: AspectRatio = "1:1";
   let sourceResolution: Resolution = "1K";
 
-  const resolvedPath = imagePath || stdinData?.imagePath;
+  const resolvedPath = firstText(imagePath, stdinData?.imagePath);
 
-  if (resolvedPath) {
-    try {
-      sourceImagePath = validateEditPath(resolvedPath);
-    } catch (error) {
-      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
-    }
-  } else {
+  if (resolvedPath === undefined) {
     const last = await getLastGeneration();
     if (!last) {
       emitError(
@@ -137,6 +132,12 @@ export async function upscaleLast(
     sourcePrompt = last.prompt;
     sourceAspect = last.aspect;
     sourceResolution = last.resolution;
+  } else {
+    try {
+      sourceImagePath = validateEditPath(resolvedPath);
+    } catch (error) {
+      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
+    }
   }
 
   const scaleFactor = validateOption(emitOpts.format, () =>
@@ -148,13 +149,14 @@ export async function upscaleLast(
       )
     )
   );
-  const rawOutput = options.output || stdinData?.output;
-  const outputPath = rawOutput
-    ? validateOutput(emitOpts.format, rawOutput)
-    : derivedOutputPath(sourceImagePath, `-up${scaleFactor}x`);
+  const rawOutput = firstText(options.output, stdinData?.output);
+  const outputPath =
+    rawOutput === undefined
+      ? derivedOutputPath(sourceImagePath, `-up${scaleFactor}x`)
+      : validateOutput(emitOpts.format, rawOutput);
 
   // -- Dry run --
-  if (options.dryRun) {
+  if (options.dryRun === true) {
     const dryResult = {
       command: "upscale",
       dryRun: true,
@@ -195,8 +197,10 @@ export async function upscaleLast(
       model: config.upscaler,
       scaleFactor,
       // Clarity upscale params from stdin (power-user API access)
-      ...(stdinData?.upscalePrompt && { prompt: stdinData.upscalePrompt }),
-      ...(stdinData?.upscaleNegativePrompt && {
+      ...(hasText(stdinData?.upscalePrompt) && {
+        prompt: stdinData.upscalePrompt,
+      }),
+      ...(hasText(stdinData?.upscaleNegativePrompt) && {
         negativePrompt: stdinData.upscaleNegativePrompt,
       }),
       ...(stdinData?.upscaleResemblance !== undefined && {
@@ -217,7 +221,7 @@ export async function upscaleLast(
     const actualOutputPath = await downloadImage(image.url, outputPath);
 
     const dims = await getImageDimensions(actualOutputPath);
-    const size = await getFileSize(actualOutputPath);
+    const size = getFileSize(actualOutputPath);
 
     if (!isStructured(emitOpts.format)) {
       console.log(
@@ -257,8 +261,12 @@ export async function upscaleLast(
       );
     }
 
-    if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
-      await openImage(actualOutputPath);
+    if (
+      config.openAfterGenerate &&
+      options.noOpen !== true &&
+      stdinData?.noOpen !== true
+    ) {
+      openImage(actualOutputPath);
     }
   } catch (error) {
     spinner?.fail("Upscale failed");
@@ -284,13 +292,14 @@ export async function removeBackgroundLast(
     exitForErrorCode("NO_PREVIOUS");
   }
 
-  const rawOutput = options.output || stdinData?.output;
-  const outputPath = rawOutput
-    ? validateOutput(emitOpts.format, rawOutput)
-    : derivedOutputPath(last.output, "-nobg");
+  const rawOutput = firstText(options.output, stdinData?.output);
+  const outputPath =
+    rawOutput === undefined
+      ? derivedOutputPath(last.output, "-nobg")
+      : validateOutput(emitOpts.format, rawOutput);
 
   // -- Dry run --
-  if (options.dryRun) {
+  if (options.dryRun === true) {
     const dryResult = {
       command: "rmbg",
       dryRun: true,
@@ -327,19 +336,24 @@ export async function removeBackgroundLast(
     const result = await removeBackground({
       imageUrl: imageData,
       model: config.backgroundRemover,
-      // BiRefNet params from stdin
-      ...(stdinData?.rmbgVariant && {
+      // BiRefNet params from stdin. These are deliberate pass-throughs: fal
+      // validates the values server-side, and validating locally would change
+      // the error envelope (INVALID_OPTION instead of RMBG_FAILED).
+      ...(hasText(stdinData?.rmbgVariant) && {
+        // oxlint-disable-next-line no-unsafe-type-assertion -- pass-through to fal; server validates, local validation would change the error envelope
         variant: stdinData.rmbgVariant as
           | "General Use (Light)"
           | "General Use (Heavy)"
           | "Portrait",
       }),
-      ...(stdinData?.rmbgOperatingResolution && {
+      ...(hasText(stdinData?.rmbgOperatingResolution) && {
+        // oxlint-disable-next-line no-unsafe-type-assertion -- pass-through to fal; server validates, local validation would change the error envelope
         operatingResolution: stdinData.rmbgOperatingResolution as
           | "1024x1024"
           | "2048x2048",
       }),
-      ...(stdinData?.rmbgOutputFormat && {
+      ...(hasText(stdinData?.rmbgOutputFormat) && {
+        // oxlint-disable-next-line no-unsafe-type-assertion -- pass-through to fal; server validates, local validation would change the error envelope
         outputFormat: stdinData.rmbgOutputFormat as "png" | "webp" | "gif",
       }),
       ...(stdinData?.rmbgRefineForeground !== undefined && {
@@ -357,7 +371,7 @@ export async function removeBackgroundLast(
     const actualOutputPath = await downloadImage(image.url, outputPath);
 
     const dims = await getImageDimensions(actualOutputPath);
-    const size = await getFileSize(actualOutputPath);
+    const size = getFileSize(actualOutputPath);
 
     if (!isStructured(emitOpts.format)) {
       console.log(
@@ -396,8 +410,12 @@ export async function removeBackgroundLast(
       );
     }
 
-    if (config.openAfterGenerate && !options.noOpen && !stdinData?.noOpen) {
-      await openImage(actualOutputPath);
+    if (
+      config.openAfterGenerate &&
+      options.noOpen !== true &&
+      stdinData?.noOpen !== true
+    ) {
+      openImage(actualOutputPath);
     }
   } catch (error) {
     spinner?.fail("Background removal failed");

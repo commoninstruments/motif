@@ -32,6 +32,7 @@ import { exitForErrorCode, handleError } from "./utils/errors";
 import { readStdinJson } from "./utils/input";
 import { emit, emitError, isStructured, resolveFormat } from "./utils/output";
 import type { EmitOptions } from "./utils/output";
+import { firstText, hasText } from "./utils/text";
 import { PACKAGE_VERSION } from "./version";
 
 // -- Commands --
@@ -64,7 +65,7 @@ async function showLastGeneration(emitOpts: EmitOptions): Promise<void> {
     `  Prompt: ${chalk.cyan(last.prompt.slice(0, 60))}${last.prompt.length > 60 ? "..." : ""}`
   );
   console.log(
-    `  Model:  ${chalk.green(MODELS[last.model]?.name || last.model)}`
+    `  Model:  ${chalk.green(MODELS[last.model]?.name ?? last.model)}`
   );
   console.log(`  Aspect: ${last.aspect} | Resolution: ${last.resolution}`);
   console.log(`  Output: ${chalk.dim(last.output)}`);
@@ -265,7 +266,7 @@ export async function runCli(
 
   // Stdin can specify a command
   const stdinCommand = stdinData?.command;
-  if (stdinData?.dryRun) {
+  if (stdinData?.dryRun === true) {
     options.dryRun = true;
   }
 
@@ -282,15 +283,19 @@ export async function runCli(
   }
 
   // -- History --
-  if (options.history || stdinCommand === "history") {
+  if (options.history === true || stdinCommand === "history") {
     await runHistory(
       {
         limit:
           stdinData?.limit ??
-          (options.limit ? Number.parseInt(options.limit, 10) : undefined),
+          (hasText(options.limit)
+            ? Number.parseInt(options.limit, 10)
+            : undefined),
         offset:
           stdinData?.offset ??
-          (options.offset ? Number.parseInt(options.offset, 10) : undefined),
+          (hasText(options.offset)
+            ? Number.parseInt(options.offset, 10)
+            : undefined),
       },
       emitOpts
     );
@@ -298,7 +303,7 @@ export async function runCli(
   }
 
   // -- Last --
-  if (options.last || stdinCommand === "last") {
+  if (options.last === true || stdinCommand === "last") {
     await showLastGeneration(emitOpts);
     return;
   }
@@ -311,10 +316,10 @@ export async function runCli(
     stdinCommand === "tool-describe";
   if (stdinData && isToolCommand) {
     if (
-      stdinData?.tool &&
+      hasText(stdinData.tool) &&
       stdinCommand !== "tool-list" &&
       stdinCommand !== "tool-describe" &&
-      !options.dryRun
+      options.dryRun !== true
     ) {
       try {
         getApiKey(config);
@@ -342,19 +347,19 @@ export async function runCli(
 
   // Validate API key for operations that need it
   const wouldCallFal =
-    prompt ||
-    stdinData?.prompt ||
-    options.vary ||
-    options.up ||
-    options.rmbg ||
-    options.video ||
-    options.edit?.length ||
+    hasText(prompt) ||
+    hasText(stdinData?.prompt) ||
+    options.vary === true ||
+    options.up === true ||
+    options.rmbg === true ||
+    options.video === true ||
+    (options.edit !== undefined && options.edit.length > 0) ||
     stdinCommand === "generate" ||
     stdinCommand === "vary" ||
     stdinCommand === "upscale" ||
     stdinCommand === "rmbg" ||
     stdinCommand === "video";
-  const requiresApiKey = wouldCallFal && !options.dryRun;
+  const requiresApiKey = wouldCallFal && options.dryRun !== true;
 
   if (requiresApiKey) {
     try {
@@ -365,32 +370,32 @@ export async function runCli(
   }
 
   // -- Video --
-  if (options.video || stdinCommand === "video") {
+  if (options.video === true || stdinCommand === "video") {
     await generateVideo(prompt, options, stdinData, config, emitOpts);
     return;
   }
 
   // -- Vary --
-  if (options.vary || stdinCommand === "vary") {
+  if (options.vary === true || stdinCommand === "vary") {
     await generateVariations(prompt, options, stdinData, config, emitOpts);
     return;
   }
 
   // -- Upscale --
-  if (options.up || stdinCommand === "upscale") {
+  if (options.up === true || stdinCommand === "upscale") {
     await upscaleLast(prompt, options, stdinData, config, emitOpts);
     return;
   }
 
   // -- Remove background --
-  if (options.rmbg || stdinCommand === "rmbg") {
+  if (options.rmbg === true || stdinCommand === "rmbg") {
     await removeBackgroundLast(options, stdinData, config, emitOpts);
     return;
   }
 
   // -- Generate --
-  const resolvedPrompt = prompt || stdinData?.prompt;
-  if (resolvedPrompt) {
+  const resolvedPrompt = firstText(prompt, stdinData?.prompt);
+  if (resolvedPrompt !== undefined) {
     const sanitized = sanitizePrompt(resolvedPrompt);
     if (!sanitized) {
       emitError(

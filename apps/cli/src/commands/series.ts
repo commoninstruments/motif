@@ -71,6 +71,7 @@ import {
   slugify,
 } from "../utils/series";
 import type { SeriesConfig } from "../utils/series";
+import { hasText } from "../utils/text";
 
 // -- Helpers --
 
@@ -124,7 +125,7 @@ export function buildSeriesRunStylePrompt(
   style?: string
 ): string {
   const base = style?.trim();
-  if (base) {
+  if (hasText(base)) {
     return base;
   }
   return [
@@ -153,7 +154,7 @@ export async function loadOrCreateRunSeries(options: {
   stylePrompt: string;
   theme: string;
 }): Promise<SeriesConfig> {
-  if (options.series) {
+  if (hasText(options.series)) {
     return await loadSeries(options.series);
   }
 
@@ -168,7 +169,7 @@ export async function loadOrCreateRunSeries(options: {
       stylePrompt: options.stylePrompt,
     });
   } catch (error) {
-    if (String((error as Error).message).includes("already exists")) {
+    if (error instanceof Error && error.message.includes("already exists")) {
       return await loadSeries(slug);
     }
     throw error;
@@ -189,20 +190,20 @@ async function cmdCreate(
   emitOpts: EmitOptions
 ): Promise<void> {
   try {
-    if (opts.model) {
+    if (hasText(opts.model)) {
       validateResourceId(opts.model, "model");
     }
-    const model = opts.model
+    const model = hasText(opts.model)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.model ?? "", GENERATION_MODELS, "model")
         )
       : undefined;
-    const defaultAspect = opts.aspect
+    const defaultAspect = hasText(opts.aspect)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : undefined;
-    const defaultResolution = opts.resolution
+    const defaultResolution = hasText(opts.resolution)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
@@ -211,7 +212,7 @@ async function cmdCreate(
     const config = await createSeries({
       defaultAspect,
       defaultResolution,
-      fromImage: opts.from ? resolve(opts.from) : undefined,
+      fromImage: hasText(opts.from) ? resolve(opts.from) : undefined,
       model,
       name,
       stylePrompt: opts.style,
@@ -435,16 +436,16 @@ async function cmdGenerate(
     const refTags = opts.refs?.split(",").map((t) => t.trim());
     const refPaths = resolveRefs(config, refTags);
 
-    if (opts.model) {
+    if (hasText(opts.model)) {
       validateResourceId(opts.model, "model");
     }
     const modelId = opts.model ?? config.model;
-    const aspect = opts.aspect
+    const aspect = hasText(opts.aspect)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : config.defaultAspect;
-    const resolution = opts.resolution
+    const resolution = hasText(opts.resolution)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
@@ -482,7 +483,7 @@ async function cmdGenerate(
     const cost = estimateCost(modelId, resolution, numImages);
 
     // -- Dry run --
-    if (opts.dryRun) {
+    if (opts.dryRun === true) {
       const dryResult = {
         dryRun: true,
         command: "series-generate",
@@ -523,10 +524,10 @@ async function cmdGenerate(
     // -- Generate --
     const outputDir = seriesOutputsDir(slug);
     const outputNum = String(config.outputs.length + 1).padStart(3, "0");
-    const outputFilename = opts.output
+    const outputFilename = hasText(opts.output)
       ? opts.output
       : `${outputNum}-${slugify(sanitized.slice(0, 40))}.png`;
-    const outputPath = opts.output
+    const outputPath = hasText(opts.output)
       ? validateOutputPath(opts.output)
       : `${outputDir}/${outputFilename}`;
 
@@ -648,7 +649,7 @@ async function cmdGenerate(
       );
     }
 
-    if (appConfig.openAfterGenerate && !opts.noOpen && savedImages[0]) {
+    if (appConfig.openAfterGenerate && opts.noOpen !== true && savedImages[0]) {
       openImage(savedImages[0].path);
     }
   } catch (error) {
@@ -690,9 +691,11 @@ async function cmdRun(
       exitForErrorCode("EMPTY_PROMPT");
     }
 
-    const existingSeries = opts.series ? await loadSeries(opts.series) : null;
+    const existingSeries = hasText(opts.series)
+      ? await loadSeries(opts.series)
+      : null;
 
-    if (opts.model) {
+    if (hasText(opts.model)) {
       validateResourceId(opts.model, "model");
     }
     const modelId = opts.model ?? existingSeries?.model ?? "banana";
@@ -715,12 +718,12 @@ async function cmdRun(
         min: 1,
       })
     );
-    const aspect = opts.aspect
+    const aspect = hasText(opts.aspect)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.aspect ?? "", ASPECT_RATIOS, "aspect")
         )
       : (existingSeries?.defaultAspect ?? "1:1");
-    const resolution = opts.resolution
+    const resolution = hasText(opts.resolution)
       ? validateSeriesOption(emitOpts, () =>
           validateEnumOption(opts.resolution ?? "", RESOLUTIONS, "resolution")
         )
@@ -762,9 +765,9 @@ async function cmdRun(
     );
     const estimatedCost = estimateCost(modelId, resolution, count);
     const canUseAnchorReference =
-      Boolean(modelConfig.supportsEdit) && refPaths.length < maxRefs;
+      modelConfig.supportsEdit && refPaths.length < maxRefs;
 
-    if (opts.dryRun) {
+    if (opts.dryRun === true) {
       emit(
         {
           command: "series-run",
@@ -841,7 +844,7 @@ async function cmdRun(
       const filename = `${outputNum}-${slugify(sanitizedTheme.slice(0, 40))}-${String(i + 1).padStart(2, "0")}.png`;
       const outputPath = `${outputDir}/${filename}`;
       const editImages =
-        anchorPath && canUseAnchorReference
+        hasText(anchorPath) && canUseAnchorReference
           ? [...refPaths, anchorPath]
           : refPaths.length > 0
             ? refPaths
@@ -859,9 +862,9 @@ async function cmdRun(
         throw new Error("Series run returned no images");
       }
       const actualOutputPath = await downloadImage(image.url, outputPath);
-      if (!anchorPath) {
-        anchorPath = actualOutputPath;
-      }
+      // downloadImage always returns a non-empty path, so ??= matches the
+      // previous `if (!anchorPath)` truthiness here.
+      anchorPath ??= actualOutputPath;
       const dims = await getImageDimensions(actualOutputPath);
       const size = getFileSize(actualOutputPath);
       savedImages.push({
@@ -919,7 +922,7 @@ async function cmdRun(
       );
     }
 
-    if (appConfig.openAfterGenerate && !opts.noOpen && savedImages[0]) {
+    if (appConfig.openAfterGenerate && opts.noOpen !== true && savedImages[0]) {
       openImage(savedImages[0].path);
     }
   } catch (error) {
@@ -959,7 +962,11 @@ async function cmdHistory(
     const page = all.slice(offset, offset + limit);
 
     if (emitOpts.format === "ndjson") {
-      emitStream(page as unknown as Record<string, unknown>[], emitOpts);
+      // Spread into fresh literals: preserves key order, satisfies Record.
+      emitStream(
+        page.map((out) => ({ ...out })),
+        emitOpts
+      );
       return;
     }
 
@@ -1095,7 +1102,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("-m, --model <model>", "Preferred model")
     .option("-a, --aspect <ratio>", "Default aspect ratio")
     .option("-r, --resolution <res>", "Default resolution")
-    .action(async (name: string, opts) => {
+    .action(async (name: string, opts: Parameters<typeof cmdCreate>[1]) => {
       await cmdCreate(name, opts, emitOpts);
     });
 
@@ -1122,9 +1129,15 @@ export async function runSeries(args: string[]): Promise<void> {
       "style"
     )
     .option("-d, --description <desc>", "Description of the reference")
-    .action(async (slug: string, image: string, opts) => {
-      await cmdRefAdd(slug, image, opts, emitOpts);
-    });
+    .action(
+      async (
+        slug: string,
+        image: string,
+        opts: Parameters<typeof cmdRefAdd>[2]
+      ) => {
+        await cmdRefAdd(slug, image, opts, emitOpts);
+      }
+    );
 
   program
     .command("ref-remove <slug> <filename>")
@@ -1155,9 +1168,15 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("--motion <id>", "Motion treatment id")
     .option("--no-open", "Don't open after generation")
     .option("--dry-run", "Validate without API call")
-    .action(async (slug: string, prompt: string, opts) => {
-      await cmdGenerate(slug, prompt, opts, emitOpts);
-    });
+    .action(
+      async (
+        slug: string,
+        prompt: string,
+        opts: Parameters<typeof cmdGenerate>[2]
+      ) => {
+        await cmdGenerate(slug, prompt, opts, emitOpts);
+      }
+    );
 
   program
     .command("run <theme>")
@@ -1182,7 +1201,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .option("--motion <id>", "Motion treatment id")
     .option("--no-open", "Don't open after generation")
     .option("--dry-run", "Validate and plan without API call")
-    .action(async (theme: string, opts) => {
+    .action(async (theme: string, opts: Parameters<typeof cmdRun>[1]) => {
       await cmdRun(theme, opts, emitOpts);
     });
 
@@ -1191,7 +1210,7 @@ export async function runSeries(args: string[]): Promise<void> {
     .description("Show generation history for a series")
     .option("--limit <n>", "Entries per page", "10")
     .option("--offset <n>", "Skip first N entries", "0")
-    .action(async (slug: string, opts) => {
+    .action(async (slug: string, opts: Parameters<typeof cmdHistory>[1]) => {
       await cmdHistory(slug, opts, emitOpts);
     });
 
@@ -1211,7 +1230,7 @@ async function handleStdinCommand(
 ): Promise<void> {
   switch (data.command) {
     case "series-create": {
-      if (!data.name) {
+      if (!hasText(data.name)) {
         throw new Error("name is required");
       }
       await cmdCreate(
@@ -1232,21 +1251,21 @@ async function handleStdinCommand(
       break;
     }
     case "series-show": {
-      if (!data.series) {
+      if (!hasText(data.series)) {
         throw new Error("series slug is required");
       }
       await cmdShow(data.series, emitOpts);
       break;
     }
     case "series-delete": {
-      if (!data.series) {
+      if (!hasText(data.series)) {
         throw new Error("series slug is required");
       }
       await cmdDelete(data.series, emitOpts);
       break;
     }
     case "series-ref-add": {
-      if (!(data.series && data.image && data.tag)) {
+      if (!(hasText(data.series) && hasText(data.image) && hasText(data.tag))) {
         throw new Error("series, image, and tag are required");
       }
       await cmdRefAdd(
@@ -1258,14 +1277,14 @@ async function handleStdinCommand(
       break;
     }
     case "series-ref-remove": {
-      if (!(data.series && data.filename)) {
+      if (!(hasText(data.series) && hasText(data.filename))) {
         throw new Error("series and filename are required");
       }
       await cmdRefRemove(data.series, data.filename, emitOpts);
       break;
     }
     case "series-generate": {
-      if (!(data.series && data.prompt)) {
+      if (!(hasText(data.series) && hasText(data.prompt))) {
         throw new Error("series and prompt are required");
       }
       await cmdGenerate(
@@ -1277,7 +1296,10 @@ async function handleStdinCommand(
           dryRun: data.dryRun,
           model: data.model,
           noOpen: data.noOpen,
-          num: data.numImages ? String(data.numImages) : undefined,
+          num:
+            data.numImages !== undefined && data.numImages !== 0
+              ? String(data.numImages)
+              : undefined,
           output: data.output,
           refs: data.refs,
           resolution: data.resolution,
@@ -1287,18 +1309,19 @@ async function handleStdinCommand(
       break;
     }
     case "series-run": {
-      if (!(data.theme || data.prompt)) {
+      if (!(hasText(data.theme) || hasText(data.prompt))) {
         throw new Error("theme is required");
       }
       await cmdRun(
         data.theme ?? data.prompt ?? "",
         {
           aspect: data.aspect,
-          count: data.count
-            ? String(data.count)
-            : data.numImages
-              ? String(data.numImages)
-              : undefined,
+          count:
+            data.count !== undefined && data.count !== 0
+              ? String(data.count)
+              : data.numImages !== undefined && data.numImages !== 0
+                ? String(data.numImages)
+                : undefined,
           creative: data.creative,
           dryRun: data.dryRun,
           model: data.model,
@@ -1313,21 +1336,29 @@ async function handleStdinCommand(
       break;
     }
     case "series-history": {
-      if (!data.series) {
+      if (!hasText(data.series)) {
         throw new Error("series slug is required");
       }
       await cmdHistory(
         data.series,
         {
-          limit: data.limit ? String(data.limit) : undefined,
-          offset: data.offset ? String(data.offset) : undefined,
+          limit:
+            data.limit !== undefined && data.limit !== 0
+              ? String(data.limit)
+              : undefined,
+          offset:
+            data.offset !== undefined && data.offset !== 0
+              ? String(data.offset)
+              : undefined,
         },
         emitOpts
       );
       break;
     }
     default: {
-      throw new Error(`Unknown series command: ${data.command}`);
+      // data.command is `never` here after the exhaustive switch, but at
+      // runtime stdin JSON can carry any string.
+      throw new Error(`Unknown series command: ${String(data.command)}`);
     }
   }
 }

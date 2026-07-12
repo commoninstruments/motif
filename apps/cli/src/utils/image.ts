@@ -4,6 +4,8 @@ import { existsSync, statSync, unlinkSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { extname, join, parse, resolve } from "node:path";
 
+import { hasText } from "./text";
+
 const DIMENSION_REGEX = /(\d+)\s*x\s*(\d+)/g;
 const SIPS_HEIGHT_REGEX = /pixelHeight:\s*(\d+)/;
 const SIPS_WIDTH_REGEX = /pixelWidth:\s*(\d+)/;
@@ -19,7 +21,8 @@ async function exec(
   return await new Promise((resolve) => {
     execFile(cmd, args, { env: SAFE_ENV }, (error, stdout) => {
       resolve({
-        exitCode: error ? ((error.code as number) ?? 1) : 0,
+        exitCode:
+          error === null ? 0 : typeof error.code === "number" ? error.code : 1,
         stdout: stdout ?? "",
       });
     });
@@ -80,7 +83,7 @@ function detectImageExtension(
 }
 
 function withDetectedExtension(outputPath: string, extension: string | null) {
-  if (!extension) {
+  if (!hasText(extension)) {
     return outputPath;
   }
 
@@ -92,7 +95,7 @@ function withDetectedExtension(outputPath: string, extension: string | null) {
     return outputPath;
   }
 
-  if (!currentExtension) {
+  if (!hasText(currentExtension)) {
     return `${outputPath}${extension}`;
   }
   return `${outputPath.slice(0, -currentExtension.length)}${extension}`;
@@ -191,7 +194,7 @@ export async function getImageDimensions(
     const width = SIPS_WIDTH_REGEX.exec(result.stdout)?.[1];
     const height = SIPS_HEIGHT_REGEX.exec(result.stdout)?.[1];
 
-    if (result.exitCode === 0 && width && height) {
+    if (result.exitCode === 0 && hasText(width) && hasText(height)) {
       return {
         height: Number.parseInt(height, 10),
         width: Number.parseInt(width, 10),
@@ -206,7 +209,7 @@ export async function getImageDimensions(
     const matches = [...result.stdout.matchAll(DIMENSION_REGEX)];
     const match = matches.at(-1);
 
-    if (match?.[1] && match[2]) {
+    if (match !== undefined && hasText(match[1]) && hasText(match[2])) {
       return {
         height: Number.parseInt(match[2], 10),
         width: Number.parseInt(match[1], 10),

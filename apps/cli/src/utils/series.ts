@@ -25,6 +25,7 @@ import type { AspectRatio, Resolution } from "@howells/motif-sdk";
 
 import { atomicWrite } from "./config";
 import { validateEditPath, validateResourceId } from "./input";
+import { hasText } from "./text";
 
 const MOTIF_DIR = join(homedir(), ".motif");
 const SERIES_DIR = join(MOTIF_DIR, "series");
@@ -155,7 +156,7 @@ export async function createSeries(options: {
   };
 
   // Copy the initial style reference image if provided
-  if (options.fromImage) {
+  if (hasText(options.fromImage)) {
     const sourcePath = validateEditPath(options.fromImage);
     const filename = `style-${basename(sourcePath)}`;
     cpSync(sourcePath, join(dir, "refs", filename));
@@ -171,13 +172,21 @@ export async function createSeries(options: {
   return config;
 }
 
+function isSeriesConfig(value: unknown): value is SeriesConfig {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function loadSeries(slug: string): Promise<SeriesConfig> {
   const configPath = seriesConfigPath(slug);
   if (!existsSync(configPath)) {
     throw new Error(`Series not found: ${slug}`);
   }
   const raw = await readFile(configPath, "utf-8");
-  return JSON.parse(raw) as SeriesConfig;
+  const parsed: unknown = JSON.parse(raw);
+  if (!isSeriesConfig(parsed)) {
+    throw new Error(`Invalid series config file: ${configPath}`);
+  }
+  return parsed;
 }
 
 export async function saveSeries(config: SeriesConfig): Promise<void> {

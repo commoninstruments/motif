@@ -3,6 +3,7 @@ import { Box, Text, useInput } from "ink";
 import { useState } from "react";
 
 import type { History } from "../../utils/config";
+import { firstText } from "../../utils/text";
 import type { Screen } from "../app";
 
 function getMenuItemColor(
@@ -68,7 +69,7 @@ export function HomeScreen({ history, onNavigate }: HomeScreenProps) {
     if (key.return) {
       // biome-ignore lint/style/noNonNullAssertion: index guaranteed within bounds
       const item = MENU_ITEMS[selectedIndex]!;
-      if (item.requiresLast && !hasLast) {
+      if (item.requiresLast === true && !hasLast) {
         return; // Can't select this item
       }
       onNavigate(item.key);
@@ -79,7 +80,7 @@ export function HomeScreen({ history, onNavigate }: HomeScreenProps) {
     <Box flexDirection="column">
       {MENU_ITEMS.map((item, index) => {
         const isSelected = index === selectedIndex;
-        const isDisabled = Boolean(item.requiresLast && !hasLast);
+        const isDisabled = item.requiresLast === true && !hasLast;
 
         return (
           <Box key={item.key} marginLeft={1}>
@@ -110,7 +111,8 @@ export function HomeScreen({ history, onNavigate }: HomeScreenProps) {
           </Box>
           <Box>
             <Text dimColor>
-              {MODELS[last.model]?.name || last.model} · {last.aspect}
+              {firstText(MODELS[last.model]?.name) ?? last.model} ·{" "}
+              {last.aspect}
             </Text>
           </Box>
         </Box>

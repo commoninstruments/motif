@@ -62,6 +62,7 @@ import {
 } from "../utils/input";
 import { emit, emitError, isStructured } from "../utils/output";
 import type { EmitOptions } from "../utils/output";
+import { firstText, hasText } from "../utils/text";
 
 // -- Structured result for saved images --
 
@@ -112,6 +113,10 @@ async function saveGeneratedImages(
   const savedImages: SavedImage[] = [];
   const generations: Generation[] = [];
   const now = new Date().toISOString();
+  const firstEditPath = meta.editPaths?.[0];
+  const editedFrom = hasText(firstEditPath)
+    ? resolve(firstEditPath)
+    : undefined;
 
   for (let i = 0; i < images.length; i++) {
     // biome-ignore lint/style/noNonNullAssertion: Index is guaranteed within bounds by the loop condition
@@ -138,7 +143,7 @@ async function saveGeneratedImages(
     generations.push({
       aspect: meta.aspect,
       cost: estimateCost(meta.model, meta.resolution, 1),
-      editedFrom: meta.editPaths?.[0] ? resolve(meta.editPaths[0]) : undefined,
+      editedFrom,
       id: generateId(),
       model: meta.model,
       output: resolve(path),
@@ -166,7 +171,7 @@ async function saveGeneratedImages(
   }
 
   // Open first image after all downloads complete
-  if (config.openAfterGenerate && !noOpen) {
+  if (config.openAfterGenerate && noOpen !== true) {
     // biome-ignore lint/style/noNonNullAssertion: paths[0] exists since images is non-empty
     openImage(paths[0]!);
   }
@@ -198,7 +203,8 @@ export async function generateImage(
     )
   );
 
-  const modelId = options.model || stdinData?.model || config.defaultModel;
+  const modelId =
+    firstText(options.model, stdinData?.model) ?? config.defaultModel;
 
   // Validate model name against hallucination patterns
   try {
@@ -216,8 +222,10 @@ export async function generateImage(
 
   let outputPath: string;
   try {
-    const rawOutput = options.output || stdinData?.output;
-    outputPath = rawOutput ? validateOutputPath(rawOutput) : generateFilename();
+    const rawOutput = firstText(options.output, stdinData?.output);
+    outputPath = hasText(rawOutput)
+      ? validateOutputPath(rawOutput)
+      : generateFilename();
   } catch (error) {
     handleError(error, "INVALID_OUTPUT_PATH", emitOpts.format);
   }
@@ -236,7 +244,7 @@ export async function generateImage(
   }
 
   const editPaths = resolveEditPaths(
-    options.edit || stdinData?.editImages,
+    options.edit ?? stdinData?.editImages,
     modelConfig,
     emitOpts.format
   );
@@ -249,10 +257,10 @@ export async function generateImage(
       ? parseIntegerOption(options.seed ?? stdinData?.seed ?? 0, "seed")
       : undefined
   );
-  const negativePrompt = options.negative || stdinData?.negativePrompt;
-  const style = options.style || stdinData?.style;
+  const negativePrompt = firstText(options.negative, stdinData?.negativePrompt);
+  const style = firstText(options.style, stdinData?.style);
   const outputFormat = validateOption(emitOpts.format, () =>
-    options.outputFormat || stdinData?.outputFormat
+    hasText(options.outputFormat) || hasText(stdinData?.outputFormat)
       ? validateEnumOption(
           options.outputFormat ?? stdinData?.outputFormat ?? "",
           OUTPUT_FORMATS,
@@ -261,7 +269,7 @@ export async function generateImage(
       : undefined
   );
   const background = validateOption(emitOpts.format, () =>
-    options.background || stdinData?.background
+    hasText(options.background) || hasText(stdinData?.background)
       ? validateEnumOption(
           options.background ?? stdinData?.background ?? "",
           BACKGROUND_MODES,
@@ -270,7 +278,7 @@ export async function generateImage(
       : undefined
   );
   const quality = validateOption(emitOpts.format, () =>
-    options.quality || stdinData?.quality
+    hasText(options.quality) || hasText(stdinData?.quality)
       ? validateEnumOption(
           options.quality ?? stdinData?.quality ?? "",
           QUALITY_LEVELS,
@@ -292,7 +300,7 @@ export async function generateImage(
     );
   }
   const safetyTolerance = validateOption(emitOpts.format, () =>
-    options.safety || stdinData?.safetyTolerance
+    hasText(options.safety) || hasText(stdinData?.safetyTolerance)
       ? validateEnumOption(
           options.safety ?? stdinData?.safetyTolerance ?? "",
           SAFETY_LEVELS,
@@ -300,13 +308,14 @@ export async function generateImage(
         )
       : undefined
   );
-  const enableWebSearch = options.webSearch || stdinData?.enableWebSearch;
+  const enableWebSearch = options.webSearch ?? stdinData?.enableWebSearch;
   const enableGoogleSearch =
-    options.googleSearch || stdinData?.enableGoogleSearch;
-  const enableSafetyChecker = options.disableSafetyChecker
-    ? false
-    : (options.safetyChecker ?? stdinData?.enableSafetyChecker);
-  const syncMode = options.syncMode || stdinData?.syncMode;
+    options.googleSearch ?? stdinData?.enableGoogleSearch;
+  const enableSafetyChecker =
+    options.disableSafetyChecker === true
+      ? false
+      : (options.safetyChecker ?? stdinData?.enableSafetyChecker);
+  const syncMode = options.syncMode ?? stdinData?.syncMode;
   const creative = resolveCreativeDirection(options, stdinData?.creative);
   const creativeResult = creative
     ? validateOption(emitOpts.format, () => enrichPrompt({ creative, prompt }))
@@ -316,9 +325,10 @@ export async function generateImage(
     parseImageSizeOption(options.imageSize ?? stdinData?.imageSize)
   );
   const maskImageUrl = options.mask ?? stdinData?.maskImageUrl;
-  const limitGenerations = options.disableLimitGenerations
-    ? false
-    : (options.limitGenerations ?? stdinData?.limitGenerations);
+  const limitGenerations =
+    options.disableLimitGenerations === true
+      ? false
+      : (options.limitGenerations ?? stdinData?.limitGenerations);
   const imagePromptStrength = validateOption(emitOpts.format, () =>
     options.imagePromptStrength !== undefined ||
     stdinData?.imagePromptStrength !== undefined
@@ -330,7 +340,7 @@ export async function generateImage(
       : undefined
   );
   const thinkingLevel = validateOption(emitOpts.format, () =>
-    options.thinking || stdinData?.thinkingLevel
+    hasText(options.thinking) || hasText(stdinData?.thinkingLevel)
       ? validateEnumOption(
           options.thinking ?? stdinData?.thinkingLevel ?? "",
           THINKING_LEVELS,
@@ -357,10 +367,10 @@ export async function generateImage(
         )
       : undefined
   );
-  const raw = options.raw || stdinData?.raw;
-  const enhancePrompt = options.enhancePrompt || stdinData?.enhancePrompt;
+  const raw = options.raw ?? stdinData?.raw;
+  const enhancePrompt = options.enhancePrompt ?? stdinData?.enhancePrompt;
   const renderingSpeed = validateOption(emitOpts.format, () =>
-    options.renderingSpeed || stdinData?.renderingSpeed
+    hasText(options.renderingSpeed) || hasText(stdinData?.renderingSpeed)
       ? validateEnumOption(
           options.renderingSpeed ?? stdinData?.renderingSpeed ?? "",
           RENDERING_SPEEDS,
@@ -369,7 +379,7 @@ export async function generateImage(
       : undefined
   );
   const expandPrompt = options.expandPrompt ?? stdinData?.expandPrompt;
-  const ephemeral = options.ephemeral || stdinData?.ephemeral;
+  const ephemeral = options.ephemeral ?? stdinData?.ephemeral;
   const dryRunGenerateOptions: GenerateOptions = {
     aspect,
     background,
@@ -384,7 +394,7 @@ export async function generateImage(
     guidanceScale,
     imagePromptStrength,
     imageSize,
-    inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
+    inputFidelity: options.loose === true ? "low" : stdinData?.inputFidelity,
     limitGenerations,
     maskImageUrl,
     model: modelId,
@@ -402,14 +412,14 @@ export async function generateImage(
     style,
     syncMode,
     thinkingLevel,
-    transparent: options.transparent || stdinData?.transparent,
+    transparent: options.transparent ?? stdinData?.transparent,
   };
   const requestPreview = validateOption(emitOpts.format, () =>
     buildGenerateBody(dryRunGenerateOptions)
   );
 
   // -- Dry run --
-  if (options.dryRun) {
+  if (options.dryRun === true) {
     const dryResult = {
       dryRun: true,
       command: "generate",
@@ -425,35 +435,35 @@ export async function generateImage(
       numImages,
       output: outputPath,
       editImages: editPaths,
-      transparent: options.transparent || stdinData?.transparent,
-      inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
+      transparent: options.transparent ?? stdinData?.transparent,
+      inputFidelity: options.loose === true ? "low" : stdinData?.inputFidelity,
       endpoint: requestPreview.endpoint,
       body: requestPreview.body,
       ephemeral,
-      historyRecorded: !ephemeral,
-      storeIo: !ephemeral,
+      historyRecorded: ephemeral !== true,
+      storeIo: ephemeral !== true,
       // New fields — only include when set
       ...(seed !== undefined && { seed }),
-      ...(background && { background }),
-      ...(quality && { quality }),
-      ...(negativePrompt && { negativePrompt }),
-      ...(style && { style }),
-      ...(outputFormat && { outputFormat }),
-      ...(safetyTolerance && { safetyTolerance }),
-      ...(enableWebSearch && { enableWebSearch }),
-      ...(enableGoogleSearch && { enableGoogleSearch }),
+      ...(hasText(background) && { background }),
+      ...(hasText(quality) && { quality }),
+      ...(hasText(negativePrompt) && { negativePrompt }),
+      ...(hasText(style) && { style }),
+      ...(hasText(outputFormat) && { outputFormat }),
+      ...(hasText(safetyTolerance) && { safetyTolerance }),
+      ...(enableWebSearch === true && { enableWebSearch }),
+      ...(enableGoogleSearch === true && { enableGoogleSearch }),
       ...(enableSafetyChecker !== undefined && { enableSafetyChecker }),
-      ...(syncMode && { syncMode }),
-      ...(imageSize && { imageSize }),
+      ...(syncMode === true && { syncMode }),
+      ...(imageSize !== undefined && { imageSize }),
       ...(imagePromptStrength !== undefined && { imagePromptStrength }),
-      ...(maskImageUrl && { maskImageUrl }),
+      ...(hasText(maskImageUrl) && { maskImageUrl }),
       ...(limitGenerations !== undefined && { limitGenerations }),
-      ...(thinkingLevel && { thinkingLevel }),
+      ...(hasText(thinkingLevel) && { thinkingLevel }),
       ...(guidanceScale !== undefined && { guidanceScale }),
       ...(numInferenceSteps !== undefined && { numInferenceSteps }),
-      ...(raw && { raw }),
-      ...(enhancePrompt && { enhancePrompt }),
-      ...(renderingSpeed && { renderingSpeed }),
+      ...(raw === true && { raw }),
+      ...(enhancePrompt === true && { enhancePrompt }),
+      ...(hasText(renderingSpeed) && { renderingSpeed }),
       ...(expandPrompt !== undefined && { expandPrompt }),
       estimatedCost: cost,
       valid: true,
@@ -466,7 +476,7 @@ export async function generateImage(
       console.log(`  Images: ${numImages}`);
       console.log(`  Output: ${chalk.dim(outputPath)}`);
       console.log(`  Cost:   ${chalk.yellow(`~$${cost.toFixed(3)}`)}`);
-      if (ephemeral) {
+      if (ephemeral === true) {
         console.log("  Fal IO: not retained after local download");
       }
       if (editPaths) {
@@ -488,7 +498,7 @@ export async function generateImage(
       `Prompt: ${chalk.dim(requestPrompt.slice(0, 80))}${requestPrompt.length > 80 ? "..." : ""}`
     );
     console.log(`Est. cost: ${chalk.yellow(`$${cost.toFixed(3)}`)}`);
-    if (ephemeral) {
+    if (ephemeral === true) {
       console.log("Fal IO: not retained after local download");
     }
     if (editPaths) {
@@ -515,7 +525,7 @@ export async function generateImage(
       guidanceScale,
       imagePromptStrength,
       imageSize,
-      inputFidelity: options.loose ? "low" : stdinData?.inputFidelity,
+      inputFidelity: options.loose === true ? "low" : stdinData?.inputFidelity,
       limitGenerations,
       maskImageUrl,
       model: modelId,
@@ -533,7 +543,7 @@ export async function generateImage(
       style,
       syncMode,
       thinkingLevel,
-      transparent: options.transparent || stdinData?.transparent,
+      transparent: options.transparent ?? stdinData?.transparent,
     });
 
     spinner?.succeed("Generated!");
@@ -545,14 +555,14 @@ export async function generateImage(
       { aspect, editPaths, model: modelId, prompt: requestPrompt, resolution },
       config,
       emitOpts,
-      options.noOpen || stdinData?.noOpen,
-      !ephemeral
+      options.noOpen === true || stdinData?.noOpen === true,
+      ephemeral !== true
     );
 
     let payloadsDeleted = false;
     let payloadDeleteError: string | undefined;
-    if (ephemeral) {
-      if (result.requestId) {
+    if (ephemeral === true) {
+      if (hasText(result.requestId)) {
         try {
           await deletePayloads(result.requestId);
           payloadsDeleted = true;
@@ -578,12 +588,12 @@ export async function generateImage(
           command: "generate",
           ...saved,
           ephemeral,
-          ...(ephemeral && {
+          ...(ephemeral === true && {
             payloadsDeleted,
             requestId: result.requestId,
             storeIo: false,
           }),
-          ...(payloadDeleteError && { payloadDeleteError }),
+          ...(hasText(payloadDeleteError) && { payloadDeleteError }),
           prompt: requestPrompt,
           ...(creativeResult && {
             basePrompt: creativeResult.basePrompt,

@@ -107,8 +107,8 @@ function modelRankSummary(config: ModelConfig | undefined): string {
   const textRank = config?.benchmark?.artificialAnalysis?.textToImage?.rank;
   const editRank = config?.benchmark?.artificialAnalysis?.editing?.rank;
   const ranks = [
-    textRank ? `T2I #${textRank}` : null,
-    editRank ? `Edit #${editRank}` : null,
+    textRank !== undefined && textRank !== 0 ? `T2I #${textRank}` : null,
+    editRank !== undefined && editRank !== 0 ? `Edit #${editRank}` : null,
   ].filter(Boolean);
   return ranks.length ? ranks.join(" · ") : "";
 }
@@ -184,11 +184,11 @@ export function GenerateScreen({
     onSelect: (item: T) => void,
     key: { upArrow?: boolean; downArrow?: boolean; return?: boolean }
   ) => {
-    if (key.upArrow) {
+    if (key.upArrow === true) {
       setSelectedIndex((i) => (i > 0 ? i - 1 : items.length - 1));
-    } else if (key.downArrow) {
+    } else if (key.downArrow === true) {
       setSelectedIndex((i) => (i < items.length - 1 ? i + 1 : 0));
-    } else if (key.return) {
+    } else if (key.return === true) {
       // biome-ignore lint/style/noNonNullAssertion: index guaranteed within bounds
       onSelect(items[selectedIndex]!);
       setSelectedIndex(0);
@@ -240,11 +240,11 @@ export function GenerateScreen({
     return?: boolean;
     tab?: boolean;
   }) => {
-    if (key.upArrow && selectedIndex > 0) {
+    if (key.upArrow === true && selectedIndex > 0) {
       setSelectedIndex(selectedIndex - 1);
-    } else if (key.downArrow && selectedIndex < PRESETS.length - 1) {
+    } else if (key.downArrow === true && selectedIndex < PRESETS.length - 1) {
       setSelectedIndex(selectedIndex + 1);
-    } else if (key.return) {
+    } else if (key.return === true) {
       // biome-ignore lint/style/noNonNullAssertion: index guaranteed within bounds
       const preset = PRESETS[selectedIndex]!;
       setAspect(preset.aspect);
@@ -255,7 +255,7 @@ export function GenerateScreen({
       setConfirmIndex(0);
       setConfirmField(null);
       setStep("confirm");
-    } else if (key.tab) {
+    } else if (key.tab === true) {
       setSelectedIndex(0);
       setStep("model");
     }
@@ -272,7 +272,7 @@ export function GenerateScreen({
         setModel(m);
         setConfirmIndex(0);
         setConfirmField(null);
-        setStep(MODELS[m]?.supportsAspect ? "aspect" : "confirm");
+        setStep(MODELS[m]?.supportsAspect === true ? "aspect" : "confirm");
       },
       key
     );
@@ -290,23 +290,26 @@ export function GenerateScreen({
     const row = Math.floor(selectedIndex / cols);
     const col = selectedIndex % cols;
 
-    if (key.leftArrow) {
+    if (key.leftArrow === true) {
       setSelectedIndex((i) => (col > 0 ? i - 1 : i));
-    } else if (key.rightArrow) {
+    } else if (key.rightArrow === true) {
       setSelectedIndex((i) => (col < cols - 1 && i < total - 1 ? i + 1 : i));
-    } else if (key.upArrow) {
+    } else if (key.upArrow === true) {
       setSelectedIndex((i) => (row > 0 ? i - cols : i));
-    } else if (key.downArrow) {
+    } else if (key.downArrow === true) {
       const newIndex = selectedIndex + cols;
       if (newIndex < total) {
         setSelectedIndex(newIndex);
       }
-    } else if (key.return) {
-      setAspect(ASPECT_RATIOS[selectedIndex] as AspectRatio);
+    } else if (key.return === true) {
+      // biome-ignore lint/style/noNonNullAssertion: index guaranteed within bounds
+      setAspect(ASPECT_RATIOS[selectedIndex]!);
       setSelectedIndex(0);
       setConfirmIndex(0);
       setConfirmField(null);
-      setStep(modelConfig?.supportsResolution ? "resolution" : "confirm");
+      setStep(
+        modelConfig?.supportsResolution === true ? "resolution" : "confirm"
+      );
     }
   };
 
@@ -333,7 +336,7 @@ export function GenerateScreen({
     downArrow?: boolean;
     return?: boolean;
   }) => {
-    if (key.escape) {
+    if (key.escape === true) {
       setConfirmField(null);
       setSelectedIndex(0);
     } else if (confirmField === "model") {
@@ -348,9 +351,9 @@ export function GenerateScreen({
       );
     } else if (confirmField === "aspect") {
       handleListNavigation(
-        [...ASPECT_RATIOS] as string[],
+        ASPECT_RATIOS,
         (a) => {
-          setAspect(a as AspectRatio);
+          setAspect(a);
           setConfirmField(null);
           setSelectedIndex(0);
         },
@@ -370,7 +373,7 @@ export function GenerateScreen({
   };
 
   const getConfirmFields = (): ConfirmField[] =>
-    MODELS[model]?.supportsResolution
+    MODELS[model]?.supportsResolution === true
       ? ["model", "aspect", "resolution"]
       : ["model", "aspect"];
 
@@ -394,17 +397,19 @@ export function GenerateScreen({
 
     const fields = getConfirmFields();
 
-    if (key.upArrow) {
+    if (key.upArrow === true) {
       setConfirmIndex((i) => (i > 0 ? i - 1 : fields.length - 1));
-    } else if (key.downArrow) {
+    } else if (key.downArrow === true) {
       setConfirmIndex((i) => (i < fields.length - 1 ? i + 1 : 0));
-    } else if (key.return) {
+    } else if (key.return === true) {
       // biome-ignore lint/style/noNonNullAssertion: index guaranteed within bounds
       const field = fields[confirmIndex]!;
       setConfirmField(field);
       setSelectedIndex(getFieldSelectedIndex(field));
     } else if (input === "y") {
-      runGeneration();
+      // Fire-and-forget: ink input handlers are synchronous, and
+      // runGeneration reports failures through its own try/catch + onError.
+      void runGeneration();
     } else if (input === "n") {
       onBack();
     }
@@ -415,11 +420,11 @@ export function GenerateScreen({
     downArrow?: boolean;
     return?: boolean;
   }) => {
-    if (key.upArrow) {
+    if (key.upArrow === true) {
       setSelectedIndex((i) => (i > 0 ? i - 1 : POST_ACTIONS.length - 1));
-    } else if (key.downArrow) {
+    } else if (key.downArrow === true) {
       setSelectedIndex((i) => (i < POST_ACTIONS.length - 1 ? i + 1 : 0));
-    } else if (key.return) {
+    } else if (key.return === true) {
       const action = POST_ACTIONS[selectedIndex]?.key;
       switch (action) {
         case "edit":
@@ -445,7 +450,7 @@ export function GenerateScreen({
           onComplete("home");
           break;
         }
-        default: {
+        case undefined: {
           break;
         }
       }
@@ -492,7 +497,7 @@ export function GenerateScreen({
       outputPath = await downloadImage(result.images[0]!.url, outputPath);
 
       const dims = await getImageDimensions(outputPath);
-      const size = await getFileSize(outputPath);
+      const size = getFileSize(outputPath);
 
       // Record generation
       await addGeneration({
@@ -515,13 +520,13 @@ export function GenerateScreen({
       });
 
       if (config.openAfterGenerate) {
-        await openImage(fullPath);
+        openImage(fullPath);
       }
 
       setSelectedIndex(0);
       setStep("done");
     } catch (error) {
-      onError(error as Error);
+      onError(error instanceof Error ? error : new Error(String(error)));
       onBack();
     }
   };
@@ -598,7 +603,7 @@ export function GenerateScreen({
   };
 
   const renderConfirmResolutionField = () => {
-    if (!modelConfig?.supportsResolution) {
+    if (modelConfig?.supportsResolution !== true) {
       return null;
     }
     if (confirmField === "resolution") {

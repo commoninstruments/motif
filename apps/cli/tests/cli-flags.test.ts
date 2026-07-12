@@ -77,14 +77,21 @@ async function dryRunBody(
   ]);
   expect(result.code, result.stderr).toBe(0);
   expect(result.stderr).toBe("");
-  const payload = JSON.parse(result.stdout.trim()) as Record<string, unknown>;
-  return payload.body as Record<string, unknown>;
+  const payload: unknown = JSON.parse(result.stdout.trim());
+  if (!isRecord(payload) || !isRecord(payload.body)) {
+    throw new Error("expected a dry-run body object");
+  }
+  return payload.body;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 afterEach(() => {
   while (tempHomes.length > 0) {
     const dir = tempHomes.pop();
-    if (dir) {
+    if (dir !== undefined && dir !== "") {
       rmSync(dir, { force: true, recursive: true });
     }
   }

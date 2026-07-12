@@ -12,7 +12,7 @@ const JPEG_16X16_WITH_DENSITY =
 let testDir: string | undefined;
 
 afterEach(() => {
-  if (testDir) {
+  if (testDir !== undefined && testDir !== "") {
     rmSync(testDir, { force: true, recursive: true });
     testDir = undefined;
   }

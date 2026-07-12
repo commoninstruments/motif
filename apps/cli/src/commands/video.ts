@@ -31,6 +31,7 @@ import {
 } from "../utils/input";
 import { emit, emitError, isStructured } from "../utils/output";
 import type { EmitOptions } from "../utils/output";
+import { firstText, hasText } from "../utils/text";
 
 export async function generateVideo(
   imagePath: string | undefined,
@@ -40,16 +41,10 @@ export async function generateVideo(
   emitOpts: EmitOptions
 ): Promise<void> {
   // Resolve source image
-  const resolvedPath = imagePath || stdinData?.imagePath;
+  const resolvedPath = firstText(imagePath, stdinData?.imagePath);
   let sourceImagePath: string;
 
-  if (resolvedPath) {
-    try {
-      sourceImagePath = validateEditPath(resolvedPath);
-    } catch (error) {
-      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
-    }
-  } else {
+  if (resolvedPath === undefined) {
     const last = await getLastGeneration();
     if (!last) {
       emitError(
@@ -63,10 +58,16 @@ export async function generateVideo(
       exitForErrorCode("NO_PREVIOUS");
     }
     sourceImagePath = last.output;
+  } else {
+    try {
+      sourceImagePath = validateEditPath(resolvedPath);
+    } catch (error) {
+      handleError(error, "INVALID_IMAGE_PATH", emitOpts.format);
+    }
   }
 
   const prompt =
-    stdinData?.prompt || "cinematic motion, smooth camera movement";
+    firstText(stdinData?.prompt) ?? "cinematic motion, smooth camera movement";
   const duration = validateOption(emitOpts.format, () =>
     parseIntegerOption(
       stdinData?.duration ?? options.videoDuration ?? 5,
@@ -74,16 +75,18 @@ export async function generateVideo(
       { max: 15, min: 3 }
     )
   );
-  const generateAudio = stdinData?.generateAudio ?? !options.videoNoAudio;
+  const generateAudio =
+    stdinData?.generateAudio ?? options.videoNoAudio !== true;
 
   const cost = estimateVideoCost(duration, generateAudio);
-  const rawOutput = options.output || stdinData?.output;
-  const outputPath = rawOutput
-    ? validateOutput(emitOpts.format, rawOutput)
-    : `motif-video-${new Date().toISOString().slice(0, 19).replaceAll(/[-:T]/g, "")}.mp4`;
+  const rawOutput = firstText(options.output, stdinData?.output);
+  const outputPath =
+    rawOutput === undefined
+      ? `motif-video-${new Date().toISOString().slice(0, 19).replaceAll(/[-:T]/g, "")}.mp4`
+      : validateOutput(emitOpts.format, rawOutput);
 
   // -- Dry run --
-  if (options.dryRun) {
+  if (options.dryRun === true) {
     const dryResult = {
       command: "video",
       dryRun: true,
@@ -128,10 +131,10 @@ export async function generateVideo(
       generateAudio,
       imageUrl: sourceImagePath,
       prompt,
-      ...(stdinData?.videoNegativePrompt && {
+      ...(hasText(stdinData?.videoNegativePrompt) && {
         negativePrompt: stdinData.videoNegativePrompt,
       }),
-      ...(options.videoNegative && {
+      ...(hasText(options.videoNegative) && {
         negativePrompt: options.videoNegative,
       }),
       ...(stdinData?.videoCfgScale !== undefined && {
@@ -163,7 +166,7 @@ export async function generateVideo(
         if (spinner) {
           spinner.text =
             status === "queued"
-              ? `Queued${position ? ` (position ${position})` : ""}...`
+              ? `Queued${position !== undefined && position !== 0 ? ` (position ${position})` : ""}...`
               : "Generating video...";
         }
       }

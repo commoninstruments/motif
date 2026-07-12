@@ -19,6 +19,14 @@ interface RunResult {
   stdout: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isPackResult(value: unknown): value is PackResult {
+  return typeof value === "object" && value !== null && "files" in value;
+}
+
 const repoRoot = resolve(import.meta.dirname, "../../..");
 
 async function runCommand(
@@ -63,7 +71,15 @@ async function npmPackDryRun(packagePath: string): Promise<PackResult> {
     packagePath
   );
   expect(result.code, result.stderr).toBe(0);
-  return JSON.parse(result.stdout)[0] as PackResult;
+  const parsed: unknown = JSON.parse(result.stdout);
+  if (!Array.isArray(parsed)) {
+    throw new TypeError("expected npm pack --json to return an array");
+  }
+  const first: unknown = parsed[0];
+  if (!isPackResult(first)) {
+    throw new Error("expected an npm pack result object");
+  }
+  return first;
 }
 
 function expectPublicPackage(pack: PackResult, expectedFiles: string[]) {
@@ -124,7 +140,10 @@ describe("package smoke", () => {
       repoRoot
     );
     expect(dryRun.code).toBe(0);
-    const payload = JSON.parse(dryRun.stdout) as Record<string, unknown>;
+    const payload: unknown = JSON.parse(dryRun.stdout);
+    if (!isRecord(payload)) {
+      throw new Error("expected a JSON object");
+    }
     expect(payload).toMatchObject({
       endpoint: "fal-ai/gpt-image-1.5",
       valid: true,

@@ -20,6 +20,8 @@ import type {
   VideoResponse,
 } from "@howells/motif-sdk";
 
+import { hasText } from "../utils/text";
+
 export type { GenerateOptions, MotifResponse } from "@howells/motif-sdk";
 
 /** CLI-specific generate options that accept local file paths */
@@ -67,12 +69,12 @@ export function setApiKey(key: string): void {
 }
 
 export function getApiKey(): string {
-  if (_apiKey) {
+  if (hasText(_apiKey)) {
     return _apiKey;
   }
 
   const envKey = getFalKeyFromEnv();
-  if (envKey) {
+  if (hasText(envKey)) {
     return envKey;
   }
 
@@ -82,9 +84,7 @@ export function getApiKey(): string {
 }
 
 function getMotif(): MotifServer {
-  if (!_motif) {
-    _motif = new MotifServer(getApiKey());
-  }
+  _motif ??= new MotifServer(getApiKey());
   return _motif;
 }
 
@@ -96,7 +96,7 @@ export async function generate(
 
   // Upload local files to fal CDN if needed
   let editImageUrls: string[] | undefined;
-  if (editImages?.length) {
+  if (editImages !== undefined && editImages.length > 0) {
     editImageUrls = await Promise.all(
       editImages.map(async (img) =>
         img.startsWith("http")
@@ -137,7 +137,8 @@ export async function runTool(options: ToolRunOptions): Promise<ToolResponse> {
       ? await Promise.resolve(value)
       : await uploadFile(value);
 
-  const values = options.inputs ?? (options.input ? [options.input] : []);
+  const values =
+    options.inputs ?? (hasText(options.input) ? [options.input] : []);
   const uploaded = await Promise.all(
     values.map(async (value) => await upload(value))
   );
@@ -184,7 +185,9 @@ export async function waitForVideo(
     }
 
     onProgress?.(statusResult.status, statusResult.queuePosition);
-    await new Promise((r) => setTimeout(r, pollInterval));
+    await new Promise<void>((r) => {
+      setTimeout(r, pollInterval);
+    });
   }
 
   throw new Error("Video generation timed out");
