@@ -63,17 +63,40 @@ const emptyResult = (limit: number, offset: number): HistoryResult => ({
   total: 0,
 });
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Structural check for the history file shape this reader relies on.
+ *
+ * Entry fields are trusted as written by the CLI (the sole writer of
+ * `~/.motif/history.json`); only the containers the pagination logic
+ * dereferences are verified.
+ */
+function isRawHistory(value: unknown): value is RawHistory {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.generations) &&
+    isRecord(value.totalCost)
+  );
+}
+
 export function readHistory(limit = 10, offset = 0): HistoryResult {
   if (!existsSync(HISTORY_PATH)) {
     return emptyResult(limit, offset);
   }
 
-  let history: RawHistory;
+  let parsed: unknown;
   try {
-    history = JSON.parse(readFileSync(HISTORY_PATH, "utf-8")) as RawHistory;
+    parsed = JSON.parse(readFileSync(HISTORY_PATH, "utf-8"));
   } catch {
     return emptyResult(limit, offset);
   }
+  if (!isRawHistory(parsed)) {
+    return emptyResult(limit, offset);
+  }
+  const history = parsed;
 
   // Stored oldest-first; reverse for newest-first
   const all = [...history.generations].reverse();

@@ -11,9 +11,26 @@
 import { MotifServer } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it } from "vitest";
 
 import { createMotifMcpServer } from "../src/create-server.js";
+
+/** Typed view of Motif's structured tool error payload. */
+interface ErrorPayload {
+  error: boolean;
+  message: string;
+}
+
+/** Parse the structured error JSON from the first text content block. */
+function parseErrorPayload(result: CallToolResult): ErrorPayload {
+  const first = result.content[0];
+  if (!first || first.type !== "text") {
+    throw new Error("Expected text tool content");
+  }
+  // oxlint-disable-next-line no-unsafe-type-assertion -- JSON.parse returns `any`; structured tool errors pin this shape and the assertions verify it at runtime
+  return JSON.parse(first.text) as ErrorPayload;
+}
 
 async function makeClient(motif: MotifServer) {
   const server = createMotifMcpServer(motif);
@@ -40,8 +57,7 @@ describe("generate tool with a real MotifServer", () => {
     });
 
     expect(result.isError).toBe(true);
-    const { text } = (result.content as { text: string }[])[0];
-    const parsed = JSON.parse(text);
+    const parsed = parseErrorPayload(result);
     expect(parsed.error).toBe(true);
     expect(parsed.message).toContain("Unknown creative lighting");
   });

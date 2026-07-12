@@ -10,7 +10,9 @@ import { EDIT_CAPABLE_MODELS } from "@howells/motif-sdk";
 import type { MotifServer } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, it, vi } from "vitest";
+import type { Mock } from "vitest";
 
 import { createMotifMcpServer } from "../src/create-server.js";
 
@@ -57,7 +59,15 @@ const MOCK_IMAGES = [
   { height: 1024, url: "https://fal.media/img.png", width: 1024 },
 ];
 
-function makeMockMotif() {
+/** Typed view of the mocked MotifServer surface exercised by these tests. */
+interface MockMotif {
+  estimateCost: Mock;
+  generate: Mock;
+  removeBackground: Mock;
+  upscale: Mock;
+}
+
+function makeMockMotif(): MockMotif {
   return {
     estimateCost: vi.fn().mockReturnValue(0.13),
     generate: vi
@@ -79,13 +89,79 @@ function makeMockMotif() {
         ],
       })
     ),
-  } as unknown as MotifServer;
+  };
+}
+
+// ─── Response parsing ────────────────────────────────────────────────
+
+/**
+ * Typed view of the JSON payloads Motif tools embed in text content.
+ *
+ * Fields cover every tool response and structured error; each test only
+ * reads the fields its tool actually returns.
+ */
+interface ToolResponsePayload {
+  code: string;
+  cost_estimate: number;
+  costs: { allTime: number; session: number; today: number };
+  error: boolean;
+  generations: { filePath: string; prompt: string }[];
+  hasMore: boolean;
+  images: { url: string }[];
+  is_retriable: boolean;
+  limit: number;
+  message: string;
+  offset: number;
+  seed: number;
+  suggestions: string[];
+  total: number;
+}
+
+/** Return the text of the first content block, failing loudly otherwise. */
+function firstText(result: CallToolResult): string {
+  const first = result.content[0];
+  if (!first || first.type !== "text") {
+    throw new Error("Expected text tool content");
+  }
+  return first.text;
+}
+
+/** Parse the JSON payload a Motif tool embeds in its first text block. */
+function parseToolResponse(result: CallToolResult): ToolResponsePayload {
+  // oxlint-disable-next-line no-unsafe-type-assertion -- JSON.parse returns `any`; the MCP tool contract pins this payload shape and the assertions verify it at runtime
+  return JSON.parse(firstText(result)) as ToolResponsePayload;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Parse a JSON document that must be an object. */
+function parseJsonObject(text: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(text);
+  if (!isRecord(parsed)) {
+    throw new Error("Expected a JSON object");
+  }
+  return parsed;
+}
+
+/** Walk nested keys of a JSON-schema `properties` object, returning `unknown`. */
+function schemaPath(start: unknown, ...path: string[]): unknown {
+  let current = start;
+  for (const key of path) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
 }
 
 // ─── Connect client ──────────────────────────────────────────────────
 
-async function makeClient(motif: MotifServer) {
-  const server = createMotifMcpServer(motif);
+async function makeClient(motif: MockMotif) {
+  // oxlint-disable-next-line no-unsafe-type-assertion -- the mock stands in for MotifServer; the server factory only calls the four mocked methods
+  const server = createMotifMcpServer(motif as unknown as MotifServer);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "1.0.0" });
@@ -170,46 +246,41 @@ describe("ListTools", () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
     const generate = tools.find((t) => t.name === "generate");
-    const properties = generate?.inputSchema.properties as Record<
-      string,
-      { enum?: string[] }
-    >;
+    const properties = generate?.inputSchema.properties;
 
-    expect(properties.model?.enum).toContain("banana2");
-    expect(properties.model?.enum).toContain("qwen");
-    expect(properties.aspect?.enum).toContain("auto");
-    expect(properties.aspect?.enum).toContain("8:1");
-    expect(properties.resolution?.enum).toContain("0.5K");
+    expect(schemaPath(properties, "model", "enum")).toContain("banana2");
+    expect(schemaPath(properties, "model", "enum")).toContain("qwen");
+    expect(schemaPath(properties, "aspect", "enum")).toContain("auto");
+    expect(schemaPath(properties, "aspect", "enum")).toContain("8:1");
+    expect(schemaPath(properties, "resolution", "enum")).toContain("0.5K");
   });
 
   it("vary schema advertises the edit-capable model enum", async () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
     const vary = tools.find((t) => t.name === "vary");
-    const properties = vary?.inputSchema.properties as Record<
-      string,
-      { enum?: string[] }
-    >;
+    const properties = vary?.inputSchema.properties;
 
-    expect(properties.model?.enum).toEqual([...EDIT_CAPABLE_MODELS]);
+    expect(schemaPath(properties, "model", "enum")).toEqual([
+      ...EDIT_CAPABLE_MODELS,
+    ]);
   });
 
   it("generate schema advertises creative direction options", async () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
     const generate = tools.find((t) => t.name === "generate");
-    const properties = generate?.inputSchema.properties as Record<
-      string,
-      { properties?: Record<string, { enum?: string[] }> }
-    >;
+    const properties = generate?.inputSchema.properties;
 
-    expect(properties.creative?.properties?.recipe?.enum).toContain(
-      "cinematic"
-    );
-    expect(properties.creative?.properties?.lighting?.enum).toContain("rim");
-    expect(properties.creative?.properties?.material?.enum).toContain(
-      "reflective"
-    );
+    expect(
+      schemaPath(properties, "creative", "properties", "recipe", "enum")
+    ).toContain("cinematic");
+    expect(
+      schemaPath(properties, "creative", "properties", "lighting", "enum")
+    ).toContain("rim");
+    expect(
+      schemaPath(properties, "creative", "properties", "material", "enum")
+    ).toContain("reflective");
   });
 
   it("vary tool requires prompt and imageUrls", async () => {
@@ -224,13 +295,14 @@ describe("ListTools", () => {
     const client = await makeClient(makeMockMotif());
     const { tools } = await client.listTools();
     const vary = tools.find((t) => t.name === "vary");
-    const properties = vary?.inputSchema.properties as Record<
-      string,
-      { properties?: Record<string, { enum?: string[] }> }
-    >;
+    const properties = vary?.inputSchema.properties;
 
-    expect(properties.creative?.properties?.shot?.enum).toContain("close-up");
-    expect(properties.creative?.properties?.genre?.enum).toContain("film-noir");
+    expect(
+      schemaPath(properties, "creative", "properties", "shot", "enum")
+    ).toContain("close-up");
+    expect(
+      schemaPath(properties, "creative", "properties", "genre", "enum")
+    ).toContain("film-noir");
   });
 });
 
@@ -257,7 +329,7 @@ describe("Resources", () => {
     if (!content || !("text" in content)) {
       throw new Error("Expected text resource content");
     }
-    const parsed = JSON.parse(content.text);
+    const parsed = parseJsonObject(content.text);
     expect(parsed.gpt).toMatchObject({
       endpoint: "fal-ai/gpt-image-1.5",
     });
@@ -271,7 +343,7 @@ describe("Resources", () => {
     if (!content || !("text" in content)) {
       throw new Error("Expected text resource content");
     }
-    const parsed = JSON.parse(content.text);
+    const parsed = parseJsonObject(content.text);
     expect(parsed.required).toContain("generations");
     expect(JSON.stringify(parsed)).not.toContain("a red fox");
   });
@@ -301,8 +373,7 @@ describe("generate tool", () => {
       name: "generate",
     });
 
-    const { text } = result.content[0] as { text: string };
-    const parsed = JSON.parse(text);
+    const parsed = parseToolResponse(result);
     expect(parsed.images).toHaveLength(1);
     expect(parsed.images[0].url).toBe("https://fal.media/img.png");
   });
@@ -314,13 +385,13 @@ describe("generate tool", () => {
       name: "generate",
     });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(typeof parsed.cost_estimate).toBe("number");
   });
 
   it("omits optional dimensions when fal does not return them", async () => {
     const motif = makeMockMotif();
-    (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
+    motif.generate.mockResolvedValue(
       makeOk({
         images: [
           { height: null, url: "https://fal.media/no-dims.png", width: null },
@@ -334,7 +405,7 @@ describe("generate tool", () => {
       name: "generate",
     });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.images[0]).toEqual({ url: "https://fal.media/no-dims.png" });
   });
 
@@ -406,9 +477,7 @@ describe("generate tool", () => {
 
   it("returns structured tool errors when generate fails", async () => {
     const motif = makeMockMotif();
-    (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
-      makeErr("fal.ai 502")
-    );
+    motif.generate.mockResolvedValue(makeErr("fal.ai 502"));
     const client = await makeClient(motif);
 
     const result = await client.callTool({
@@ -417,7 +486,7 @@ describe("generate tool", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed).toMatchObject({
       code: "GENERATION_FAILED",
       error: true,
@@ -440,7 +509,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
     expect(motif.generate).not.toHaveBeenCalled();
   });
@@ -455,7 +524,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
     expect(parsed.suggestions.join(" ")).toContain("model");
     expect(motif.generate).not.toHaveBeenCalled();
@@ -471,7 +540,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
     expect(motif.generate).not.toHaveBeenCalled();
   });
@@ -490,7 +559,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
     expect(motif.generate).not.toHaveBeenCalled();
   });
@@ -503,7 +572,7 @@ describe("argument validation", () => {
 
     expect(result.isError).toBeFalsy();
     expect(readHistory).toHaveBeenCalledWith(10, 0);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.generations).toHaveLength(1);
   });
 
@@ -516,7 +585,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
   });
 
@@ -529,7 +598,7 @@ describe("argument validation", () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.code).toBe("INVALID_PARAMS");
   });
 
@@ -574,7 +643,7 @@ describe("upscale tool", () => {
       name: "upscale",
     });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.images[0].url).toBe("https://fal.media/upscaled.png");
   });
 });
@@ -606,7 +675,7 @@ describe("remove_background tool", () => {
       name: "remove_background",
     });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.images[0].url).toBe("https://fal.media/transparent.png");
   });
 });
@@ -676,7 +745,7 @@ describe("vary tool", () => {
 
   it("returns image variation URLs when fal omits dimensions", async () => {
     const motif = makeMockMotif();
-    (motif.generate as ReturnType<typeof vi.fn>).mockResolvedValue(
+    motif.generate.mockResolvedValue(
       makeOk({
         images: [
           { height: null, url: "https://fal.media/variation.png", width: null },
@@ -693,7 +762,7 @@ describe("vary tool", () => {
       name: "vary",
     });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.images[0]).toEqual({
       url: "https://fal.media/variation.png",
     });
@@ -728,7 +797,7 @@ describe("history tool", () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({ arguments: {}, name: "history" });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.generations).toHaveLength(1);
     expect(parsed.generations[0].prompt).toBe("a red fox");
     expect(parsed.generations[0].filePath).toBe("/Users/example/motif-abc.png");
@@ -738,7 +807,7 @@ describe("history tool", () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({ arguments: {}, name: "history" });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(parsed.total).toBe(1);
     expect(parsed.hasMore).toBe(false);
     expect(typeof parsed.offset).toBe("number");
@@ -749,7 +818,7 @@ describe("history tool", () => {
     const client = await makeClient(makeMockMotif());
     const result = await client.callTool({ arguments: {}, name: "history" });
 
-    const parsed = JSON.parse((result.content[0] as { text: string }).text);
+    const parsed = parseToolResponse(result);
     expect(typeof parsed.costs.allTime).toBe("number");
     expect(typeof parsed.costs.today).toBe("number");
     expect(typeof parsed.costs.session).toBe("number");

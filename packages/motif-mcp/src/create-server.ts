@@ -24,7 +24,6 @@ import type {
   CreativeDirection,
   ImageOutputFormat,
   MotifServer,
-  Resolution,
 } from "@howells/motif-sdk";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
@@ -211,24 +210,75 @@ function invalidParams(message: string, suggestions: string[]) {
 }
 
 /**
- * Validate an optional value against an allowed enum.
+ * Result of narrowing an optional enum argument.
  *
- * Returns an error message when the value is present but not a member, or
- * `undefined` when the value is absent or valid.
+ * `ok: true` carries the matched member (or `undefined` when the argument was
+ * absent); `ok: false` carries the user-facing validation message.
  */
-function validateEnum(
+type ParsedEnum<T> = { error: string; ok: false } | { ok: true; value?: T };
+
+/**
+ * Narrow an optional value to a member of `allowed`.
+ *
+ * Absent values are accepted as `undefined`; present values must match a
+ * member exactly, otherwise a validation message is returned. Replaces blind
+ * `args as {...}` casts with a real type guard now that MOT-10 added runtime
+ * validation upstream.
+ */
+function parseOptionalEnum<T extends string>(
   value: unknown,
-  allowed: readonly string[],
+  allowed: readonly T[],
   field: string
-): string | undefined {
+): ParsedEnum<T> {
   if (value === undefined) {
-    return undefined;
+    return { ok: true };
   }
-  if (typeof value !== "string" || !allowed.includes(value)) {
-    return `Invalid ${field}: ${JSON.stringify(value)}`;
+  const match = allowed.find((option) => option === value);
+  if (match === undefined) {
+    return { error: `Invalid ${field}: ${JSON.stringify(value)}`, ok: false };
   }
-  return undefined;
+  return { ok: true, value: match };
 }
+
+/** Narrow an optional value to a member of `allowed`, or `undefined`. */
+function optionalOneOf<T extends string>(
+  value: unknown,
+  allowed: readonly T[]
+): T | undefined {
+  return allowed.find((option) => option === value);
+}
+
+/** Narrow an optional MCP argument to a boolean, or `undefined`. */
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+/** Narrow an optional MCP argument to a number, or `undefined`. */
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+/**
+ * Recognize a creative-direction object.
+ *
+ * Only the object shape is checked here; option ids are validated by the SDK
+ * (`buildGenerateBody`), which throws `CreativeOptionError` for unknown ids.
+ */
+function isCreativeDirection(value: unknown): value is CreativeDirection {
+  return typeof value === "object" && value !== null;
+}
+
+/** Recognize an array whose members are all strings. */
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+const OUTPUT_FORMATS: readonly ImageOutputFormat[] = ["jpeg", "png", "webp"];
+const INPUT_FIDELITIES = ["low", "high"] as const;
+const UPSCALE_MODELS = ["clarity", "crystal"] as const;
+const REMOVE_BACKGROUND_MODELS = ["rmbg", "bria"] as const;
 
 /** Build a suggestion string listing valid enum values (truncated if long). */
 function enumSuggestion(field: string, allowed: readonly string[]): string {
@@ -631,7 +681,9 @@ const TOOLS = [
  * The caller owns the `MotifServer` instance and chooses stdio, in-memory, or
  * another MCP transport; this factory only registers Motif resources and tools.
  */
+// oxlint-disable-next-line no-deprecated -- Server → McpServer migration tracked separately; low-level Server is still supported in SDK 1.x
 export function createMotifMcpServer(motif: MotifServer): Server {
+  // oxlint-disable-next-line no-deprecated -- Server → McpServer migration tracked separately; low-level Server is still supported in SDK 1.x
   const server = new Server(
     { name: "motif", version: "1.0.0" },
     { capabilities: { resources: {}, tools: {} } }
@@ -677,94 +729,87 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── generate ──────────────────────────────────────────────────
 
     if (name === "generate") {
-      const {
-        prompt,
-        model = "gpt",
-        aspect,
-        resolution,
-        preset,
-        numImages = 1,
-        transparent,
-        outputFormat,
-        seed,
-        enableWebSearch,
-        enableGoogleSearch,
-        creative,
-      } = args as {
-        prompt: string;
-        creative?: CreativeDirection;
-        model?: string;
-        aspect?: string;
-        resolution?: Resolution;
-        preset?: string;
-        numImages?: number;
-        transparent?: boolean;
-        outputFormat?: ImageOutputFormat;
-        seed?: number;
-        enableWebSearch?: boolean;
-        enableGoogleSearch?: boolean;
-      };
-
+      const prompt = args.prompt;
       if (typeof prompt !== "string" || prompt.trim() === "") {
         return invalidParams("generate requires a non-empty string prompt.", [
           "Pass a prompt describing the image to generate.",
         ]);
       }
-      const generateModelError = validateEnum(
-        model,
+      const modelParse = parseOptionalEnum(
+        args.model,
         GENERATION_MODELS,
         "model"
       );
-      if (generateModelError) {
-        return invalidParams(generateModelError, [
+      if (!modelParse.ok) {
+        return invalidParams(modelParse.error, [
           enumSuggestion("model", GENERATION_MODELS),
         ]);
       }
-      if (!Number.isInteger(numImages) || numImages < 1 || numImages > 4) {
+      const model = modelParse.value ?? "gpt";
+
+      const numImagesArg = args.numImages;
+      const numImages = numImagesArg === undefined ? 1 : numImagesArg;
+      if (
+        typeof numImages !== "number" ||
+        !Number.isInteger(numImages) ||
+        numImages < 1 ||
+        numImages > 4
+      ) {
         return invalidParams(
           `Invalid numImages: ${JSON.stringify(numImages)}. Must be an integer between 1 and 4.`,
           ["Choose numImages in the range 1-4."]
         );
       }
-      if (preset !== undefined && !(preset in PRESET_MAP)) {
+
+      const preset = args.preset;
+      if (
+        preset !== undefined &&
+        (typeof preset !== "string" || !(preset in PRESET_MAP))
+      ) {
         return invalidParams(`Invalid preset: ${JSON.stringify(preset)}`, [
           enumSuggestion("preset", Object.keys(PRESET_MAP)),
         ]);
       }
-      const aspectError = validateEnum(aspect, ASPECT_RATIOS, "aspect");
-      if (aspectError) {
-        return invalidParams(aspectError, [
+      const aspectParse = parseOptionalEnum(
+        args.aspect,
+        ASPECT_RATIOS,
+        "aspect"
+      );
+      if (!aspectParse.ok) {
+        return invalidParams(aspectParse.error, [
           enumSuggestion("aspect", ASPECT_RATIOS),
         ]);
       }
-      const resolutionError = validateEnum(
-        resolution,
+      const resolutionParse = parseOptionalEnum(
+        args.resolution,
         RESOLUTIONS,
         "resolution"
       );
-      if (resolutionError) {
-        return invalidParams(resolutionError, [
+      if (!resolutionParse.ok) {
+        return invalidParams(resolutionParse.error, [
           enumSuggestion("resolution", RESOLUTIONS),
         ]);
       }
 
       const resolvedAspect =
-        (preset ? PRESET_MAP[preset] : undefined) ??
-        (aspect as AspectRatio | undefined) ??
+        (preset === undefined ? undefined : PRESET_MAP[preset]) ??
+        aspectParse.value ??
         "1:1";
 
       const result = await motif.generate({
         aspect: resolvedAspect,
-        creative,
-        enableGoogleSearch,
-        enableWebSearch,
+        creative: isCreativeDirection(args.creative)
+          ? args.creative
+          : undefined,
+        enableGoogleSearch: optionalBoolean(args.enableGoogleSearch),
+        enableWebSearch: optionalBoolean(args.enableWebSearch),
         model,
         numImages,
-        outputFormat,
+        outputFormat: optionalOneOf(args.outputFormat, OUTPUT_FORMATS),
         prompt,
-        resolution,
-        seed,
-        transparent,
+        resolution: resolutionParse.value,
+        seed: optionalNumber(args.seed),
+        transparent: optionalBoolean(args.transparent),
       });
 
       if (result.isErr()) {
@@ -794,12 +839,23 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── upscale ───────────────────────────────────────────────────
 
     if (name === "upscale") {
-      const { imageUrl, model = "clarity" } = args as {
-        imageUrl: string;
-        model?: "clarity" | "crystal";
-      };
+      const imageUrl = args.imageUrl;
+      if (typeof imageUrl !== "string") {
+        return invalidParams("upscale requires a string imageUrl.", [
+          "Pass the URL of the image to upscale.",
+        ]);
+      }
+      const modelParse = parseOptionalEnum(args.model, UPSCALE_MODELS, "model");
+      if (!modelParse.ok) {
+        return invalidParams(modelParse.error, [
+          enumSuggestion("model", UPSCALE_MODELS),
+        ]);
+      }
 
-      const result = await motif.upscale({ imageUrl, model });
+      const result = await motif.upscale({
+        imageUrl,
+        model: modelParse.value ?? "clarity",
+      });
 
       if (result.isErr()) {
         return toolError("UPSCALE_FAILED", result.error.message, {
@@ -821,12 +877,27 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── remove_background ─────────────────────────────────────────
 
     if (name === "remove_background") {
-      const { imageUrl, model = "rmbg" } = args as {
-        imageUrl: string;
-        model?: "rmbg" | "bria";
-      };
+      const imageUrl = args.imageUrl;
+      if (typeof imageUrl !== "string") {
+        return invalidParams("remove_background requires a string imageUrl.", [
+          "Pass the URL of the image to process.",
+        ]);
+      }
+      const modelParse = parseOptionalEnum(
+        args.model,
+        REMOVE_BACKGROUND_MODELS,
+        "model"
+      );
+      if (!modelParse.ok) {
+        return invalidParams(modelParse.error, [
+          enumSuggestion("model", REMOVE_BACKGROUND_MODELS),
+        ]);
+      }
 
-      const result = await motif.removeBackground({ imageUrl, model });
+      const result = await motif.removeBackground({
+        imageUrl,
+        model: modelParse.value ?? "rmbg",
+      });
 
       if (result.isErr()) {
         return toolError("REMOVE_BACKGROUND_FAILED", result.error.message, {
@@ -848,41 +919,36 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── vary ──────────────────────────────────────────────────────
 
     if (name === "vary") {
-      const {
-        prompt,
-        imageUrls,
-        model = "gpt",
-        inputFidelity,
-        creative,
-      } = args as {
-        prompt: string;
-        creative?: CreativeDirection;
-        imageUrls: string[];
-        model?: string;
-        inputFidelity?: "low" | "high";
-      };
-
+      const prompt = args.prompt;
       if (typeof prompt !== "string" || prompt.trim() === "") {
         return invalidParams("vary requires a non-empty string prompt.", [
           "Pass a prompt describing the desired changes.",
         ]);
       }
-      if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+      const imageUrls = args.imageUrls;
+      if (!isStringArray(imageUrls) || imageUrls.length === 0) {
         return invalidParams("vary requires a non-empty imageUrls array.", [
           "Pass at least one reference image URL in imageUrls.",
         ]);
       }
-      const varyModelError = validateEnum(model, EDIT_CAPABLE_MODELS, "model");
-      if (varyModelError) {
-        return invalidParams(varyModelError, [
+      const modelParse = parseOptionalEnum(
+        args.model,
+        EDIT_CAPABLE_MODELS,
+        "model"
+      );
+      if (!modelParse.ok) {
+        return invalidParams(modelParse.error, [
           enumSuggestion("model", EDIT_CAPABLE_MODELS),
         ]);
       }
+      const model = modelParse.value ?? "gpt";
 
       const result = await motif.generate({
-        creative,
+        creative: isCreativeDirection(args.creative)
+          ? args.creative
+          : undefined,
         editImageUrls: imageUrls,
-        inputFidelity,
+        inputFidelity: optionalOneOf(args.inputFidelity, INPUT_FIDELITIES),
         model,
         prompt,
       });
@@ -913,18 +979,27 @@ export function createMotifMcpServer(motif: MotifServer): Server {
     // ── history ───────────────────────────────────────────────────
 
     if (name === "history") {
-      const { limit = 10, offset = 0 } = args as {
-        limit?: number;
-        offset?: number;
-      };
+      const limitArg = args.limit;
+      const limit = limitArg === undefined ? 10 : limitArg;
+      const offsetArg = args.offset;
+      const offset = offsetArg === undefined ? 0 : offsetArg;
 
-      if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      if (
+        typeof limit !== "number" ||
+        !Number.isInteger(limit) ||
+        limit < 1 ||
+        limit > 50
+      ) {
         return invalidParams(
           `Invalid limit: ${JSON.stringify(limit)}. Must be an integer between 1 and 50.`,
           ["Choose limit in the range 1-50."]
         );
       }
-      if (!Number.isInteger(offset) || offset < 0) {
+      if (
+        typeof offset !== "number" ||
+        !Number.isInteger(offset) ||
+        offset < 0
+      ) {
         return invalidParams(
           `Invalid offset: ${JSON.stringify(offset)}. Must be a non-negative integer.`,
           ["Choose offset >= 0."]
