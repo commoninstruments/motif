@@ -896,7 +896,7 @@ export const GENERATION_MODELS = [
 
 /** Models whose fal endpoints support image editing (vary/edit flows). */
 export const EDIT_CAPABLE_MODELS = GENERATION_MODELS.filter(
-  (id) => MODELS[id]?.supportsEdit
+  (id) => MODELS[id]?.supportsEdit === true
 );
 
 export const UTILITY_MODELS = ["clarity", "crystal", "rmbg", "bria"] as const;

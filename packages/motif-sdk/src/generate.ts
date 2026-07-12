@@ -70,7 +70,8 @@ function validateGenerateOptions(
   hasEditImages: boolean
 ): void {
   if (
-    options.editImageUrls?.length &&
+    options.editImageUrls !== undefined &&
+    options.editImageUrls.length > 0 &&
     config.maxReferenceImages !== undefined &&
     options.editImageUrls.length > config.maxReferenceImages
   ) {
@@ -79,7 +80,11 @@ function validateGenerateOptions(
     );
   }
 
-  if (options.editImageUrls?.length && !config.supportsEdit) {
+  if (
+    options.editImageUrls !== undefined &&
+    options.editImageUrls.length > 0 &&
+    !config.supportsEdit
+  ) {
     unsupported(config, "image editing");
   }
   if (options.aspect !== undefined && sizeMode === "none") {
@@ -99,12 +104,14 @@ function validateGenerateOptions(
   ) {
     unsupported(config, "numImages");
   }
-  if (options.background !== undefined && !config.supportsBackground) {
+  if (options.background !== undefined && config.supportsBackground !== true) {
     unsupported(config, "background");
   }
   if (
-    options.transparent &&
-    !(config.supportsBackground || config.supportsOutputFormat)
+    options.transparent === true &&
+    !(
+      config.supportsBackground === true || config.supportsOutputFormat === true
+    )
   ) {
     unsupported(config, "transparent output");
   }
@@ -125,86 +132,110 @@ function validateGenerateOptions(
   }
   if (
     options.imagePromptStrength !== undefined &&
-    !config.supportsImagePromptStrength
+    config.supportsImagePromptStrength !== true
   ) {
     unsupported(config, "imagePromptStrength");
   }
   if (options.imagePromptStrength !== undefined && !hasEditImages) {
     throw new Error("imagePromptStrength requires editImageUrls");
   }
-  if (options.maskImageUrl !== undefined && !config.supportsMaskImage) {
+  if (options.maskImageUrl !== undefined && config.supportsMaskImage !== true) {
     unsupported(config, "maskImageUrl");
   }
   if (options.maskImageUrl !== undefined && !hasEditImages) {
     throw new Error("maskImageUrl requires editImageUrls");
   }
-  if (options.seed !== undefined && !config.supportsSeed) {
+  if (options.seed !== undefined && config.supportsSeed !== true) {
     unsupported(config, "seed");
   }
-  if (options.outputFormat !== undefined && !config.supportsOutputFormat) {
+  if (
+    options.outputFormat !== undefined &&
+    config.supportsOutputFormat !== true
+  ) {
     unsupported(config, "outputFormat");
   }
-  if (options.quality !== undefined && !config.supportsQuality) {
+  if (options.quality !== undefined && config.supportsQuality !== true) {
     unsupported(config, "quality");
   }
-  if (options.negativePrompt !== undefined && !config.supportsNegativePrompt) {
+  if (
+    options.negativePrompt !== undefined &&
+    config.supportsNegativePrompt !== true
+  ) {
     unsupported(config, "negativePrompt");
   }
-  if (options.style !== undefined && !config.supportsStyle) {
+  if (options.style !== undefined && config.supportsStyle !== true) {
     unsupported(config, "style");
   }
-  if (options.syncMode !== undefined && !config.supportsSyncMode) {
+  if (options.syncMode !== undefined && config.supportsSyncMode !== true) {
     unsupported(config, "syncMode");
   }
-  if (options.renderingSpeed !== undefined && !config.supportsRenderingSpeed) {
+  if (
+    options.renderingSpeed !== undefined &&
+    config.supportsRenderingSpeed !== true
+  ) {
     unsupported(config, "renderingSpeed");
   }
-  if (options.guidanceScale !== undefined && !config.supportsGuidanceScale) {
+  if (
+    options.guidanceScale !== undefined &&
+    config.supportsGuidanceScale !== true
+  ) {
     unsupported(config, "guidanceScale");
   }
   if (
     options.numInferenceSteps !== undefined &&
-    !config.supportsInferenceSteps
+    config.supportsInferenceSteps !== true
   ) {
     unsupported(config, "numInferenceSteps");
   }
-  if (options.raw !== undefined && !config.supportsRaw) {
+  if (options.raw !== undefined && config.supportsRaw !== true) {
     unsupported(config, "raw");
   }
-  if (options.enhancePrompt !== undefined && !config.supportsEnhancePrompt) {
+  if (
+    options.enhancePrompt !== undefined &&
+    config.supportsEnhancePrompt !== true
+  ) {
     unsupported(config, "enhancePrompt");
   }
   if (
     options.safetyTolerance !== undefined &&
-    !config.supportsSafetyTolerance
+    config.supportsSafetyTolerance !== true
   ) {
     unsupported(config, "safetyTolerance");
   }
-  if (options.enableWebSearch !== undefined && !config.supportsWebSearch) {
+  if (
+    options.enableWebSearch !== undefined &&
+    config.supportsWebSearch !== true
+  ) {
     unsupported(config, "enableWebSearch");
   }
   if (
     options.enableGoogleSearch !== undefined &&
-    !config.supportsGoogleSearch
+    config.supportsGoogleSearch !== true
   ) {
     unsupported(config, "enableGoogleSearch");
   }
   if (
     options.enableSafetyChecker !== undefined &&
-    !config.supportsSafetyChecker
+    config.supportsSafetyChecker !== true
   ) {
     unsupported(config, "enableSafetyChecker");
   }
   if (
     options.limitGenerations !== undefined &&
-    !config.supportsLimitGenerations
+    config.supportsLimitGenerations !== true
   ) {
     unsupported(config, "limitGenerations");
   }
-  if (options.thinkingLevel !== undefined && !config.supportsThinkingLevel) {
+  if (
+    options.thinkingLevel !== undefined &&
+    config.supportsThinkingLevel !== true
+  ) {
     unsupported(config, "thinkingLevel");
   }
-  if (options.expandPrompt !== undefined && !config.supportsExpandPrompt) {
+  if (
+    options.expandPrompt !== undefined &&
+    config.supportsExpandPrompt !== true
+  ) {
     unsupported(config, "expandPrompt");
   }
 }
@@ -299,34 +330,42 @@ export function buildGenerateBody(options: GenerateOptions): {
       }
       break;
     }
+
+    case "none": {
+      break;
+    }
   }
 
-  if (config.supportsQuality) {
+  if (config.supportsQuality === true) {
     body.quality = quality ?? "high";
   }
 
-  if (config.supportsBackground && background) {
+  if (config.supportsBackground === true && background) {
     body.background = background;
   }
-  if (config.supportsBackground && transparent) {
+  if (config.supportsBackground === true && transparent === true) {
     body.background = "transparent";
   }
-  if (transparent && config.supportsOutputFormat) {
+  if (transparent === true && config.supportsOutputFormat === true) {
     body.output_format = "png";
   }
 
-  if (syncMode !== undefined && config.supportsSyncMode) {
+  if (syncMode !== undefined && config.supportsSyncMode === true) {
     body.sync_mode = syncMode;
   }
 
   // ── Seed ──────────────────────────────────────────────────────────
-  if (seed !== undefined && config.supportsSeed) {
+  if (seed !== undefined && config.supportsSeed === true) {
     body.seed = seed;
   }
 
   // ── Output format ──────────────────────────────────────────────────
   // transparent mode already forces output_format = "png" where supported.
-  if (outputFormat && config.supportsOutputFormat && !transparent) {
+  if (
+    outputFormat &&
+    config.supportsOutputFormat === true &&
+    transparent !== true
+  ) {
     if (
       config.supportedOutputFormats &&
       !config.supportedOutputFormats.includes(outputFormat)
@@ -338,82 +377,88 @@ export function buildGenerateBody(options: GenerateOptions): {
     body.output_format = outputFormat;
   }
 
-  if (config.supportsRaw && raw !== undefined) {
+  if (config.supportsRaw === true && raw !== undefined) {
     body.raw = raw;
   }
-  if (config.supportsEnhancePrompt && enhancePrompt !== undefined) {
+  if (config.supportsEnhancePrompt === true && enhancePrompt !== undefined) {
     body.enhance_prompt = enhancePrompt;
   }
-  if (config.supportsImagePromptStrength && imagePromptStrength !== undefined) {
+  if (
+    config.supportsImagePromptStrength === true &&
+    imagePromptStrength !== undefined
+  ) {
     body.image_prompt_strength = imagePromptStrength;
   }
   if (model === "flux") {
-    if (safetyTolerance) {
+    if (safetyTolerance !== undefined && safetyTolerance !== "") {
       body.safety_tolerance = safetyTolerance;
     }
   }
 
-  if (config.supportsGuidanceScale && guidanceScale !== undefined) {
+  if (config.supportsGuidanceScale === true && guidanceScale !== undefined) {
     body.guidance_scale = guidanceScale;
   }
-  if (config.supportsInferenceSteps && numInferenceSteps !== undefined) {
+  if (
+    config.supportsInferenceSteps === true &&
+    numInferenceSteps !== undefined
+  ) {
     body.num_inference_steps = numInferenceSteps;
   }
 
   // ── Shared safety / web-search controls ────────────────────────────
-  if (config.supportsSafetyTolerance) {
-    if (safetyTolerance) {
+  if (config.supportsSafetyTolerance === true) {
+    if (safetyTolerance !== undefined && safetyTolerance !== "") {
       body.safety_tolerance = safetyTolerance;
     }
   }
-  if (config.supportsWebSearch) {
+  if (config.supportsWebSearch === true) {
     if (enableWebSearch !== undefined) {
       body.enable_web_search = enableWebSearch;
     }
   }
-  if (config.supportsGoogleSearch) {
+  if (config.supportsGoogleSearch === true) {
     if (enableGoogleSearch !== undefined) {
       body.enable_google_search = enableGoogleSearch;
     }
   }
-  if (config.supportsSafetyChecker) {
+  if (config.supportsSafetyChecker === true) {
     if (enableSafetyChecker !== undefined) {
       body.enable_safety_checker = enableSafetyChecker;
     }
   }
-  if (config.supportsLimitGenerations) {
+  if (config.supportsLimitGenerations === true) {
     if (limitGenerations !== undefined) {
       body.limit_generations = limitGenerations;
     }
   }
-  if (config.supportsThinkingLevel) {
+  if (config.supportsThinkingLevel === true) {
     if (thinkingLevel) {
       body.thinking_level = thinkingLevel;
     }
   }
 
   // ── Recraft: style ────────────────────────────────────────────────
-  if (config.supportsStyle && style) {
+  if (config.supportsStyle === true && style !== undefined && style !== "") {
     body.style = style;
   }
 
   // ── Ideogram: negative_prompt, style, rendering_speed, expand_prompt
-  if (config.supportsNegativePrompt) {
-    if (negativePrompt) {
+  if (config.supportsNegativePrompt === true) {
+    if (negativePrompt !== undefined && negativePrompt !== "") {
       body.negative_prompt = negativePrompt;
     }
   }
   if (model === "ideogram") {
-    if (style) {
+    if (style !== undefined && style !== "") {
       body.style = style;
     }
   }
-  if (config.supportsRenderingSpeed) {
+  if (config.supportsRenderingSpeed === true) {
     if (renderingSpeed) {
       body.rendering_speed = renderingSpeed;
     }
   }
-  if (config.supportsExpandPrompt) {
+  if (config.supportsExpandPrompt === true) {
     if (expandPrompt !== undefined) {
       body.expand_prompt = expandPrompt;
     }
@@ -451,7 +496,11 @@ export function buildGenerateBody(options: GenerateOptions): {
     }
   }
 
-  if (maskImageUrl && config.supportsMaskImage) {
+  if (
+    maskImageUrl !== undefined &&
+    maskImageUrl !== "" &&
+    config.supportsMaskImage === true
+  ) {
     body.mask_image_url = maskImageUrl;
   }
 

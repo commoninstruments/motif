@@ -20,14 +20,6 @@ import { disabledReactDoctorRules } from "@howells/lint/oxlint/react-doctor-rule
 // exception with a removal path.
 export default {
   extends: [react],
-  options: {
-    // Migration exception (see MIGRATIONS.md): the codebase is not yet clean
-    // under Oxlint type-aware mode — strict-boolean-expressions and no-unsafe-*
-    // fire in the hundreds against fal's untyped responses and ink's loose
-    // props. Disabled temporarily to adopt the lane; removal + type-aware
-    // cleanup tracked as follow-up tech debt.
-    typeAware: false,
-  },
   rules: {
     // Migration exception: React Doctor rules are DOM-oriented (see header note).
     ...disabledReactDoctorRules,

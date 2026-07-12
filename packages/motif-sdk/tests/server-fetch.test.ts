@@ -9,17 +9,40 @@ function jsonResponse(data: unknown): Response {
   });
 }
 
+// The fetch DOM globals (`HeadersInit`, `RequestInfo`) collide with @types/node
+// in this project and resolve to `any`, so this helper narrows the recorded
+// call arguments from `unknown` with plain guards instead of DOM types.
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function headerRecord(headers: unknown): Record<string, string> {
+  if (!isRecord(headers)) {
+    return {};
+  }
+  const record: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (typeof value === "string") {
+      record[key] = value;
+    }
+  }
+  return record;
+}
+
 function requestAt(index: number) {
   const call = vi.mocked(fetch).mock.calls[index];
   if (!call) {
     throw new Error(`fetch call ${index} was not made`);
   }
-  const [url, init] = call;
+  const input: unknown = call.at(0);
+  const init: unknown = call.at(1);
+  const initRecord = isRecord(init) ? init : {};
+  const { body, method } = initRecord;
   return {
-    body: init?.body ? JSON.parse(String(init.body)) : undefined,
-    headers: init?.headers as Record<string, string>,
-    method: init?.method,
-    url: String(url),
+    body: typeof body === "string" ? (JSON.parse(body) as unknown) : undefined,
+    headers: headerRecord(initRecord.headers),
+    method: typeof method === "string" ? method : undefined,
+    url: typeof input === "string" ? input : "",
   };
 }
 

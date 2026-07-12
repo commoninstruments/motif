@@ -44,6 +44,9 @@ export function aspectToGptSize(aspect: AspectRatio): string {
     case "21:9": {
       return "1536x1024";
     }
+    case "1:1": {
+      return "1024x1024";
+    }
     default: {
       return "1024x1024";
     }
@@ -84,6 +87,9 @@ export function aspectToFalImageSize(aspect: AspectRatio): string {
     }
     case "3:4": {
       return "portrait_4_3";
+    }
+    case "1:1": {
+      return "square_hd";
     }
     default: {
       return "square_hd";

@@ -409,6 +409,10 @@ export const FAL_TOOLS = {
 } as const satisfies Record<string, FalToolConfig>;
 
 export const FAL_TOOLS_CHECKED_AT = FAL_EXPLORE_CHECKED_AT;
+// `Object.keys` is typed as `string[]`; narrowing to the concrete key union is
+// sound here because `FAL_TOOLS` is a closed literal object, but TS cannot prove
+// it. Preserves the exported `FalToolId` union derived below.
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
 export const FAL_TOOL_IDS = Object.keys(
   FAL_TOOLS
 ) as (keyof typeof FAL_TOOLS)[];
@@ -425,7 +429,11 @@ export function buildFalToolRequest(
     throw new Error(`Unknown fal tool: ${options.tool}`);
   }
   const tool = FAL_TOOLS[options.tool];
-  const values = options.inputs ?? (options.input ? [options.input] : []);
+  const values =
+    options.inputs ??
+    (options.input !== undefined && options.input !== ""
+      ? [options.input]
+      : []);
   if (values.length === 0) {
     throw new Error(`${options.tool} requires input media`);
   }

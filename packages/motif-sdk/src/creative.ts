@@ -202,7 +202,7 @@ export function enrichPrompt(
 
   for (const field of CREATIVE_FIELDS) {
     const optionId = options.creative?.[field];
-    if (!optionId) {
+    if (optionId === undefined || optionId === "") {
       continue;
     }
 

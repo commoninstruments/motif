@@ -55,7 +55,7 @@ describe("enrichPrompt", () => {
         },
         prompt: "studio portrait",
       })
-    ).toThrowError(
+    ).toThrow(
       expect.objectContaining({
         availableIds: ["rim"],
         code: "INVALID_OPTION",

@@ -2,6 +2,17 @@ import { err, ok } from "neverthrow";
 import type { Result } from "neverthrow";
 
 import { estimateCost, estimateVideoCost } from "./cost";
+import {
+  asNumber,
+  asString,
+  endpointFromQueueUrl,
+  isRecord,
+  parseImages,
+  parseLogs,
+  parseQueueSubmission,
+  toHeaderRecord,
+  toMotifImage,
+} from "./fal-parse";
 import { buildGenerateBody } from "./generate";
 import { GENERATION_MODELS, MODELS, UTILITY_MODELS } from "./models";
 import { buildFalToolRequest, FAL_TOOLS } from "./tools";
@@ -9,7 +20,6 @@ import type { FalToolRequest } from "./tools";
 import type {
   GenerateOptions,
   JobStatus,
-  MotifImage,
   MotifResponse,
   MotifServerConfig,
   QueuedJob,
@@ -26,22 +36,6 @@ const FAL_BASE_URL = "https://fal.run";
 const FAL_QUEUE_URL = "https://queue.fal.run";
 const FAL_API_URL = "https://api.fal.ai";
 const FAL_REST_URL = "https://rest.alpha.fal.ai";
-
-function endpointFromQueueUrl(
-  url: string | undefined,
-  fallback: string
-): string {
-  if (!url) {
-    return fallback;
-  }
-  try {
-    const parsed = new URL(url);
-    const match = /^\/(.+)\/requests\//.exec(parsed.pathname);
-    return match?.[1] ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 /**
  * Motif Server SDK
@@ -91,7 +85,7 @@ export class MotifServer {
     options: GenerateOptions
   ): Promise<Result<MotifResponse, MotifError>> {
     const config = MODELS[options.model];
-    if (config?.useQueue) {
+    if (config?.useQueue === true) {
       return await this.generateQueued(options);
     }
 
@@ -111,7 +105,7 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = await response.value.json();
+    const data: unknown = await response.value.json();
     return this.normalizeResponse(data);
   }
 
@@ -145,7 +139,9 @@ export class MotifServer {
         );
       }
 
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      await new Promise((resolve) => {
+        setTimeout(resolve, pollIntervalMs);
+      });
     }
 
     return err(new MotifError("Queued generation timed out", 0));
@@ -174,19 +170,17 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = (await response.value.json()) as {
-      request_id: string;
-      response_url: string;
-    };
+    const data: unknown = await response.value.json();
+    const submission = parseQueueSubmission(data);
 
     return ok({
-      endpoint: endpointFromQueueUrl(data.response_url, endpoint),
+      endpoint: endpointFromQueueUrl(submission.responseUrl, endpoint),
       estimatedCost: estimateCost(
         options.model,
         options.resolution,
         options.numImages
       ),
-      requestId: data.request_id,
+      requestId: submission.requestId,
     });
   }
 
@@ -201,35 +195,31 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = (await response.value.json()) as {
-      detail?: string;
-      error?: string;
-      status: string;
-      queue_position?: number;
-      logs?: { message: string; timestamp: string }[];
-    };
+    const data: unknown = await response.value.json();
+    const record = isRecord(data) ? data : {};
+    const rawStatus = asString(record.status);
 
     let status: JobStatus["status"];
-    if (data.status === "IN_QUEUE") {
+    if (rawStatus === "IN_QUEUE") {
       status = "queued";
-    } else if (data.status === "IN_PROGRESS") {
+    } else if (rawStatus === "IN_PROGRESS") {
       status = "processing";
-    } else if (data.status === "COMPLETED") {
+    } else if (rawStatus === "COMPLETED") {
       status = "completed";
     } else if (
-      data.status === "FAILED" ||
-      data.status === "ERROR" ||
-      data.status === "CANCELED"
+      rawStatus === "FAILED" ||
+      rawStatus === "ERROR" ||
+      rawStatus === "CANCELED"
     ) {
       status = "failed";
     } else {
-      return err(new MotifError(`Unknown job status: ${data.status}`, 0));
+      return err(new MotifError(`Unknown job status: ${rawStatus}`, 0));
     }
 
     return ok({
-      error: data.error ?? data.detail,
-      logs: data.logs,
-      queuePosition: data.queue_position,
+      error: asString(record.error) ?? asString(record.detail),
+      logs: parseLogs(record.logs),
+      queuePosition: asNumber(record.queue_position),
       status,
     });
   }
@@ -245,7 +235,7 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = await response.value.json();
+    const data: unknown = await response.value.json();
     return this.normalizeResponse(data, requestId);
   }
 
@@ -292,10 +282,10 @@ export class MotifServer {
       if (resemblance !== undefined) {
         body.resemblance = resemblance;
       }
-      if (upscalePrompt) {
+      if (upscalePrompt !== undefined && upscalePrompt !== "") {
         body.prompt = upscalePrompt;
       }
-      if (negativePrompt) {
+      if (negativePrompt !== undefined && negativePrompt !== "") {
         body.negative_prompt = negativePrompt;
       }
       if (numInferenceSteps !== undefined) {
@@ -314,7 +304,7 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = await response.value.json();
+    const data: unknown = await response.value.json();
     return this.normalizeResponse(data);
   }
 
@@ -367,7 +357,7 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = await response.value.json();
+    const data: unknown = await response.value.json();
     return this.normalizeResponse(data);
   }
 
@@ -403,10 +393,10 @@ export class MotifServer {
       start_image_url: imageUrl,
     };
 
-    if (endImageUrl) {
+    if (endImageUrl !== undefined && endImageUrl !== "") {
       body.end_image_url = endImageUrl;
     }
-    if (negativePrompt) {
+    if (negativePrompt !== undefined && negativePrompt !== "") {
       body.negative_prompt = negativePrompt;
     }
     if (cfgScale !== undefined) {
@@ -421,15 +411,13 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = (await response.value.json()) as {
-      request_id: string;
-      response_url: string;
-    };
+    const data: unknown = await response.value.json();
+    const submission = parseQueueSubmission(data);
 
     return ok({
-      endpoint: endpointFromQueueUrl(data.response_url, config.endpoint),
+      endpoint: endpointFromQueueUrl(submission.responseUrl, config.endpoint),
       estimatedCost: estimateVideoCost(duration, generateAudio),
-      requestId: data.request_id,
+      requestId: submission.requestId,
     });
   }
 
@@ -444,24 +432,19 @@ export class MotifServer {
       return err(response.error);
     }
 
-    const data = (await response.value.json()) as {
-      video?: {
-        url: string;
-        content_type: string;
-        file_name: string;
-        file_size: number;
-      };
-    };
+    const data: unknown = await response.value.json();
+    const video =
+      isRecord(data) && isRecord(data.video) ? data.video : undefined;
 
-    if (!data.video) {
+    if (video === undefined) {
       return err(new MotifError("No video in response", 0));
     }
 
     return ok({
-      contentType: data.video.content_type,
-      fileName: data.video.file_name,
-      fileSize: data.video.file_size,
-      url: data.video.url,
+      contentType: asString(video.content_type) ?? "",
+      fileName: asString(video.file_name) ?? "",
+      fileSize: asNumber(video.file_size) ?? 0,
+      url: asString(video.url) ?? "",
     });
   }
 
@@ -489,17 +472,26 @@ export class MotifServer {
       return err(initiateResponse.error);
     }
 
-    const { file_url, upload_url } = (await initiateResponse.value.json()) as {
-      file_url: string;
-      upload_url: string;
-    };
+    const initiateData: unknown = await initiateResponse.value.json();
+    const fileUrl = isRecord(initiateData)
+      ? (asString(initiateData.file_url) ?? "")
+      : "";
+    const uploadUrl = isRecord(initiateData)
+      ? asString(initiateData.upload_url)
+      : undefined;
+
+    if (uploadUrl === undefined || uploadUrl === "") {
+      return err(
+        new MotifError("Upload initiate response missing upload_url", 0)
+      );
+    }
 
     let putResponse: Response;
     try {
       const body = Buffer.from(
         file instanceof Uint8Array ? file : new Uint8Array(file)
       );
-      putResponse = await fetch(upload_url, {
+      putResponse = await fetch(uploadUrl, {
         body,
         headers: { "Content-Type": options.contentType },
         method: "PUT",
@@ -522,7 +514,7 @@ export class MotifServer {
       );
     }
 
-    return ok(file_url);
+    return ok(fileUrl);
   }
 
   /** ─── Utilities ───────────────────────────────────────────── */
@@ -551,7 +543,8 @@ export class MotifServer {
       return err(response.error);
     }
 
-    return ok((await response.value.json()) as ToolResponse);
+    const data: unknown = await response.value.json();
+    return ok(isRecord(data) ? data : {});
   }
 
   /**
@@ -630,7 +623,7 @@ export class MotifServer {
           headers: {
             Authorization: `Key ${this.apiKey}`,
             "Content-Type": "application/json",
-            ...options.headers,
+            ...toHeaderRecord(options.headers),
           },
           signal: controller.signal,
         });
@@ -643,7 +636,9 @@ export class MotifServer {
           attempt < this.retries
         ) {
           const delay = 1000 * 2 ** attempt; // 1s, 2s, 4s
-          await new Promise((r) => setTimeout(r, delay));
+          await new Promise((r) => {
+            setTimeout(r, delay);
+          });
           continue;
         }
 
@@ -673,7 +668,9 @@ export class MotifServer {
         // Retry on network errors
         if (attempt < this.retries) {
           const delay = 1000 * 2 ** attempt;
-          await new Promise((r) => setTimeout(r, delay));
+          await new Promise((r) => {
+            setTimeout(r, delay);
+          });
         }
       }
     }
@@ -682,7 +679,7 @@ export class MotifServer {
   }
 
   private ephemeralHeaders(options: { ephemeral?: boolean }): HeadersInit {
-    return options.ephemeral ? { "X-Fal-Store-IO": "0" } : {};
+    return options.ephemeral === true ? { "X-Fal-Store-IO": "0" } : {};
   }
 
   /**
@@ -693,30 +690,33 @@ export class MotifServer {
     data: unknown,
     fallbackRequestId?: string
   ): Result<MotifResponse, MotifError> {
-    const obj = data as Record<string, unknown>;
+    if (!isRecord(data)) {
+      return err(
+        new MotifError("Unexpected fal response shape", 0, "FAL_ERROR")
+      );
+    }
+    const obj = data;
     const requestId =
-      (obj.request_id as string | undefined) ??
-      (obj.requestId as string | undefined) ??
-      fallbackRequestId;
+      asString(obj.request_id) ?? asString(obj.requestId) ?? fallbackRequestId;
 
     if ("detail" in obj) {
-      return err(
-        new MotifError((obj as { detail: string }).detail, 0, "FAL_ERROR")
-      );
+      return err(new MotifError(asString(obj.detail) ?? "", 0, "FAL_ERROR"));
     }
 
     if ("image" in obj && !("images" in obj)) {
       return ok({
-        images: [obj.image as MotifImage],
-        prompt: obj.prompt as string | undefined,
+        images: [toMotifImage(obj.image)],
+        prompt: asString(obj.prompt),
         requestId,
-        seed: obj.seed as number | undefined,
+        seed: asNumber(obj.seed),
       });
     }
 
     return ok({
-      ...(obj as unknown as MotifResponse),
+      images: parseImages(obj.images),
+      prompt: asString(obj.prompt),
       requestId,
+      seed: asNumber(obj.seed),
     });
   }
 }
@@ -746,10 +746,8 @@ function toMotifError(error: unknown): MotifError {
   }
   const message = error instanceof Error ? error.message : String(error);
   const code =
-    error instanceof Error &&
-    "code" in error &&
-    typeof (error as { code?: unknown }).code === "string"
-      ? (error as { code: string }).code
+    error instanceof Error && "code" in error && typeof error.code === "string"
+      ? error.code
       : undefined;
   return new MotifError(message, 0, code);
 }
