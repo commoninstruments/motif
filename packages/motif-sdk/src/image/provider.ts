@@ -35,7 +35,18 @@ export interface ImageProviderAdapter {
    * network I/O.
    */
   readonly resolveModel: (modelId: string, apiKey?: string) => ImageModel;
-  /** Static per-model USD/image table (best-effort; cited per adapter). */
+  /**
+   * Static per-model USD/**image** table (best-effort; cited per adapter). This
+   * is multiplied by the returned image count to form the call total.
+   *
+   * Cost contract: if an adapter instead surfaces a cost on
+   * `result.providerMetadata` (the preferred source; see
+   * {@link costFromProviderMetadata}), that value MUST already be the **call
+   * total** across all `n` images — NOT a per-image figure. `priceUsdByModel`
+   * is per-image; `providerMetadata.cost` is the whole call. These two paths
+   * intentionally differ, so an adapter must not populate a per-image number
+   * into `providerMetadata.cost`.
+   */
   readonly priceUsdByModel: Readonly<Record<string, number>>;
 }
 

@@ -64,6 +64,11 @@ export function costForImages(
   providerMetadata: unknown,
   imageCount: number
 ): ImageCost {
+  // Cost contract: a provider-metadata cost is returned AS-IS. It MUST be the
+  // call total (already across all `n` images), NOT a per-image figure — unlike
+  // the static table below, which is per-image and multiplied by the image
+  // count. No adapter populates `providerMetadata.cost` today; any adapter that
+  // starts doing so must honor this "call total, already ×n" contract.
   const metaCost = costFromProviderMetadata(providerMetadata);
   if (metaCost !== undefined) {
     return { usd: roundUsd(metaCost), source: "provider-metadata" };

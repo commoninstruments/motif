@@ -1,12 +1,9 @@
 import type { GenerateImageResult, ImageModel } from "ai";
 import { describe, expect, it } from "vitest";
 
+import type { MotifImageDeps } from "../src/image/deps";
 import { createMotifImage, PROVIDERS } from "../src/image/index";
-import type {
-  ImageProviderId,
-  ImageTier,
-  MotifImageDeps,
-} from "../src/image/index";
+import type { ImageProviderId, ImageTier } from "../src/image/index";
 import { MotifError } from "../src/index";
 
 /** The options object the underlying `generateImage` (or its fake) receives. */
@@ -15,18 +12,32 @@ type GenerateImageArgs = Parameters<
 >[0];
 
 /**
+ * The options object an AI SDK `ImageModelV4`'s `doGenerate` receives. Derived
+ * from the `ImageModel` union (no `@ai-sdk/provider` import, which is nested).
+ */
+type DoGenerateOptions = Parameters<
+  Extract<ImageModel, { specificationVersion: "v4" }>["doGenerate"]
+>[0];
+
+/**
  * A cast-free fake `ImageModel` (ImageModelV4 shape). It performs no network
  * I/O — `doGenerate` resolves (or rejects) locally — so the REAL `generateImage`
  * from `ai` can be driven fully offline (mirroring bench/test/runner.test.ts).
  */
-function fakeImageModel(opts: { throwErr?: boolean } = {}): ImageModel {
+function fakeImageModel(
+  opts: {
+    throwErr?: boolean;
+    onCall?: (options: DoGenerateOptions) => void;
+  } = {}
+): ImageModel {
   return {
     specificationVersion: "v4",
     provider: "google",
     modelId: "fake",
     maxImagesPerCall: 4,
-    async doGenerate() {
+    async doGenerate(options: DoGenerateOptions) {
       await Promise.resolve();
+      opts.onCall?.(options);
       if (opts.throwErr === true) {
         throw new Error("fake provider failure");
       }
@@ -231,6 +242,216 @@ describe("createMotifImage.generate", () => {
       }
     }
   });
+
+  it("passes the generate prompt string down to the model's doGenerate", async () => {
+    let captured: DoGenerateOptions | undefined;
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      {
+        resolveModel: () =>
+          fakeImageModel({
+            onCall: (options) => {
+              captured = options;
+            },
+          }),
+      }
+    );
+
+    const result = await img.generate({ prompt: "a bare concrete wall" });
+
+    expect(result.isOk()).toBe(true);
+    expect(captured?.prompt).toBe("a bare concrete wall");
+    // A text→image call carries no input files.
+    expect(captured?.files).toBeUndefined();
+  });
+
+  it("returns Result.err naming an unknown provider", async () => {
+    const img = createMotifImage({}, { resolveModel: () => fakeImageModel() });
+
+    const result = await img.generate({ prompt: "x", provider: "not-real" });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+      expect(result.error.message).toContain("not-real");
+    }
+  });
+
+  it("forwards n, size, seed, signal, and providerOptions to generateImage", async () => {
+    const controller = new AbortController();
+    let call: GenerateImageArgs | undefined;
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async (options) => {
+          await Promise.resolve();
+          call = options;
+          return fakeResult();
+        },
+      }
+    );
+
+    const result = await img.generate({
+      prompt: "x",
+      n: 3,
+      size: "512x512",
+      seed: 42,
+      signal: controller.signal,
+      providerOptions: { google: { style: "vivid" } },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(call?.n).toBe(3);
+    expect(call?.size).toBe("512x512");
+    expect(call?.seed).toBe(42);
+    expect(call?.abortSignal).toBe(controller.signal);
+    expect(call?.providerOptions).toEqual({ google: { style: "vivid" } });
+  });
+
+  it("forwards aspectRatio to generateImage", async () => {
+    let call: GenerateImageArgs | undefined;
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async (options) => {
+          await Promise.resolve();
+          call = options;
+          return fakeResult();
+        },
+      }
+    );
+
+    const result = await img.generate({ prompt: "x", aspectRatio: "16:9" });
+
+    expect(result.isOk()).toBe(true);
+    expect(call?.aspectRatio).toBe("16:9");
+  });
+
+  it("extracts a requestId from an x-goog-request-id response header", async () => {
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async () => {
+          await Promise.resolve();
+          return fakeResult({
+            providerMetadata: {},
+            responses: [
+              {
+                timestamp: new Date(0),
+                modelId: "fake",
+                headers: { "x-goog-request-id": "goog_req_9" },
+              },
+            ],
+          });
+        },
+      }
+    );
+
+    const result = await img.generate({ prompt: "x" });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.requestId).toBe("goog_req_9");
+    }
+  });
+
+  it("reports cost source 'unknown' for a model absent from the price table", async () => {
+    const img = createMotifImage({}, { resolveModel: () => fakeImageModel() });
+
+    const result = await img.generate({
+      prompt: "x",
+      model: "totally-unpriced-model",
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.cost.source).toBe("unknown");
+      expect(result.value.cost.usd).toBe(0);
+    }
+  });
+
+  it("surfaces provider warnings on the result", async () => {
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async () => {
+          await Promise.resolve();
+          return fakeResult({
+            warnings: [
+              {
+                type: "unsupported",
+                feature: "size",
+                details: "ignored; aspectRatio wins",
+              },
+              { type: "other", message: "adjusted aspect ratio" },
+            ],
+          });
+        },
+      }
+    );
+
+    const result = await img.generate({ prompt: "x" });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.warnings).toHaveLength(2);
+      expect(result.value.warnings?.[0]).toContain("size");
+      expect(result.value.warnings?.[1]).toBe("adjusted aspect ratio");
+    }
+  });
+
+  it("omits the warnings field when the provider returns none", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel() }
+    );
+
+    const result = await img.generate({ prompt: "x" });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.warnings).toBeUndefined();
+    }
+  });
+
+  it("returns Result.err when providerOptions carries a bigint (non-JSON)", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel() }
+    );
+
+    const result = await img.generate({
+      prompt: "x",
+      providerOptions: { google: { big: 10n } },
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+      expect(result.error.message).toContain("providerOptions");
+    }
+  });
+
+  it("returns Result.err when providerOptions carries a function (non-JSON)", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel() }
+    );
+
+    const result = await img.generate({
+      prompt: "x",
+      providerOptions: { google: { cb: () => 1 } },
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+    }
+  });
 });
 
 describe("createMotifImage.edit", () => {
@@ -287,6 +508,68 @@ describe("createMotifImage.edit", () => {
     if (result.isOk()) {
       expect(result.value.images).toHaveLength(1);
       expect(result.value.provider).toBe("google");
+    }
+  });
+
+  it("maps edit images/text/mask to the model's files/prompt/mask (real generateImage)", async () => {
+    const roomBytes = new Uint8Array([1, 1, 1]);
+    const tileBytes = new Uint8Array([2, 2, 2]);
+    const maskBytes = new Uint8Array([3, 3, 3]);
+
+    let captured: DoGenerateOptions | undefined;
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      {
+        resolveModel: () =>
+          fakeImageModel({
+            onCall: (options) => {
+              captured = options;
+            },
+          }),
+      }
+    );
+
+    const result = await img.edit({
+      images: [roomBytes, tileBytes],
+      instruction: "Apply the oak texture from image 2 onto image 1.",
+      mask: maskBytes,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(captured?.prompt).toBe(
+      "Apply the oak texture from image 2 onto image 1."
+    );
+    expect(captured?.files).toHaveLength(2);
+    const file0 = captured?.files?.[0];
+    expect(file0?.type).toBe("file");
+    if (file0?.type === "file") {
+      expect(file0.data).toStrictEqual(roomBytes);
+    }
+    const file1 = captured?.files?.[1];
+    if (file1?.type === "file") {
+      expect(file1.data).toStrictEqual(tileBytes);
+    }
+    const mask = captured?.mask;
+    expect(mask?.type).toBe("file");
+    if (mask?.type === "file") {
+      expect(mask.data).toStrictEqual(maskBytes);
+    }
+  });
+
+  it("returns Result.err when the model throws in edit()", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel({ throwErr: true }) }
+    );
+
+    const result = await img.edit({
+      images: [new Uint8Array([9, 9, 9])],
+      instruction: "brighten the wall",
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
     }
   });
 });

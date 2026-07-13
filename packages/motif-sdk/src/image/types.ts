@@ -80,26 +80,54 @@ export interface GenerateImageOptions {
   model?: string;
   /** Provider override for this call. */
   provider?: ImageProviderId;
-  /** Aspect ratio, e.g. `"1:1"`. */
+  /**
+   * Aspect ratio, e.g. `"1:1"`. An alternative to {@link size}; pass one or the
+   * other. If both are passed the provider decides which to honor and typically
+   * surfaces a warning (see {@link MotifImageResult.warnings}).
+   */
   aspectRatio?: `${number}:${number}`;
-  /** Explicit pixel size, e.g. `"1024x1024"`. */
+  /**
+   * Explicit pixel size, e.g. `"1024x1024"`. An alternative to
+   * {@link aspectRatio}; pass one or the other. If both are passed the provider
+   * decides which to honor and typically surfaces a warning (see
+   * {@link MotifImageResult.warnings}).
+   */
   size?: `${number}x${number}`;
   /** Number of images to generate. */
   n?: number;
+  /** Seed for reproducible generation, where the provider supports it. */
+  seed?: number;
+  /** Abort signal to cancel the in-flight request. */
+  signal?: AbortSignal;
   /**
    * Provider-specific options, passed straight through to the underlying model
    * as body parameters. Outer key = provider name, inner key = option name.
+   * Values must be JSON-representable; a non-JSON value (undefined, function,
+   * bigint, symbol) makes the call fail with a `MotifError`.
    */
   providerOptions?: Record<string, Record<string, unknown>>;
 }
 
 /** Options for a multi-image edit (images in → image out), with an optional mask. */
 export interface EditImageOptions {
-  /** Input images. Each is raw bytes, a base64 string, or a data URL. */
+  /**
+   * Input images. Each entry is raw bytes (`Uint8Array`) or a string. A string
+   * may be base64, a `data:` URL, OR a remote `http(s)://` URL. Remote URLs are
+   * FETCHED by the provider — and on some providers (e.g. OpenAI) that fetch
+   * happens from the local process running this SDK. Callers that accept
+   * untrusted URLs should fetch and validate the bytes themselves before
+   * passing them here (SSRF / local-network exposure otherwise).
+   */
   images: (Uint8Array | string)[];
   /** Natural-language edit instruction. */
   instruction: string;
-  /** Optional mask (bytes, base64, or data URL) constraining the edited region. */
+  /**
+   * Optional mask constraining the edited region. Same accepted forms as
+   * {@link EditImageOptions.images} (bytes, base64, `data:` URL, or a remote
+   * `http(s)://` URL that the provider fetches — see the images note on
+   * untrusted URLs). When multiple images are passed, the mask applies to
+   * `images[0]`.
+   */
   mask?: Uint8Array | string;
   /** Quality/latency tier. Ignored when `model` is set. */
   tier?: ImageTier;
@@ -109,6 +137,10 @@ export interface EditImageOptions {
   provider?: ImageProviderId;
   /** Number of images to generate. */
   n?: number;
+  /** Seed for reproducible generation, where the provider supports it. */
+  seed?: number;
+  /** Abort signal to cancel the in-flight request. */
+  signal?: AbortSignal;
   /** Provider-specific options (see {@link GenerateImageOptions.providerOptions}). */
   providerOptions?: Record<string, Record<string, unknown>>;
 }
@@ -132,6 +164,12 @@ export interface MotifImageResult {
   model: string;
   /** Provider correlation id, where the provider surfaces one. */
   requestId?: string;
+  /**
+   * Degraded-success warnings from the provider (a requested setting was
+   * ignored or adjusted — e.g. passing both `size` and `aspectRatio`). Each is a
+   * readable string. Omitted entirely when the provider returned none.
+   */
+  warnings?: readonly string[];
 }
 
 /** The provider-agnostic image client. Every method returns a Result — no throws. */

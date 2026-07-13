@@ -17,12 +17,13 @@
  */
 
 import { generateImage } from "ai";
-import type { GenerateImageResult, ImageModel, JSONValue } from "ai";
+import type { GenerateImageResult, ImageModel, JSONValue, Warning } from "ai";
 import { err, ok } from "neverthrow";
 import type { Result } from "neverthrow";
 
 import { MotifError } from "../server";
 import { costForImages } from "./cost";
+import type { MotifImageDeps } from "./deps";
 import { getProviderAdapter } from "./provider";
 import type {
   EditImageOptions,
@@ -57,19 +58,6 @@ export { costForImages, costFromProviderMetadata } from "./cost";
 
 const DEFAULT_TIER: ImageTier = "balanced";
 const DEFAULT_PROVIDER: ImageProviderId = "google";
-
-/** A model resolver: builds an AI SDK `ImageModel` for a (provider, model, key). */
-export type ResolveImageModel = (
-  provider: ImageProviderId,
-  modelId: string,
-  apiKey?: string
-) => ImageModel;
-
-/** Internal dependency-injection seam (default: real `generateImage` + adapters). */
-export interface MotifImageDeps {
-  generateImage?: typeof generateImage;
-  resolveModel?: ResolveImageModel;
-}
 
 /**
  * Create a provider-agnostic image client.
@@ -126,6 +114,8 @@ export function createMotifImage(
         ...(opts.aspectRatio === undefined
           ? {}
           : { aspectRatio: opts.aspectRatio }),
+        ...(opts.seed === undefined ? {} : { seed: opts.seed }),
+        ...(opts.signal === undefined ? {} : { abortSignal: opts.signal }),
         ...(opts.providerOptions === undefined
           ? {}
           : { providerOptions: toProviderOptions(opts.providerOptions) }),
@@ -151,6 +141,8 @@ export function createMotifImage(
           ...(opts.mask === undefined ? {} : { mask: opts.mask }),
         },
         ...(opts.n === undefined ? {} : { n: opts.n }),
+        ...(opts.seed === undefined ? {} : { seed: opts.seed }),
+        ...(opts.signal === undefined ? {} : { abortSignal: opts.signal }),
         ...(opts.providerOptions === undefined
           ? {}
           : { providerOptions: toProviderOptions(opts.providerOptions) }),
@@ -204,13 +196,35 @@ function toMotifImageResult(
     images.length
   );
   const requestId = extractRequestId(result);
+  // Degraded-success warnings from the provider (a setting was ignored or
+  // adjusted). Omit the field entirely when there are none.
+  const warnings = result.warnings.map(renderWarning);
   return {
     images,
     cost,
     provider,
     model,
     ...(requestId === undefined ? {} : { requestId }),
+    ...(warnings.length === 0 ? {} : { warnings }),
   };
+}
+
+/** Render an AI SDK `Warning` object into a readable one-line string. */
+function renderWarning(warning: Warning): string {
+  if (warning.type === "unsupported" || warning.type === "compatibility") {
+    const label =
+      warning.type === "unsupported"
+        ? "unsupported feature"
+        : "compatibility mode for feature";
+    return warning.details === undefined
+      ? `${label} "${warning.feature}"`
+      : `${label} "${warning.feature}": ${warning.details}`;
+  }
+  if (warning.type === "deprecated") {
+    return `deprecated setting "${warning.setting}": ${warning.message}`;
+  }
+  // Remaining variant: `{ type: "other", message }`.
+  return warning.message;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -255,8 +269,10 @@ function requestIdFromMetadata(providerMetadata: unknown): string | undefined {
 
 /**
  * Coerce a public `providerOptions` (values typed `unknown`) into the AI SDK's
- * JSON-only `Record<string, Record<string, JSONValue>>`, dropping non-JSON
- * values (functions, symbols, undefined) as `null`.
+ * JSON-only `Record<string, Record<string, JSONValue>>`. Fails fast: a
+ * non-JSON-representable value (undefined/function/bigint/symbol) throws a
+ * `MotifError` naming the offending path rather than silently forwarding a value
+ * the caller did not intend.
  */
 function toProviderOptions(
   input: Record<string, Record<string, unknown>>
@@ -265,14 +281,14 @@ function toProviderOptions(
   for (const [namespace, options] of Object.entries(input)) {
     const inner: Record<string, JSONValue> = {};
     for (const [key, value] of Object.entries(options)) {
-      inner[key] = toJsonValue(value);
+      inner[key] = toJsonValue(value, `providerOptions.${namespace}.${key}`);
     }
     out[namespace] = inner;
   }
   return out;
 }
 
-function toJsonValue(value: unknown): JSONValue {
+function toJsonValue(value: unknown, path: string): JSONValue {
   if (value === null) {
     return null;
   }
@@ -286,19 +302,22 @@ function toJsonValue(value: unknown): JSONValue {
   if (typeof value === "object") {
     if (Array.isArray(value)) {
       const arr: JSONValue[] = [];
-      for (const item of value) {
-        arr.push(toJsonValue(item));
+      for (const [index, item] of value.entries()) {
+        arr.push(toJsonValue(item, `${path}[${index}]`));
       }
       return arr;
     }
     const obj: Record<string, JSONValue> = {};
     for (const [key, entry] of Object.entries(value)) {
-      obj[key] = toJsonValue(entry);
+      obj[key] = toJsonValue(entry, `${path}.${key}`);
     }
     return obj;
   }
   // undefined, function, bigint, symbol → not JSON-representable.
-  return null;
+  throw new MotifError(
+    `providerOptions value at ${path} is not JSON-representable (type: ${typeof value})`,
+    0
+  );
 }
 
 /**

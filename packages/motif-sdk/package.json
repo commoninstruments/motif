@@ -42,8 +42,8 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "dev": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup --watch",
     "lint": "howells-check .",
     "lint:fix": "howells-fix .",
     "typecheck": "tsc --noEmit",
