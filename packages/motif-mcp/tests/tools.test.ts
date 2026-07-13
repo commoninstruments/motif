@@ -55,6 +55,14 @@ function makeErr(message: string) {
   };
 }
 
+function makeErrWithRequestId(message: string, requestId: string) {
+  return {
+    error: { code: "GENERATION_FAILED", message, requestId },
+    isErr: () => true,
+    isOk: () => false,
+  };
+}
+
 const MOCK_IMAGES = [
   { height: 1024, url: "https://fal.media/img.png", width: 1024 },
 ];
@@ -115,6 +123,7 @@ interface ToolResponsePayload {
   seed: number;
   suggestions: string[];
   total: number;
+  trace_id?: string;
 }
 
 /** Return the text of the first content block, failing loudly otherwise. */
@@ -493,6 +502,37 @@ describe("generate tool", () => {
       is_retriable: true,
       message: "fal.ai 502",
     });
+  });
+
+  it("omits trace_id when the error carries no fal request id", async () => {
+    const motif = makeMockMotif();
+    motif.generate.mockResolvedValue(makeErr("fal.ai 502"));
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      arguments: { prompt: "a fox" },
+      name: "generate",
+    });
+
+    const parsed = parseToolResponse(result);
+    expect(parsed).not.toHaveProperty("trace_id");
+  });
+
+  it("surfaces fal's request id as trace_id when generate fails", async () => {
+    const motif = makeMockMotif();
+    motif.generate.mockResolvedValue(
+      makeErrWithRequestId("fal.ai 500", "req_fal_err_789")
+    );
+    const client = await makeClient(motif);
+
+    const result = await client.callTool({
+      arguments: { prompt: "a fox" },
+      name: "generate",
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = parseToolResponse(result);
+    expect(parsed.trace_id).toBe("req_fal_err_789");
   });
 });
 

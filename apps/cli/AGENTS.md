@@ -72,6 +72,8 @@ motif auto-detects the output context:
 }
 ```
 
+Structured errors include an `instance` field (an `urn:fal:request:<id>` URN) when the failure originated at fal, letting agents tie a failure back to fal's dashboard/support.
+
 Error codes are grouped below. Every code the CLI can emit is listed; the live catalog is available from `motif --describe --format json`.
 
 - General: `MISSING_API_KEY`, `UNKNOWN_MODEL`, `INVALID_MODEL_ID`, `INVALID_OPTION`, `INVALID_OUTPUT_PATH`, `INVALID_EDIT_PATH`, `INVALID_IMAGE_PATH`, `INVALID_STDIN`, `EMPTY_PROMPT`, `TOO_MANY_REFERENCES`, `NO_PREVIOUS`, `GENERATION_FAILED`, `UPSCALE_FAILED`, `RMBG_FAILED`, `VIDEO_FAILED`, `DESCRIBE_FAILED`.

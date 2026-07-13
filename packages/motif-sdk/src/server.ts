@@ -10,6 +10,7 @@ import {
   parseImages,
   parseLogs,
   parseQueueSubmission,
+  requestIdFromBody,
   toHeaderRecord,
   toMotifImage,
 } from "./fal-parse";
@@ -134,9 +135,8 @@ export class MotifServer {
       }
 
       if (status.value.status === "failed") {
-        return err(
-          new MotifError(status.value.error ?? "Queued generation failed", 0)
-        );
+        const message = status.value.error ?? "Queued generation failed";
+        return err(new MotifError(message, 0, undefined, job.value.requestId));
       }
 
       await new Promise((resolve) => {
@@ -644,11 +644,11 @@ export class MotifServer {
 
         if (!response.ok) {
           const text = await response.text();
+          const message = `Request failed: ${response.status} ${text}`;
+          const requestId =
+            response.headers.get("x-fal-request-id") ?? requestIdFromBody(text);
           return err(
-            new MotifError(
-              `Request failed: ${response.status} ${text}`,
-              response.status
-            )
+            new MotifError(message, response.status, undefined, requestId)
           );
         }
 
@@ -724,12 +724,21 @@ export class MotifServer {
 export class MotifError extends Error {
   readonly status: number;
   readonly code?: string;
+  /** fal's request-correlation id (from the `x-fal-request-id` header or the
+   * error body). Ties a failure back to fal's dashboard/support. */
+  readonly requestId?: string;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    requestId?: string
+  ) {
     super(message);
     this.name = "MotifError";
     this.status = status;
     this.code = code;
+    this.requestId = requestId;
   }
 }
 

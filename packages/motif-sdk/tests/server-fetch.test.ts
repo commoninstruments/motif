@@ -180,6 +180,51 @@ describe("MotifServer fetch integration", () => {
     expect(request.headers.Authorization).toBe("Key test-key");
   });
 
+  it("surfaces fal's x-fal-request-id header on error results", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "internal error" }), {
+          headers: { "x-fal-request-id": "req_fal_err_789" },
+          status: 500,
+        })
+      )
+    );
+
+    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const result = await motif.generate({
+      model: "gpt",
+      prompt: "a red balloon",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result.isErr() ? result.error : undefined;
+    expect(error?.requestId).toBe("req_fal_err_789");
+    expect(error?.status).toBe(500);
+  });
+
+  it("leaves requestId undefined when fal sends no correlation id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("upstream unavailable", {
+          status: 503,
+        })
+      )
+    );
+
+    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const result = await motif.generate({
+      model: "gpt",
+      prompt: "a red balloon",
+    });
+
+    expect(result.isErr()).toBe(true);
+    const error = result.isErr() ? result.error : undefined;
+    expect(error).toBeDefined();
+    expect(error?.requestId).toBeUndefined();
+  });
+
   it("sends normalized fal utility tool requests", async () => {
     vi.stubGlobal(
       "fetch",

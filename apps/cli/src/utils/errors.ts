@@ -1,7 +1,17 @@
+import { MotifError } from "@howells/motif-sdk";
+
 import { getErrorMetadata } from "./error-catalog";
 import { validateOutputPath } from "./input";
 import { emitError } from "./output";
 import type { OutputFormat } from "./output";
+
+/** Build the RFC 7807 `instance` URN from a fal request id, if the error carries one. */
+function instanceForError(err: unknown): string | undefined {
+  if (err instanceof MotifError && err.requestId !== undefined) {
+    return `urn:fal:request:${err.requestId}`;
+  }
+  return undefined;
+}
 
 /** Map a catalog HTTP-style status to a semantic process exit code. */
 export function exitCodeForStatus(status: number): number {
@@ -103,6 +113,7 @@ export function handleError(
       code,
       details: getStructuredDetails(err),
       doc_uri: metadata.docUri,
+      instance: instanceForError(err),
       is_retriable: metadata.isRetriable,
       message: getErrorMessage(err),
       status: metadata.status,

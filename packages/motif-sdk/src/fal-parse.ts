@@ -117,3 +117,27 @@ export function toHeaderRecord(
   }
   return headers;
 }
+
+/**
+ * Extract fal's request-correlation id from a non-OK error body.
+ *
+ * fal error payloads sometimes carry the id under `request_id`, `requestId`,
+ * or `trace_id`. Used as a fallback when the `x-fal-request-id` response header
+ * is absent; returns `undefined` if the body is not cleanly parseable.
+ */
+export function requestIdFromBody(text: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(parsed)) {
+    return undefined;
+  }
+  return (
+    asString(parsed.request_id) ??
+    asString(parsed.requestId) ??
+    asString(parsed.trace_id)
+  );
+}

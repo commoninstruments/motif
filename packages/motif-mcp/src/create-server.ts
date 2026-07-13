@@ -188,6 +188,7 @@ function toolError(
   options: {
     isRetriable?: boolean;
     suggestions?: string[];
+    traceId?: string;
   } = {}
 ) {
   const structured = {
@@ -196,6 +197,7 @@ function toolError(
     is_retriable: options.isRetriable ?? false,
     message,
     suggestions: options.suggestions ?? [],
+    ...(options.traceId === undefined ? {} : { trace_id: options.traceId }),
   };
 
   return {
@@ -819,6 +821,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
             "Check that FAL_KEY is valid.",
             "Try a cheaper or simpler model if fal rejects the request.",
           ],
+          traceId: result.error.requestId,
         });
       }
 
@@ -861,6 +864,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         return toolError("UPSCALE_FAILED", result.error.message, {
           isRetriable: true,
           suggestions: ["Check the input image URL and retry."],
+          traceId: result.error.requestId,
         });
       }
 
@@ -903,6 +907,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
         return toolError("REMOVE_BACKGROUND_FAILED", result.error.message, {
           isRetriable: true,
           suggestions: ["Check the input image URL and retry."],
+          traceId: result.error.requestId,
         });
       }
 
@@ -960,6 +965,7 @@ export function createMotifMcpServer(motif: MotifServer): Server {
             "Check that each reference URL is reachable.",
             "Try a model that supports image editing.",
           ],
+          traceId: result.error.requestId,
         });
       }
 

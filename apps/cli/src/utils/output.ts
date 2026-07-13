@@ -127,6 +127,9 @@ export interface StructuredError {
   message: string;
   /** Additional context */
   details?: unknown;
+  /** RFC 7807 `instance` — a URI identifying this specific occurrence. Set to
+   * the fal request URN when a failure originated at fal. */
+  instance?: string;
   /** Stable local documentation pointer for this error code */
   doc_uri: string;
   /** Sentinel: always true */
@@ -163,6 +166,7 @@ export function emitError(
     message: string;
     details?: unknown;
     doc_uri?: string;
+    instance?: string;
     is_retriable?: boolean;
     suggestions?: string[];
     /** RFC 7807 fields — auto-derived from code if omitted */
@@ -193,6 +197,7 @@ export function emitError(
     code: error.code,
     message: error.message,
     ...(hasDetails ? { details: error.details } : {}),
+    ...(hasText(error.instance) ? { instance: error.instance } : {}),
     is_retriable: error.is_retriable ?? metadata.isRetriable,
     ...(error.suggestions || metadata.suggestions
       ? { suggestions: error.suggestions ?? metadata.suggestions }
