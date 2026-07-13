@@ -161,6 +161,8 @@ describe("package smoke", () => {
     );
     expectPublicPackage(sdkPack, [
       "README.md",
+      "dist/image.d.ts",
+      "dist/image.js",
       "dist/index.cjs",
       "dist/index.d.cts",
       "dist/index.d.ts",

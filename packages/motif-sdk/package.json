@@ -32,14 +32,18 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./image": {
+      "types": "./dist/image.d.ts",
+      "import": "./dist/image.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "lint": "howells-check .",
     "lint:fix": "howells-fix .",
     "typecheck": "tsc --noEmit",
@@ -49,7 +53,9 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.12",
     "@howells/envy": "^0.3.7",
+    "ai": "^7.0.22",
     "neverthrow": "^8.2.0",
     "zod": "^4.4.3"
   },
