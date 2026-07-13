@@ -681,9 +681,9 @@ const TOOLS = [
  * The caller owns the `MotifServer` instance and chooses stdio, in-memory, or
  * another MCP transport; this factory only registers Motif resources and tools.
  */
-// oxlint-disable-next-line no-deprecated -- Server → McpServer migration tracked separately; low-level Server is still supported in SDK 1.x
+// oxlint-disable-next-line no-deprecated -- Deliberate, not pending: the SDK's own deprecation note blesses the low-level Server for "advanced use cases", which this is. McpServer.registerTool requires zod (ZodRawShapeCompat) schemas; adopting it would add a zod runtime dependency to this lean package and rewrite every hand-authored tool schema — schemas that are derived from the SDK model registry and mirrored byte-for-byte by `motif --describe`. The low-level Server keeps that single source of truth. Revisit only if the SDK hard-removes Server.
 export function createMotifMcpServer(motif: MotifServer): Server {
-  // oxlint-disable-next-line no-deprecated -- Server → McpServer migration tracked separately; low-level Server is still supported in SDK 1.x
+  // oxlint-disable-next-line no-deprecated -- See createMotifMcpServer note above: deliberate low-level Server use.
   const server = new Server(
     { name: "motif", version: "1.0.0" },
     { capabilities: { resources: {}, tools: {} } }

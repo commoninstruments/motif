@@ -108,8 +108,14 @@ export function App({
               setScreen("home");
             }}
             onSave={async (newConfig) => {
-              await onConfigChange(newConfig);
-              setScreen("home");
+              try {
+                await onConfigChange(newConfig);
+                setScreen("home");
+              } catch (error) {
+                handleError(
+                  error instanceof Error ? error : new Error(String(error))
+                );
+              }
             }}
           />
         );

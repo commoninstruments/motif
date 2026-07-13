@@ -121,8 +121,9 @@ export function SettingsScreen({
     }
 
     if (input === "s") {
-      // Save settings — fire-and-forget; useInput handlers cannot be async and
-      // the save result is surfaced via onSave's own effects.
+      // Save settings — useInput handlers cannot be async, so the promise is
+      // not awaited here; the parent's onSave catches failures and surfaces
+      // them through the shared error banner.
       void onSave(localConfig);
     }
   });
