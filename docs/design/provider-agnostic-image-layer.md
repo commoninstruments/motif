@@ -47,21 +47,34 @@ editing** (render-room, apply-texture), plus best-of-N + LLM judge.
   best-of-N judge.
 - Not segmentation/SAM3 — that stays in `@materia/vision` (fal SAM3 + Gemini boxes).
 
-## 3. Packaging decision (needs sign-off)
+## 3. Packaging decision — DECIDED: evolve `@howells/motif-sdk` (option B)
 
-`@howells/motif-sdk` is fal-specific: fal endpoints, fal queue, fal request shaping, a
-fal-priced model registry. Three options:
+`@howells/motif-sdk` becomes the provider-agnostic image gen+edit layer; fal folds to one
+adapter among several. (Considered and rejected: a separate `@howells/motif-image` package,
+or folding into `@howells/ai` — B gives the cleanest single home and name.)
 
-- **A. New package `@howells/motif-image`** (recommended). A clean AI-SDK-based layer;
-  `@howells/motif-sdk` stays the fal specialist and can later be consumed as one provider
-  adapter. No disruption to published motif-sdk consumers.
-- **B. Evolve `@howells/motif-sdk`** into the multi-provider layer, folding fal to one
-  adapter. Cleanest long-term name, but a large breaking change to a published package.
-- **C. Fold into `@howells/ai`** as an image sub-export. Maximum ecosystem consistency,
-  but couples image gen to the text client's release cadence and scope.
+Because motif-sdk is already published (0.6.0) with a fal-specific public API and two
+in-repo consumers (`@howells/motif-cli`, `@howells/motif-mcp`), B is executed **additively
+first, breaking later**:
 
-Recommendation: **A** now, with the option to rename toward **B** once proven. Open for
-your call — it's mostly a naming/coupling decision.
+1. **Add** the new provider-agnostic layer (`createMotifImage`, `generate`/`edit`) as NEW
+   exports alongside the existing `MotifServer`/fal surface. Ships as an additive minor
+   (0.7.0). Nothing breaks; consumers untouched.
+2. **Adapter-ize fal**: reimplement the fal paths behind the new provider interface so fal
+   is one adapter. Keep the old `MotifServer` exports working as a thin facade (deprecated)
+   during migration.
+3. **Migrate consumers** (CLI, MCP) to the new API, then remove the deprecated facade in a
+   later, deliberate breaking release (1.0).
+
+This keeps the published package stable while the new layer proves out.
+
+**ESM constraint (verified):** `ai@7` is ESM-only (no CJS export); `@howells/motif-sdk`
+currently ships dual CJS+ESM. To avoid breaking CJS consumers, the new layer ships as an
+**ESM-only subpath export** `@howells/motif-sdk/image` (its own tsup entry, `--format esm`),
+while the core `.` entry keeps its dual build untouched. Anyone importing `ai@7` is already
+ESM, so the subpath being ESM-only costs nothing. When fal folds into the adapter model
+later and the whole package can go ESM-only (a 1.0 breaking release), the subpath collapses
+back into the core.
 
 ## 4. Proposed API
 
@@ -137,13 +150,18 @@ Region-inpaint and segmentation stay in `@materia/vision`. This is a within-pack
 low blast radius. (Note: materia's working tree has an untracked-files/pull situation to
 resolve before touching it — a prerequisite, not part of this design.)
 
-## 8. Phasing
+## 8. Phasing (option B — additive first)
 
-- **1a — core layer**: `createMotifImage`, `generate` + `edit` (multi-image + mask) on the
-  Google provider, Result types, cost tracking, tests (mock the AI SDK image model).
-- **1b — providers**: fal / openai / replicate adapters + per-model overrides; tiering.
-- **1c — best-of-N + judge**: parallel N + judge (judge via `@howells/ai`).
-- **1d — materia integration**: swap `render-image.ts` internals; verify render-room and
+- **1a — core layer, additive in motif-sdk**: `createMotifImage`, `generate` + `edit`
+  (multi-image + mask) on the Google provider, Result types (reuse `MotifError`), cost
+  tracking, tests (mock the AI SDK image model). NEW exports only — `MotifServer`/fal
+  surface untouched. Ships motif-sdk 0.7.0. Adds `ai` + `@ai-sdk/google` deps.
+- **1b — providers**: openai / replicate adapters + per-model overrides; tiering.
+- **1c — fal as adapter**: reimplement fal behind the provider interface; keep the old
+  `MotifServer` as a deprecated facade.
+- **1d — best-of-N + judge**: parallel N + judge (judge via `@howells/ai`).
+- **1e — consumer migration**: CLI/MCP to the new API; later remove the fal facade (1.0).
+- **1f — materia integration**: swap `render-image.ts` internals; verify render-room and
   apply-texture unchanged; wire cost metering.
 
 ## 9. Open questions / risks
