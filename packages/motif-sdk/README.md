@@ -172,6 +172,34 @@ Four providers are implemented, each reading its own API key from the environmen
 
 `generate()` and `edit()` accept `tier` (`"fast" | "balanced" | "quality" | "hero"`) to resolve a model per provider, or an explicit `model` id. Every result carries a normalized per-call `cost: { usd, source }`.
 
+### Best-of-N with an injectable judge
+
+`bestOfN()` generates `n` candidates in parallel and picks a winner. It reuses the same options as `generate()` (text→image) or `edit()` (pass `images` for the edit path), plus `n` and an optional `judge`. When a `seed` is given each candidate uses `seed + index`, so the N vary. The judge is a caller-provided function — the layer takes no text-client dependency, so it pairs well with `@howells/ai`'s vision client but does not require it. Omit the judge and candidate 0 wins.
+
+```ts
+const best = await img.bestOfN({
+  prompt: "a plain room, bare concrete wall",
+  n: 4,
+  seed: 100, // candidates get seeds 100, 101, 102, 103
+  // Caller-provided judge: receives the successful candidates + context,
+  // returns the winning index. Wire in @howells/ai here if you want a vision judge.
+  judge: async (candidates, context) => {
+    // ...score candidates[i].images[0] against context.prompt...
+    return { index: 0, reason: "sharpest wall texture" };
+  },
+});
+
+if (best.isOk()) {
+  best.value.best; // the winning MotifImageResult
+  best.value.chosenIndex; // its index within candidates
+  best.value.reason; // the judge's rationale, if any
+  best.value.candidates; // every successful candidate (generation order)
+  best.value.totalCostUsd; // summed USD across all candidates generated
+}
+```
+
+If some candidates fail, the judge sees only the survivors; if all `n` fail, `bestOfN()` returns `Result.err`.
+
 ## Testing
 
 ```bash

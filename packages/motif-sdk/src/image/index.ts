@@ -26,6 +26,8 @@ import { costForImages } from "./cost";
 import type { MotifImageDeps } from "./deps";
 import { getProviderAdapter } from "./provider";
 import type {
+  BestOfNOptions,
+  BestOfNResult,
   EditImageOptions,
   GenerateImageOptions,
   ImageProviderId,
@@ -37,10 +39,13 @@ import type {
 } from "./types";
 
 export type {
+  BestOfNOptions,
+  BestOfNResult,
   EditImageOptions,
   GenerateImageOptions,
   ImageCost,
   ImageCostSource,
+  ImageJudge,
   ImageProviderId,
   ImageTier,
   MotifImageClient,
@@ -153,7 +158,151 @@ export function createMotifImage(
     }
   }
 
-  return { generate, edit };
+  async function bestOfN(
+    opts: BestOfNOptions
+  ): Promise<Result<BestOfNResult, MotifError>> {
+    return await runBestOfN(opts, generate, edit);
+  }
+
+  return { generate, edit, bestOfN };
+}
+
+/**
+ * Fire one best-of-N candidate: reuse `generate`/`edit` (discriminated by the
+ * presence of `images`, narrowed inline so TS refines the union). Each candidate
+ * makes a single image (`n: 1`) — the outer `n` is the candidate count, not the
+ * per-call image count — and takes a distinct `seed` (`seed + index`) when a seed
+ * was given, so the N vary. `opts.signal` rides along via the spread, so one
+ * cancel aborts every candidate.
+ */
+async function runCandidate(
+  opts: BestOfNOptions,
+  index: number,
+  generate: (
+    opts: GenerateImageOptions
+  ) => Promise<Result<MotifImageResult, MotifError>>,
+  edit: (
+    opts: EditImageOptions
+  ) => Promise<Result<MotifImageResult, MotifError>>
+): Promise<Result<MotifImageResult, MotifError>> {
+  const candidateSeed = opts.seed === undefined ? undefined : opts.seed + index;
+  const overrides = {
+    n: 1,
+    ...(candidateSeed === undefined ? {} : { seed: candidateSeed }),
+  };
+  if ("images" in opts) {
+    return await edit({ ...opts, ...overrides });
+  }
+  return await generate({ ...opts, ...overrides });
+}
+
+/** Ask the judge to pick a winner and validate its index; no judge → index 0. */
+async function selectWinner(
+  opts: BestOfNOptions,
+  candidates: readonly MotifImageResult[]
+): Promise<Result<{ chosenIndex: number; reason?: string }, MotifError>> {
+  const { judge } = opts;
+  if (judge === undefined) {
+    return ok({ chosenIndex: 0 });
+  }
+  const context =
+    "images" in opts
+      ? { instruction: opts.instruction }
+      : { prompt: opts.prompt };
+  const decision = await judge(candidates, context);
+  if (
+    !Number.isInteger(decision.index) ||
+    decision.index < 0 ||
+    decision.index >= candidates.length
+  ) {
+    return err(
+      new MotifError(
+        `bestOfN judge returned an out-of-range index ${decision.index} (expected 0..${candidates.length - 1})`,
+        0
+      )
+    );
+  }
+  return ok({
+    chosenIndex: decision.index,
+    ...(decision.reason === undefined ? {} : { reason: decision.reason }),
+  });
+}
+
+/**
+ * Best-of-N: generate `n` candidates in parallel, keep the successes, and pick a
+ * winner via the (optional, injectable) judge. Wraps everything so no throw
+ * escapes — any failure becomes a `Result.err`.
+ */
+async function runBestOfN(
+  opts: BestOfNOptions,
+  generate: (
+    opts: GenerateImageOptions
+  ) => Promise<Result<MotifImageResult, MotifError>>,
+  edit: (
+    opts: EditImageOptions
+  ) => Promise<Result<MotifImageResult, MotifError>>
+): Promise<Result<BestOfNResult, MotifError>> {
+  try {
+    const { n } = opts;
+    if (!Number.isInteger(n) || n < 1) {
+      return err(
+        new MotifError(`bestOfN requires an integer n >= 1 (got ${n})`, 0)
+      );
+    }
+
+    const results = await Promise.all(
+      Array.from({ length: n }, (_unused, index) => index).map(
+        async (index) => await runCandidate(opts, index, generate, edit)
+      )
+    );
+
+    // Collect successes (generation order); remember the first failure so we can
+    // surface it if every candidate failed.
+    const candidates: MotifImageResult[] = [];
+    let firstError: MotifError | undefined;
+    for (const result of results) {
+      if (result.isOk()) {
+        candidates.push(result.value);
+      } else {
+        firstError ??= result.error;
+      }
+    }
+
+    if (candidates.length === 0) {
+      return err(
+        firstError ?? new MotifError(`all ${n} bestOfN candidates failed`, 0)
+      );
+    }
+
+    const winner = await selectWinner(opts, candidates);
+    if (winner.isErr()) {
+      return err(winner.error);
+    }
+    const { chosenIndex, reason } = winner.value;
+
+    const best = candidates[chosenIndex];
+    if (best === undefined) {
+      // Unreachable: chosenIndex is validated in range (or 0 with ≥1 candidate).
+      // Guarded for exactness — no non-null assertion.
+      return err(new MotifError("bestOfN failed to resolve a winner", 0));
+    }
+
+    const totalCostUsd = Number(
+      candidates
+        .reduce((sum, candidate) => sum + candidate.cost.usd, 0)
+        .toFixed(6)
+    );
+
+    return ok({
+      best,
+      chosenIndex,
+      ...(reason === undefined ? {} : { reason }),
+      candidates,
+      totalCostUsd,
+    });
+  } catch (error) {
+    return err(toMotifError(error));
+  }
 }
 
 /** Default provider dispatch: resolve the model through the provider registry. */

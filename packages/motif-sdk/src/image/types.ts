@@ -172,6 +172,49 @@ export interface MotifImageResult {
   warnings?: readonly string[];
 }
 
+/**
+ * Picks the winning candidate for a {@link MotifImageClient.bestOfN} call.
+ *
+ * Receives the successful candidates (index-aligned to
+ * {@link BestOfNResult.candidates}) and the request context, and returns the
+ * chosen index (plus an optional human-readable reason). May be sync or async.
+ * The judge is caller-provided so the image layer stays decoupled from any text
+ * client — it pairs well with `@howells/ai`'s vision client, but that dependency
+ * is not required.
+ */
+export type ImageJudge = (
+  candidates: readonly MotifImageResult[],
+  context: { readonly prompt?: string; readonly instruction?: string }
+) =>
+  | Promise<{ index: number; reason?: string }>
+  | { index: number; reason?: string };
+
+/**
+ * Options for a best-of-N generation. Extends either {@link GenerateImageOptions}
+ * (text→image) or {@link EditImageOptions} (multi-image edit) — the presence of
+ * `images` selects the edit path — with the candidate count and an optional judge.
+ */
+export type BestOfNOptions = (GenerateImageOptions | EditImageOptions) & {
+  /** How many candidates to generate (>= 1). */
+  n: number;
+  /** Chooses the winner. Omit → candidate 0 wins. */
+  judge?: ImageJudge;
+};
+
+/** Result of a {@link MotifImageClient.bestOfN} call. */
+export interface BestOfNResult {
+  /** The winning candidate (its single-image {@link MotifImageResult}). */
+  best: MotifImageResult;
+  /** The index of `best` within `candidates`. */
+  chosenIndex: number;
+  /** Judge's rationale, if it returned one. */
+  reason?: string;
+  /** All successful candidates, in generation order. */
+  candidates: readonly MotifImageResult[];
+  /** Total USD across all candidates that were generated (successes only). */
+  totalCostUsd: number;
+}
+
 /** The provider-agnostic image client. Every method returns a Result — no throws. */
 export interface MotifImageClient {
   /** Text→image generation. */
@@ -182,4 +225,10 @@ export interface MotifImageClient {
   edit: (
     opts: EditImageOptions
   ) => Promise<Result<MotifImageResult, MotifError>>;
+  /**
+   * Generate N candidates (in parallel) and pick the best via an optional
+   * injectable judge. Discriminates generate vs edit by the presence of
+   * `images`. Returns the winner plus all successful candidates and total spend.
+   */
+  bestOfN: (opts: BestOfNOptions) => Promise<Result<BestOfNResult, MotifError>>;
 }

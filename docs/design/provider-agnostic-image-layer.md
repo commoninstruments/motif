@@ -161,7 +161,13 @@ resolve before touching it — a prerequisite, not part of this design.)
   per-model `providerOptions` overrides for endpoint quirks; tiering per provider. This
   is the additive, non-breaking completion of the four-provider image layer — the fal
   *image adapter* here is distinct from the heavier `MotifServer` fold below.
-- **1c — best-of-N + judge**: parallel N + judge (judge via `@howells/ai`).
+- **1c — best-of-N + judge**: parallel N generations + an **injectable** judge that
+  picks the winner. Decision: the judge is a caller-provided function
+  (`ImageJudge`), NOT a hard `@howells/ai` dependency — this keeps the image layer
+  decoupled from the text client, lets Material Desk pass its existing
+  `judge-render.ts`, and lets anyone wire `@howells/ai` into a judge without the SDK
+  taking the dep. No judge → returns candidate 0. Distinct `seed` per candidate when a
+  seed is given (variation is the point of N).
 - **1d — MotifServer → adapter (1.0, breaking)**: fold the rich fal client (queue, upload,
   upscale, rmbg, video, tools) into the provider model; keep the old `MotifServer` as a
   deprecated facade; migrate CLI/MCP; remove the facade at 1.0. Deliberate, not automatic —

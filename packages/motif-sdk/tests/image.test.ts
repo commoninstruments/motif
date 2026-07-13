@@ -730,6 +730,296 @@ describe.each(PROVIDER_CASES)(
   }
 );
 
+/**
+ * State captured across candidate calls by {@link countingImageModel}: a shared
+ * call counter (so each candidate returns DISTINCT bytes), plus the seed, file
+ * presence, mask presence, and abort signal each candidate's `doGenerate` saw.
+ */
+interface CountingState {
+  calls: number;
+  /** 1-based call number that should throw (simulates a partial failure). */
+  throwOnCall?: number;
+  seeds: (number | undefined)[];
+  sawFiles: boolean[];
+  sawMask: boolean[];
+  signals: (AbortSignal | undefined)[];
+}
+
+/**
+ * A fake `ImageModel` that returns DISTINCT bytes per call (keyed off a shared
+ * call counter) so best-of-N candidates are distinguishable, and records the
+ * seed / files / mask / abortSignal each call saw. All candidates share one
+ * `CountingState` so the whole fan-out is observable from the test.
+ */
+function countingImageModel(state: CountingState): ImageModel {
+  return {
+    specificationVersion: "v4",
+    provider: "google",
+    modelId: "fake",
+    maxImagesPerCall: 4,
+    async doGenerate(options: DoGenerateOptions) {
+      await Promise.resolve();
+      const callNo = (state.calls += 1);
+      state.seeds.push(options.seed);
+      state.sawFiles.push(options.files !== undefined);
+      state.sawMask.push(options.mask !== undefined);
+      state.signals.push(options.abortSignal);
+      if (state.throwOnCall === callNo) {
+        throw new Error(`fake failure on call ${callNo}`);
+      }
+      // Full PNG signature (so the media type is detected) plus a trailing byte
+      // unique to this call, making every candidate's bytes distinct.
+      return {
+        images: [
+          new Uint8Array([
+            0x89,
+            0x50,
+            0x4e,
+            0x47,
+            0x0d,
+            0x0a,
+            0x1a,
+            0x0a,
+            callNo,
+          ]),
+        ],
+        warnings: [],
+        response: {
+          timestamp: new Date(0),
+          modelId: "fake",
+          headers: undefined,
+        },
+      };
+    },
+  };
+}
+
+function newCountingState(
+  overrides: Partial<CountingState> = {}
+): CountingState {
+  return {
+    calls: 0,
+    seeds: [],
+    sawFiles: [],
+    sawMask: [],
+    signals: [],
+    ...overrides,
+  };
+}
+
+describe("createMotifImage.bestOfN", () => {
+  it("generates n candidates and lets a judge pick the winner", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      prompt: "a bare concrete wall",
+      n: 3,
+      judge: (candidates) => {
+        expect(candidates).toHaveLength(3);
+        return { index: 1, reason: "second is sharpest" };
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      const { value } = result;
+      expect(value.candidates).toHaveLength(3);
+      expect(value.chosenIndex).toBe(1);
+      expect(value.best).toBe(value.candidates[1]);
+      expect(value.reason).toBe("second is sharpest");
+      // balanced google default = gemini-3.1-flash-image-preview @ $0.039/image.
+      expect(value.totalCostUsd).toBeCloseTo(0.117, 6);
+      // Candidates are distinguishable: distinct trailing bytes per call.
+      const trailingBytes = value.candidates.map((candidate) =>
+        candidate.images[0]?.uint8Array.at(-1)
+      );
+      expect(new Set(trailingBytes).size).toBe(3);
+    }
+  });
+
+  it("defaults chosenIndex to 0 when no judge is given", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({ prompt: "x", n: 2 });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.chosenIndex).toBe(0);
+      expect(result.value.reason).toBeUndefined();
+      expect(result.value.best).toBe(result.value.candidates[0]);
+    }
+  });
+
+  it("routes an images-bearing request through the edit path", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      images: [new Uint8Array([1, 2, 3])],
+      instruction: "apply the oak texture",
+      mask: new Uint8Array([4, 5, 6]),
+      n: 2,
+      judge: (_candidates, context) => {
+        expect(context.instruction).toBe("apply the oak texture");
+        expect(context.prompt).toBeUndefined();
+        return { index: 0 };
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    // Every candidate went through the edit path: files + mask reached the model.
+    expect(state.sawFiles).toHaveLength(2);
+    expect(state.sawFiles.every(Boolean)).toBe(true);
+    expect(state.sawMask.every(Boolean)).toBe(true);
+  });
+
+  it("passes a distinct seed (seed + index) to each candidate", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({ prompt: "x", n: 3, seed: 100 });
+
+    expect(result.isOk()).toBe(true);
+    // Order across the parallel fan-out is not guaranteed; assert the set.
+    expect([...state.seeds].sort((a, b) => Number(a) - Number(b))).toEqual([
+      100, 101, 102,
+    ]);
+  });
+
+  it("judges among the successes when some candidates fail", async () => {
+    const state = newCountingState({ throwOnCall: 2 });
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      prompt: "x",
+      n: 3,
+      judge: (candidates) => {
+        // One of three candidates failed; the judge sees only the survivors.
+        expect(candidates).toHaveLength(2);
+        return { index: 0 };
+      },
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.candidates).toHaveLength(2);
+      // Two successes @ $0.039 each.
+      expect(result.value.totalCostUsd).toBeCloseTo(0.078, 6);
+    }
+  });
+
+  it("returns Result.err when every candidate fails", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel({ throwErr: true }) }
+    );
+
+    const result = await img.bestOfN({ prompt: "x", n: 2 });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+    }
+  });
+
+  it("returns Result.err when the judge throws", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      prompt: "x",
+      n: 2,
+      judge: () => {
+        throw new Error("judge blew up");
+      },
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+      expect(result.error.message).toContain("judge blew up");
+    }
+  });
+
+  it("returns Result.err when the judge picks an out-of-range index", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      prompt: "x",
+      n: 3,
+      judge: () => ({ index: 5 }),
+    });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+      expect(result.error.message).toContain("out-of-range");
+    }
+  });
+
+  it("returns Result.err for a non-positive n", async () => {
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({ prompt: "x", n: 0 });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+    }
+    // No candidate calls were made.
+    expect(state.calls).toBe(0);
+  });
+
+  it("forwards the abort signal to every candidate call", async () => {
+    const controller = new AbortController();
+    const state = newCountingState();
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      { resolveModel: () => countingImageModel(state) }
+    );
+
+    const result = await img.bestOfN({
+      prompt: "x",
+      n: 3,
+      signal: controller.signal,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(state.signals).toHaveLength(3);
+    expect(state.signals.every((signal) => signal === controller.signal)).toBe(
+      true
+    );
+  });
+});
+
 describe("image provider registry", () => {
   it("contains all four providers, each keyed by its own id", () => {
     const ids: ImageProviderId[] = ["google", "openai", "replicate", "fal"];
