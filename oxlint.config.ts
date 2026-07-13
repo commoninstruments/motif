@@ -124,9 +124,14 @@ export default {
       // resolution boundary.
       files: [
         "packages/motif-sdk/src/env.ts",
-        // Provider-agnostic image layer's Google adapter resolves
-        // GOOGLE_GENERATIVE_AI_API_KEY as its env-access boundary.
+        // Provider-agnostic image layer's per-provider adapters each resolve
+        // their own API key env var as their env-access boundary
+        // (GOOGLE_GENERATIVE_AI_API_KEY / OPENAI_API_KEY / REPLICATE_API_TOKEN /
+        // FAL_KEY).
         "packages/motif-sdk/src/image/google.ts",
+        "packages/motif-sdk/src/image/openai.ts",
+        "packages/motif-sdk/src/image/replicate.ts",
+        "packages/motif-sdk/src/image/fal.ts",
         "apps/cli/src/api/fal.ts",
         "apps/cli/src/utils/image.ts",
       ],

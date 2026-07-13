@@ -1,7 +1,7 @@
 import type { GenerateImageResult, ImageModel } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { createMotifImage } from "../src/image/index";
+import { createMotifImage, PROVIDERS } from "../src/image/index";
 import type {
   ImageProviderId,
   ImageTier,
@@ -288,5 +288,177 @@ describe("createMotifImage.edit", () => {
       expect(result.value.images).toHaveLength(1);
       expect(result.value.provider).toBe("google");
     }
+  });
+});
+
+/**
+ * Phase 1b providers. Each case documents its tier→model map, the balanced-tier
+ * default model, its static table price for that model, and the env var its real
+ * adapter reads. All exercised offline via the injected fake `resolveModel`
+ * (dispatch/cost) or the real adapter with the env var removed (missing-key).
+ */
+interface ProviderCase {
+  provider: ImageProviderId;
+  apiKeyEnv: string;
+  config: Parameters<typeof createMotifImage>[0];
+  tierModels: Record<ImageTier, string>;
+  /** balanced tier (the default) resolves to this model id. */
+  defaultModel: string;
+  /** static table USD/image for `defaultModel`. */
+  priceUsd: number;
+}
+
+const PROVIDER_CASES: ProviderCase[] = [
+  {
+    provider: "openai",
+    apiKeyEnv: "OPENAI_API_KEY",
+    config: { openai: { apiKey: "test-key" } },
+    tierModels: {
+      fast: "gpt-image-1",
+      balanced: "gpt-image-1",
+      quality: "gpt-image-1",
+      hero: "gpt-image-1",
+    },
+    defaultModel: "gpt-image-1",
+    priceUsd: 0.042,
+  },
+  {
+    provider: "replicate",
+    apiKeyEnv: "REPLICATE_API_TOKEN",
+    config: { replicate: { apiToken: "test-token" } },
+    tierModels: {
+      fast: "black-forest-labs/flux-1.1-pro-ultra",
+      balanced: "black-forest-labs/flux-1.1-pro-ultra",
+      quality: "black-forest-labs/flux-1.1-pro-ultra",
+      hero: "black-forest-labs/flux-1.1-pro-ultra",
+    },
+    defaultModel: "black-forest-labs/flux-1.1-pro-ultra",
+    priceUsd: 0.06,
+  },
+  {
+    provider: "fal",
+    apiKeyEnv: "FAL_KEY",
+    config: { fal: { apiKey: "test-key" } },
+    tierModels: {
+      fast: "fal-ai/flux-pro/v1.1-ultra",
+      balanced: "fal-ai/gpt-image-1.5",
+      quality: "fal-ai/gpt-image-1.5",
+      hero: "fal-ai/gpt-image-1.5",
+    },
+    defaultModel: "fal-ai/gpt-image-1.5",
+    priceUsd: 0.133,
+  },
+];
+
+describe.each(PROVIDER_CASES)(
+  "createMotifImage — $provider provider",
+  ({ provider, apiKeyEnv, config, tierModels, defaultModel, priceUsd }) => {
+    it("registers an adapter whose tierModels match the documented map", () => {
+      const adapter = PROVIDERS[provider];
+      expect(adapter).toBeDefined();
+      expect(adapter?.id).toBe(provider);
+      expect(adapter?.tierModels).toEqual(tierModels);
+    });
+
+    it("dispatches each tier through the registry to the right model id", async () => {
+      const tiers: ImageTier[] = ["fast", "balanced", "quality", "hero"];
+      for (const tier of tiers) {
+        const seen: { provider: ImageProviderId; modelId: string }[] = [];
+        const img = createMotifImage(config, {
+          resolveModel: (resolvedProvider, modelId) => {
+            seen.push({ provider: resolvedProvider, modelId });
+            return fakeImageModel();
+          },
+        });
+
+        const result = await img.generate({ prompt: "x", provider, tier });
+
+        expect(result.isOk()).toBe(true);
+        expect(seen).toEqual([{ provider, modelId: tierModels[tier] }]);
+      }
+    });
+
+    it("dispatches edit through the registry to the right ImageModel", async () => {
+      const seen: { provider: ImageProviderId; modelId: string }[] = [];
+      const img = createMotifImage(config, {
+        resolveModel: (resolvedProvider, modelId) => {
+          seen.push({ provider: resolvedProvider, modelId });
+          return fakeImageModel();
+        },
+      });
+
+      const result = await img.edit({
+        provider,
+        images: [new Uint8Array([1, 2, 3])],
+        instruction: "apply texture",
+      });
+
+      expect(result.isOk()).toBe(true);
+      expect(seen).toEqual([{ provider, modelId: defaultModel }]);
+      if (result.isOk()) {
+        expect(result.value.provider).toBe(provider);
+        expect(result.value.model).toBe(defaultModel);
+      }
+    });
+
+    it("looks up the static table price with source 'table'", async () => {
+      const img = createMotifImage(config, {
+        resolveModel: () => fakeImageModel(),
+      });
+
+      const result = await img.generate({ prompt: "x", provider });
+
+      expect(result.isOk()).toBe(true);
+      if (result.isOk()) {
+        expect(result.value.cost.source).toBe("table");
+        expect(result.value.cost.usd).toBe(priceUsd);
+      }
+    });
+
+    it("returns Result.err (no throw) when the real adapter finds no key", async () => {
+      const previous = process.env[apiKeyEnv];
+      Reflect.deleteProperty(process.env, apiKeyEnv);
+      try {
+        // No injected resolveModel: the REAL adapter runs and must throw a
+        // MotifError for the missing key, captured as a Result.err.
+        const img = createMotifImage(
+          { defaultProvider: provider },
+          {
+            generateImage: async () => {
+              await Promise.resolve();
+              return fakeResult();
+            },
+          }
+        );
+
+        const result = await img.generate({ prompt: "x" });
+
+        expect(result.isErr()).toBe(true);
+        if (result.isErr()) {
+          expect(result.error).toBeInstanceOf(MotifError);
+          expect(result.error.message).toContain(apiKeyEnv);
+        }
+      } finally {
+        if (previous !== undefined) {
+          process.env[apiKeyEnv] = previous;
+        }
+      }
+    });
+  }
+);
+
+describe("image provider registry", () => {
+  it("contains all four providers, each keyed by its own id", () => {
+    const ids: ImageProviderId[] = ["google", "openai", "replicate", "fal"];
+    for (const id of ids) {
+      const adapter = PROVIDERS[id];
+      expect(adapter, `missing adapter for ${id}`).toBeDefined();
+      expect(adapter?.id).toBe(id);
+      expect(typeof adapter?.resolveModel).toBe("function");
+      expect(typeof adapter?.apiKeyEnv).toBe("string");
+    }
+    expect(Object.keys(PROVIDERS).sort()).toEqual(
+      ["fal", "google", "openai", "replicate"].sort()
+    );
   });
 });

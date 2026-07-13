@@ -12,6 +12,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ImageModel } from "ai";
 
 import { MotifError } from "../server";
+import type { ImageProviderAdapter } from "./provider";
 import type { ImageTier } from "./types";
 
 /**
@@ -37,6 +38,29 @@ export function googleModelForTier(tier: ImageTier): string {
 }
 
 /**
+ * Static Google-direct USD/image, keyed by model id.
+ *
+ * Sources (Google direct, not fal-hosted):
+ *   - `gemini-2.5-flash-image` ("nano banana"): image output billed at 1290
+ *     output tokens/image at $30 / 1M output tokens ≈ $0.039/image.
+ *     Source: https://ai.google.dev/gemini-api/docs/pricing
+ *     Sanity anchor: fal-hosted `fal-ai/gemini-25-flash-image` is $0.0398
+ *     (`MODELS.gemini.pricePerImageUsd` in ../models) — same ballpark.
+ *   - `gemini-3-pro-image-preview` ("nano banana pro"): standard 1K/2K image
+ *     output ≈ $0.134/image (higher tiers/4K cost more).
+ *     Source: https://ai.google.dev/gemini-api/docs/pricing
+ *     Sanity anchor: fal-hosted `fal-ai/gemini-3-pro-image-preview` is $0.15
+ *     (`MODELS.gemini3`/`MODELS.banana` in ../models) — fal adds overhead.
+ *   - `gemini-3.1-flash-image-preview`: flash-tier image output; priced with the
+ *     2.5 flash-image line (≈ $0.039/image) pending a distinct published rate.
+ */
+export const GOOGLE_IMAGE_PRICE_USD: Readonly<Record<string, number>> = {
+  "gemini-2.5-flash-image": 0.039,
+  "gemini-3.1-flash-image-preview": 0.039,
+  "gemini-3-pro-image-preview": 0.134,
+};
+
+/**
  * Build a Google Gemini `ImageModel`. Prefers the passed `apiKey`, else the
  * `GOOGLE_GENERATIVE_AI_API_KEY` env var. Throws `MotifError` when neither is
  * present (callers translate this into a `Result.err`).
@@ -51,3 +75,12 @@ export function resolveModel(modelId: string, apiKey?: string): ImageModel {
   }
   return createGoogleGenerativeAI({ apiKey: key }).image(modelId);
 }
+
+/** The Google (Gemini) provider adapter registered in the provider registry. */
+export const googleAdapter: ImageProviderAdapter = {
+  id: "google",
+  tierModels: GOOGLE_TIER_MODELS,
+  apiKeyEnv: GOOGLE_API_KEY_ENV,
+  resolveModel,
+  priceUsdByModel: GOOGLE_IMAGE_PRICE_USD,
+};

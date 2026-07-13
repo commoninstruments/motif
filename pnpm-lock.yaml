@@ -118,9 +118,18 @@ importers:
 
   packages/motif-sdk:
     dependencies:
+      '@ai-sdk/fal':
+        specifier: ^3.0.8
+        version: 3.0.8(zod@4.4.3)
       '@ai-sdk/google':
         specifier: ^4.0.12
         version: 4.0.12(zod@4.4.3)
+      '@ai-sdk/openai':
+        specifier: ^4.0.11
+        version: 4.0.11(zod@4.4.3)
+      '@ai-sdk/replicate':
+        specifier: ^3.0.8
+        version: 3.0.8(zod@4.4.3)
       '@howells/envy':
         specifier: ^0.3.7
         version: 0.3.7(zod@4.4.3)
@@ -183,6 +192,12 @@ importers:
 
 packages:
 
+  '@ai-sdk/fal@3.0.8':
+    resolution: {integrity: sha512-0GrHOKKSILwZYtPmnC0kEUPxOf1bB9Wh0CRKAbTaNfbxXMN0iCRn44IPWPgPsMYgsLv92FrGbcfng78NG+5AqA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/gateway@4.0.16':
     resolution: {integrity: sha512-9iYxdOLquoOFk5e+02P9qfBIA+EJU0FNJvyjGxi4iXJabt2+GlbaCg7TX0sTtxOsBVkdabkatqWM6+kvp53tBg==}
     engines: {node: '>=22'}
@@ -191,6 +206,12 @@ packages:
 
   '@ai-sdk/google@4.0.12':
     resolution: {integrity: sha512-4Rw4viFwH2Wprx6OssZzhV/KgNWaA7qYr5Kg28AlZ7r3sEvyXH0kDZtZok7onPjr0RuFTg2EjCjTIeoCesg0Ww==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/openai@4.0.11':
+    resolution: {integrity: sha512-2PLnVPBsdJusgquPVYgPWd3ox4lbUFkp7DVUSmM0lQ4VISQoNxdgo6TvFAHgwQn9wJ/ckVYVRLU7+BvHc7T8ww==}
     engines: {node: '>=22'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -204,6 +225,12 @@ packages:
   '@ai-sdk/provider@4.0.3':
     resolution: {integrity: sha512-e0CpNWJUY7OxAFAnCZkw+ri9QOHWwTs1tXP42782KFGCU07qt8NiXCrCVowyCB5dP2r5/Uls+g2oPd8kOJn9dw==}
     engines: {node: '>=22'}
+
+  '@ai-sdk/replicate@3.0.8':
+    resolution: {integrity: sha512-2ssWA/Ioyib6VjgbeLwApVF27PpZI3b9dFwdbKhU3iZlaU5awUt7LTZ42t/AsUKsvoktRi8GgFmH5Unj+Br6hA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   '@alcalzone/ansi-tokenize@0.3.0':
     resolution: {integrity: sha512-p+CMKJ93HFmLkjXKlXiVGlMQEuRb6H0MokBSwUsX+S6BRX8eV5naFZpQJFfJHjRZY0Hmnqy1/r6UWl3x+19zYA==}
@@ -4214,6 +4241,12 @@ packages:
 
 snapshots:
 
+  '@ai-sdk/fal@3.0.8(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.3
+      '@ai-sdk/provider-utils': 5.0.7(zod@4.4.3)
+      zod: 4.4.3
+
   '@ai-sdk/gateway@4.0.16(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
@@ -4222,6 +4255,12 @@ snapshots:
       zod: 4.4.3
 
   '@ai-sdk/google@4.0.12(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.3
+      '@ai-sdk/provider-utils': 5.0.7(zod@4.4.3)
+      zod: 4.4.3
+
+  '@ai-sdk/openai@4.0.11(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 4.0.3
       '@ai-sdk/provider-utils': 5.0.7(zod@4.4.3)
@@ -4238,6 +4277,12 @@ snapshots:
   '@ai-sdk/provider@4.0.3':
     dependencies:
       json-schema: 0.4.0
+
+  '@ai-sdk/replicate@3.0.8(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.3
+      '@ai-sdk/provider-utils': 5.0.7(zod@4.4.3)
+      zod: 4.4.3
 
   '@alcalzone/ansi-tokenize@0.3.0':
     dependencies:

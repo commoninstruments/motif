@@ -18,11 +18,16 @@ import type { MotifError } from "../server";
 export type ImageTier = "fast" | "balanced" | "quality" | "hero";
 
 /**
- * Image provider id. Only `google` is implemented in Phase 1a; the type is kept
- * an open union so later adapters (fal, openai, replicate) can slot in without a
- * breaking type change.
+ * Image provider id. All four Phase 1b adapters are implemented
+ * (`google`, `openai`, `replicate`, `fal`); the type keeps an open union tail so
+ * further adapters can slot in without a breaking type change.
  */
-export type ImageProviderId = "google" | (string & Record<never, never>);
+export type ImageProviderId =
+  | "google"
+  | "openai"
+  | "replicate"
+  | "fal"
+  | (string & Record<never, never>);
 
 /** Source that produced a normalized per-call cost. */
 export type ImageCostSource = "provider-metadata" | "table" | "unknown";
@@ -35,12 +40,32 @@ export interface ImageCost {
   source: ImageCostSource;
 }
 
-/** Client configuration. Provider keys fall back to environment variables. */
+/**
+ * Client configuration. Every provider key is optional and falls back to that
+ * provider's environment variable (see each adapter's `apiKeyEnv`). The config
+ * field name mirrors each SDK's own option name — notably Replicate calls its
+ * credential `apiToken`, not `apiKey`.
+ */
 export interface MotifImageConfig {
   /** Provider used when a call does not specify one. Defaults to `google`. */
   defaultProvider?: ImageProviderId;
   /** Google provider overrides. `apiKey` falls back to `GOOGLE_GENERATIVE_AI_API_KEY`. */
   google?: {
+    apiKey?: string;
+  };
+  /** OpenAI provider overrides. `apiKey` falls back to `OPENAI_API_KEY`. */
+  openai?: {
+    apiKey?: string;
+  };
+  /**
+   * Replicate provider overrides. Replicate's SDK names the credential
+   * `apiToken` (not `apiKey`); it falls back to `REPLICATE_API_TOKEN`.
+   */
+  replicate?: {
+    apiToken?: string;
+  };
+  /** fal provider overrides. `apiKey` falls back to `FAL_KEY`. */
+  fal?: {
     apiKey?: string;
   };
 }

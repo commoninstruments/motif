@@ -23,10 +23,7 @@ import type { Result } from "neverthrow";
 
 import { MotifError } from "../server";
 import { costForImages } from "./cost";
-import {
-  googleModelForTier,
-  resolveModel as resolveGoogleModel,
-} from "./google";
+import { getProviderAdapter } from "./provider";
 import type {
   EditImageOptions,
   GenerateImageOptions,
@@ -51,6 +48,11 @@ export type {
   MotifImageResult,
 } from "./types";
 export { GOOGLE_API_KEY_ENV, GOOGLE_TIER_MODELS } from "./google";
+export { OPENAI_API_KEY_ENV, OPENAI_TIER_MODELS } from "./openai";
+export { REPLICATE_API_KEY_ENV, REPLICATE_TIER_MODELS } from "./replicate";
+export { FAL_API_KEY_ENV, FAL_TIER_MODELS } from "./fal";
+export { PROVIDERS, getProviderAdapter } from "./provider";
+export type { ImageProviderAdapter } from "./provider";
 export { costForImages, costFromProviderMetadata } from "./cost";
 
 const DEFAULT_TIER: ImageTier = "balanced";
@@ -88,10 +90,25 @@ export function createMotifImage(
   }
 
   function apiKeyFor(provider: ImageProviderId): string | undefined {
-    if (provider === "google") {
-      return config.google?.apiKey;
+    // Normalize each provider's config field to a single key string for the
+    // adapter. Replicate names its credential `apiToken`, not `apiKey`.
+    switch (provider) {
+      case "google": {
+        return config.google?.apiKey;
+      }
+      case "openai": {
+        return config.openai?.apiKey;
+      }
+      case "replicate": {
+        return config.replicate?.apiToken;
+      }
+      case "fal": {
+        return config.fal?.apiKey;
+      }
+      default: {
+        return undefined;
+      }
     }
-    return undefined;
   }
 
   async function generate(
@@ -147,16 +164,13 @@ export function createMotifImage(
   return { generate, edit };
 }
 
-/** Default provider dispatch. Only `google` is wired in Phase 1a. */
+/** Default provider dispatch: resolve the model through the provider registry. */
 function defaultResolveModel(
   provider: ImageProviderId,
   modelId: string,
   apiKey?: string
 ): ImageModel {
-  if (provider === "google") {
-    return resolveGoogleModel(modelId, apiKey);
-  }
-  throw new MotifError(`Unsupported image provider: ${provider}`, 0);
+  return getProviderAdapter(provider).resolveModel(modelId, apiKey);
 }
 
 /** Resolve the model id: explicit `model` wins, else the provider's tier map. */
@@ -169,10 +183,7 @@ function resolveModelId(
     return model;
   }
   const resolvedTier = tier ?? DEFAULT_TIER;
-  if (provider === "google") {
-    return googleModelForTier(resolvedTier);
-  }
-  throw new MotifError(`Unsupported image provider: ${provider}`, 0);
+  return getProviderAdapter(provider).tierModels[resolvedTier];
 }
 
 /** Map the AI SDK result → normalized MotifImageResult (with cost + requestId). */
