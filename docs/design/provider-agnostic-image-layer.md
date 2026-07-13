@@ -156,12 +156,17 @@ resolve before touching it — a prerequisite, not part of this design.)
   (multi-image + mask) on the Google provider, Result types (reuse `MotifError`), cost
   tracking, tests (mock the AI SDK image model). NEW exports only — `MotifServer`/fal
   surface untouched. Ships motif-sdk 0.7.0. Adds `ai` + `@ai-sdk/google` deps.
-- **1b — providers**: openai / replicate adapters + per-model overrides; tiering.
-- **1c — fal as adapter**: reimplement fal behind the provider interface; keep the old
-  `MotifServer` as a deprecated facade.
-- **1d — best-of-N + judge**: parallel N + judge (judge via `@howells/ai`).
-- **1e — consumer migration**: CLI/MCP to the new API; later remove the fal facade (1.0).
-- **1f — materia integration**: swap `render-image.ts` internals; verify render-room and
+- **1b — all image providers**: openai + replicate + fal image adapters (all via
+  `@ai-sdk/*`), refactored behind a provider registry so adding one is a single entry;
+  per-model `providerOptions` overrides for endpoint quirks; tiering per provider. This
+  is the additive, non-breaking completion of the four-provider image layer — the fal
+  *image adapter* here is distinct from the heavier `MotifServer` fold below.
+- **1c — best-of-N + judge**: parallel N + judge (judge via `@howells/ai`).
+- **1d — MotifServer → adapter (1.0, breaking)**: fold the rich fal client (queue, upload,
+  upscale, rmbg, video, tools) into the provider model; keep the old `MotifServer` as a
+  deprecated facade; migrate CLI/MCP; remove the facade at 1.0. Deliberate, not automatic —
+  fal remains the right home for several models per the benchmark.
+- **1e — materia integration**: swap `render-image.ts` internals; verify render-room and
   apply-texture unchanged; wire cost metering.
 
 ## 9. Open questions / risks
