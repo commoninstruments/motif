@@ -117,7 +117,7 @@ pnpm link --global
 
 ## What Motif Does
 
-- SDK: `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimates, fal CDN upload, queue polling, utility tools, video jobs, and payload cleanup.
+- SDK: `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimates, fal CDN upload, queue polling, utility tools, video jobs, and payload cleanup. The `@howells/motif-sdk/image` subpath adds a provider-agnostic image generate/edit layer (google, openai, replicate, fal) with per-call cost tracking.
 - CLI: text-to-image, reference-image editing, upscaling, background removal, image-to-video, local history and costs, series management, terminal Studio, CWD-sandboxed output paths, and validated inputs.
 - MCP: local stdio tools for `generate`, `upscale`, `remove_background`, `vary`, and `history`, plus read-only `motif://models`, `motif://tools`, `motif://leaderboards`, and `motif://history/schema` resources.
 - Agent interfaces: `--format json`, `--format ndjson`, `--fields`, `--dry-run`, stdin JSON, `--describe`, structured errors, and MCP structured content.

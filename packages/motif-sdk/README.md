@@ -123,6 +123,55 @@ The package exports public types for generation, processing, queue, metadata, an
 - `ModelConfig`, `AspectRatio`, `Resolution`, `ImageSize`, `ImageQuality`, `BackgroundMode`, `ThinkingLevel`
 - `FalToolConfig`, `FalToolId`, `FalToolRequest`, `FalToolRunOptions`
 
+## Image Layer (`@howells/motif-sdk/image`)
+
+A provider-agnostic image generation + editing layer, additive to the fal-specific `MotifServer` surface above. It is an ESM-only subpath export, built on the Vercel AI SDK image interface (`ai`'s `generateImage`).
+
+```bash
+npm install @howells/motif-sdk
+```
+
+```ts
+import { createMotifImage } from "@howells/motif-sdk/image";
+
+const img = createMotifImage({ defaultProvider: "google" });
+
+// text -> image
+const generated = await img.generate({
+  tier: "fast",
+  prompt: "a plain room, bare concrete wall",
+  aspectRatio: "1:1",
+});
+
+// multi-image edit (images + instruction, optional mask -> image out)
+const edited = await img.edit({
+  tier: "balanced",
+  images: [roomBytes, tileBytes],
+  instruction: "Apply the oak texture from image 2 onto the wall in image 1.",
+  mask: surfaceMaskBytes,
+});
+
+if (edited.isOk()) {
+  edited.value.images; // MotifImageFile[]
+  edited.value.cost; // { usd, source: "provider-metadata" | "table" | "unknown" }
+  edited.value.provider; // resolved ImageProviderId
+  edited.value.model; // resolved model id
+}
+```
+
+Both `generate()` and `edit()` return `Result<MotifImageResult, MotifError>`, matching the rest of the SDK — no throws, check `isOk()` / `isErr()`.
+
+Four providers are implemented, each reading its own API key from the environment (or a `MotifImageConfig` override):
+
+| Provider | Env var | Notes |
+| --- | --- | --- |
+| `google` | `GOOGLE_GENERATIVE_AI_API_KEY` | Default provider; Gemini gen + edit |
+| `openai` | `OPENAI_API_KEY` | gpt-image-1 |
+| `replicate` | `REPLICATE_API_TOKEN` | flux-1.1-pro-ultra |
+| `fal` | `FAL_KEY` | fal-hosted adapter |
+
+`generate()` and `edit()` accept `tier` (`"fast" | "balanced" | "quality" | "hero"`) to resolve a model per provider, or an explicit `model` id. Every result carries a normalized per-call `cost: { usd, source }`.
+
 ## Testing
 
 ```bash

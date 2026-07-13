@@ -39,14 +39,17 @@ RUN_FAL_CANARY=1 pnpm --filter @howells/motif-sdk test -- tests/fal-canary.test.
 
 - CLI: `motif --describe --format json`, `motif --dry-run --format json`, stdin JSON, `--fields`, `--format ndjson`.
 - SDK: `MotifServer`, `buildGenerateBody`, model metadata, fal utility tools, and Result-returning methods.
+- SDK image layer: `@howells/motif-sdk/image` (ESM-only subpath) — `createMotifImage(config?)` returns a client with `generate()` (text→image) and `edit()` (multi-image + optional mask → image-out) over four providers (google, openai, replicate, fal), each returning `Result<MotifImageResult, MotifError>` with per-call cost tracking.
 - MCP: stdio server exposing generate, upscale, remove background, vary, history, and read-only registry resources.
 - Discovery: `README.md`, `llms.txt`, `docs/security.md`, and `docs/surface/`.
 
 ## Environment
 
-`FAL_KEY` is the only public Motif environment variable. The CLI can also read `apiKey` from `~/.motif/config.json`; environment values take precedence.
+`FAL_KEY` is the primary public Motif environment variable, used by `MotifServer`, the CLI, and MCP. The CLI can also read `apiKey` from `~/.motif/config.json`; environment values take precedence.
 
-Never print or commit real API keys. Do not run live fal canaries unless explicitly asked.
+`@howells/motif-sdk/image` reads three additional provider keys, one per adapter: `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`, and `REPLICATE_API_TOKEN`. It also reads `FAL_KEY` for its fal adapter. All four are optional per call — only the key for the provider in use is required — and each falls back from `MotifImageConfig` overrides to the matching env var.
+
+Never print or commit real API keys for any of these four variables. Do not run live fal canaries unless explicitly asked.
 
 ## Architecture Rules
 
