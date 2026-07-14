@@ -121,6 +121,7 @@ export function createMotifImage(
           : { aspectRatio: opts.aspectRatio }),
         ...(opts.seed === undefined ? {} : { seed: opts.seed }),
         ...(opts.signal === undefined ? {} : { abortSignal: opts.signal }),
+        ...(opts.headers === undefined ? {} : { headers: opts.headers }),
         ...(opts.providerOptions === undefined
           ? {}
           : { providerOptions: toProviderOptions(opts.providerOptions) }),
@@ -148,6 +149,7 @@ export function createMotifImage(
         ...(opts.n === undefined ? {} : { n: opts.n }),
         ...(opts.seed === undefined ? {} : { seed: opts.seed }),
         ...(opts.signal === undefined ? {} : { abortSignal: opts.signal }),
+        ...(opts.headers === undefined ? {} : { headers: opts.headers }),
         ...(opts.providerOptions === undefined
           ? {}
           : { providerOptions: toProviderOptions(opts.providerOptions) }),
@@ -483,5 +485,14 @@ function toMotifError(error: unknown): MotifError {
     error instanceof Error && "code" in error && typeof error.code === "string"
       ? error.code
       : undefined;
-  return new MotifError(message, 0, code);
+  // AI SDK APICallError carries the HTTP status on `statusCode` (not in the
+  // message text). Lift it onto MotifError.status so callers branch on
+  // `error.status === 429` instead of string-matching the message.
+  const status =
+    error instanceof Error &&
+    "statusCode" in error &&
+    typeof error.statusCode === "number"
+      ? error.statusCode
+      : 0;
+  return new MotifError(message, status, code);
 }

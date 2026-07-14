@@ -4,7 +4,24 @@ import { describe, expect, it } from "vitest";
 import type { MotifImageDeps } from "../src/image/deps";
 import { createMotifImage, PROVIDERS } from "../src/image/index";
 import type { ImageProviderId, ImageTier } from "../src/image/index";
-import { MotifError } from "../src/index";
+import { MODELS, MotifError } from "../src/index";
+
+/**
+ * A minimal stand-in for the AI SDK's `APICallError`: an `Error` subclass that
+ * carries the HTTP status on `statusCode` (a number) and NOT in the message —
+ * exactly the shape the phase-A live spike confirmed. Used to prove
+ * `toMotifError` lifts `statusCode` onto `MotifError.status`.
+ */
+class FakeApiCallError extends Error {
+  readonly statusCode: number;
+  constructor(message: string, statusCode: number) {
+    super(message);
+    // Mirrors the AI SDK APICallError name ("AI_APICallError"); `toMotifError`
+    // keys off `statusCode`, not the name, so the exact string is immaterial.
+    this.name = "FakeApiCallError";
+    this.statusCode = statusCode;
+  }
+}
 
 /** The options object the underlying `generateImage` (or its fake) receives. */
 type GenerateImageArgs = Parameters<
@@ -452,6 +469,73 @@ describe("createMotifImage.generate", () => {
       expect(result.error).toBeInstanceOf(MotifError);
     }
   });
+
+  it("lifts an AI-SDK APICallError statusCode onto MotifError.status", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async () => {
+          await Promise.resolve();
+          throw new FakeApiCallError("Too Many Requests", 429);
+        },
+      }
+    );
+
+    const result = await img.generate({ prompt: "x" });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error).toBeInstanceOf(MotifError);
+      // Callers branch on `error.status === 429`, not the message text.
+      expect(result.error.status).toBe(429);
+      expect(result.error.message).toBe("Too Many Requests");
+    }
+  });
+
+  it("maps a plain Error (no statusCode) to status 0", async () => {
+    const img = createMotifImage(
+      { google: { apiKey: "test-key" } },
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async () => {
+          await Promise.resolve();
+          throw new Error("local failure");
+        },
+      }
+    );
+
+    const result = await img.generate({ prompt: "x" });
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.status).toBe(0);
+      expect(result.error.message).toBe("local failure");
+    }
+  });
+
+  it("forwards headers to generateImage (fal non-retained IO)", async () => {
+    let call: GenerateImageArgs | undefined;
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async (options) => {
+          await Promise.resolve();
+          call = options;
+          return fakeResult();
+        },
+      }
+    );
+
+    const result = await img.generate({
+      prompt: "x",
+      headers: { "X-Fal-Store-IO": "0" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(call?.headers).toEqual({ "X-Fal-Store-IO": "0" });
+  });
 });
 
 describe("createMotifImage.edit", () => {
@@ -570,6 +654,54 @@ describe("createMotifImage.edit", () => {
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {
       expect(result.error).toBeInstanceOf(MotifError);
+    }
+  });
+
+  it("forwards headers to generateImage in edit()", async () => {
+    let call: GenerateImageArgs | undefined;
+    const img = createMotifImage(
+      {},
+      {
+        resolveModel: () => fakeImageModel(),
+        generateImage: async (options) => {
+          await Promise.resolve();
+          call = options;
+          return fakeResult();
+        },
+      }
+    );
+
+    const result = await img.edit({
+      images: [new Uint8Array([9, 9, 9])],
+      instruction: "brighten the wall",
+      headers: { "X-Fal-Store-IO": "0" },
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(call?.headers).toEqual({ "X-Fal-Store-IO": "0" });
+  });
+});
+
+describe("createMotifImage — fal explicit-model pricing", () => {
+  it("prices an explicit fal endpoint from the MODELS registry (source 'table')", async () => {
+    const img = createMotifImage(
+      { fal: { apiKey: "test-key" } },
+      { resolveModel: () => fakeImageModel() }
+    );
+
+    const result = await img.generate({
+      prompt: "x",
+      provider: "fal",
+      model: "fal-ai/flux/schnell",
+    });
+
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.model).toBe("fal-ai/flux/schnell");
+      expect(result.value.cost.source).toBe("table");
+      // FLUX Schnell price comes from MODELS["flux-fast"], not 0/"unknown".
+      expect(result.value.cost.usd).toBe(MODELS["flux-fast"]?.pricePerImageUsd);
+      expect(result.value.cost.usd).toBeGreaterThan(0);
     }
   });
 });

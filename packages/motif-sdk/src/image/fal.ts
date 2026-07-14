@@ -36,7 +36,11 @@ import type { ImageTier } from "./types";
 const FAL_FLUX_MODEL = "fal-ai/flux-pro/v1.1-ultra";
 const FAL_GPT_IMAGE_MODEL = "fal-ai/gpt-image-1.5";
 
-/** Tier → fal model id. */
+/**
+ * Tier → fal model id. For fal, explicit `model:` endpoint ids are the primary
+ * path (any fal endpoint resolves via passthrough); this tier map is a
+ * convenience covering the two most common (FLUX Pro Ultra + gpt-image).
+ */
 export const FAL_TIER_MODELS: Readonly<Record<ImageTier, string>> = {
   fast: FAL_FLUX_MODEL,
   balanced: FAL_GPT_IMAGE_MODEL,
@@ -48,18 +52,52 @@ export const FAL_TIER_MODELS: Readonly<Record<ImageTier, string>> = {
 export const FAL_API_KEY_ENV = "FAL_KEY";
 
 /**
- * Static fal USD/image, keyed by model id. Sourced from the existing fal pricing
- * snapshot in `../models` (`MODELS[...].pricePerImageUsd`) so the fal adapter's
- * prices stay in sync with the SDK's fal registry rather than drifting to a
- * second hand-maintained copy. The `??` fallbacks are the registry values at
- * time of writing, used only if a registry entry loses its optional price.
- *   - `fal-ai/flux-pro/v1.1-ultra`: $0.06 (`MODELS.flux`).
- *   - `fal-ai/gpt-image-1.5`: $0.133 (`MODELS.gpt`; fal adds overhead vs $0.042
- *     for OpenAI-direct gpt-image — see the design doc §10).
+ * Static fal USD/image, keyed by the fal ENDPOINT id. Explicit `model:` endpoint
+ * ids are fal's primary path (the tier map covers only two), so cost tracking
+ * must price the endpoints consumers actually pass — kiln uses
+ * `fal-ai/flux/schnell`, `fal-ai/flux-2-pro`, `fal-ai/flux-2-max`. Every price is
+ * sourced from the fal registry snapshot in `../models`
+ * (`MODELS[...].pricePerImageUsd`) so this table stays in sync rather than
+ * drifting to a second hand-maintained copy; the `??` fallbacks are the registry
+ * values at time of writing, used only if a registry entry loses its optional
+ * price. Each key is `MODELS[x].endpoint`; the trailing comment cites the
+ * `MODELS` key it comes from. Covers the flux/flux2 family, banana, seedream, and
+ * the other priced fal generation endpoints.
  */
 const FAL_IMAGE_PRICE_USD: Readonly<Record<string, number>> = {
-  [FAL_FLUX_MODEL]: MODELS.flux?.pricePerImageUsd ?? 0.06,
-  [FAL_GPT_IMAGE_MODEL]: MODELS.gpt?.pricePerImageUsd ?? 0.133,
+  // FLUX family.
+  [FAL_FLUX_MODEL]: MODELS.flux?.pricePerImageUsd ?? 0.06, // MODELS.flux
+  "fal-ai/flux/schnell": MODELS["flux-fast"]?.pricePerImageUsd ?? 0.003, // MODELS["flux-fast"]
+  // FLUX.2 family.
+  "fal-ai/flux-2-max": MODELS["flux2-max"]?.pricePerImageUsd ?? 0.07, // MODELS["flux2-max"]
+  "fal-ai/flux-2-pro": MODELS["flux2-pro"]?.pricePerImageUsd ?? 0.03, // MODELS["flux2-pro"]
+  "fal-ai/flux-2-flex": MODELS["flux2-flex"]?.pricePerImageUsd ?? 0.05, // MODELS["flux2-flex"]
+  "fal-ai/flux-2": MODELS["flux2-dev"]?.pricePerImageUsd ?? 0.012, // MODELS["flux2-dev"]
+  "fal-ai/flux-2/turbo": MODELS["flux2-turbo"]?.pricePerImageUsd ?? 0.008, // MODELS["flux2-turbo"]
+  // gpt-image (fal adds overhead vs OpenAI-direct — see design doc §10).
+  [FAL_GPT_IMAGE_MODEL]: MODELS.gpt?.pricePerImageUsd ?? 0.133, // MODELS.gpt
+  "openai/gpt-image-2": MODELS.gpt2?.pricePerImageUsd ?? 0.211, // MODELS.gpt2
+  // Nano Banana (Gemini image) family.
+  "fal-ai/nano-banana-2": MODELS.banana2?.pricePerImageUsd ?? 0.08, // MODELS.banana2
+  "fal-ai/nano-banana-pro": MODELS.banana?.pricePerImageUsd ?? 0.15, // MODELS.banana
+  "fal-ai/gemini-25-flash-image": MODELS.gemini?.pricePerImageUsd ?? 0.0398, // MODELS.gemini
+  "fal-ai/gemini-3-pro-image-preview": MODELS.gemini3?.pricePerImageUsd ?? 0.15, // MODELS.gemini3
+  // Seedream family.
+  "fal-ai/bytedance/seedream/v4/text-to-image":
+    MODELS.seedream4?.pricePerImageUsd ?? 0.03, // MODELS.seedream4
+  "fal-ai/bytedance/seedream/v4.5/text-to-image":
+    MODELS.seedream45?.pricePerImageUsd ?? 0.04, // MODELS.seedream45
+  "bytedance/seedream/v5/pro/text-to-image":
+    MODELS.seedream5?.pricePerImageUsd ?? 0.0675, // MODELS.seedream5
+  "fal-ai/bytedance/seedream/v5/lite/text-to-image":
+    MODELS["seedream5-lite"]?.pricePerImageUsd ?? 0.035, // MODELS["seedream5-lite"]
+  // Other priced fal generation endpoints.
+  "fal-ai/recraft-v3": MODELS.recraft?.pricePerImageUsd ?? 0.04, // MODELS.recraft
+  "fal-ai/recraft/v4/text-to-image": MODELS.recraft4?.pricePerImageUsd ?? 0.04, // MODELS.recraft4
+  "fal-ai/ideogram/v3": MODELS.ideogram?.pricePerImageUsd ?? 0.03, // MODELS.ideogram
+  "ideogram/v4": MODELS.ideogram4?.pricePerImageUsd ?? 0.03, // MODELS.ideogram4
+  "xai/grok-imagine-image": MODELS["grok-image"]?.pricePerImageUsd ?? 0.02, // MODELS["grok-image"]
+  "fal-ai/qwen-image": MODELS.qwen?.pricePerImageUsd ?? 0.02, // MODELS.qwen
 };
 
 /**

@@ -100,6 +100,12 @@ export interface GenerateImageOptions {
   /** Abort signal to cancel the in-flight request. */
   signal?: AbortSignal;
   /**
+   * Extra HTTP headers forwarded to the provider request. Fal's non-retained IO
+   * (paired with FalClient.deletePayloads) is
+   * `headers: { "X-Fal-Store-IO": "0" }`.
+   */
+  headers?: Record<string, string>;
+  /**
    * Provider-specific options, passed straight through to the underlying model
    * as body parameters. Outer key = provider name, inner key = option name.
    * Values must be JSON-representable; a non-JSON value (undefined, function,
@@ -141,6 +147,12 @@ export interface EditImageOptions {
   seed?: number;
   /** Abort signal to cancel the in-flight request. */
   signal?: AbortSignal;
+  /**
+   * Extra HTTP headers forwarded to the provider request. Fal's non-retained IO
+   * (paired with FalClient.deletePayloads) is
+   * `headers: { "X-Fal-Store-IO": "0" }`.
+   */
+  headers?: Record<string, string>;
   /** Provider-specific options (see {@link GenerateImageOptions.providerOptions}). */
   providerOptions?: Record<string, Record<string, unknown>>;
 }
