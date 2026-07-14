@@ -2,10 +2,10 @@ import { readFile } from "node:fs/promises";
 import { extname } from "node:path";
 
 import {
+  FalClient,
   FAL_TOOLS,
   getFalKeyFromEnv,
   isFalToolId,
-  MotifServer,
 } from "@howells/motif-sdk";
 import type {
   GenerateOptions,
@@ -60,7 +60,7 @@ function unwrap<T>(result: Result<T, MotifError>): T {
 }
 
 let _apiKey: string | null = null;
-let _motif: MotifServer | null = null;
+let _motif: FalClient | null = null;
 
 export function setApiKey(key: string): void {
   _apiKey = key;
@@ -83,8 +83,8 @@ export function getApiKey(): string {
   );
 }
 
-function getMotif(): MotifServer {
-  _motif ??= new MotifServer(getApiKey());
+function getMotif(): FalClient {
+  _motif ??= new FalClient(getApiKey());
   return _motif;
 }
 

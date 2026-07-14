@@ -22,8 +22,8 @@ import {
 import type {
   AspectRatio,
   CreativeDirection,
+  FalClient,
   ImageOutputFormat,
-  MotifServer,
 } from "@howells/motif-sdk";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
@@ -680,11 +680,11 @@ const TOOLS = [
 /**
  * Create a Motif MCP server without binding it to a transport.
  *
- * The caller owns the `MotifServer` instance and chooses stdio, in-memory, or
+ * The caller owns the `FalClient` instance and chooses stdio, in-memory, or
  * another MCP transport; this factory only registers Motif resources and tools.
  */
 // oxlint-disable-next-line no-deprecated -- Deliberate, not pending: the SDK's own deprecation note blesses the low-level Server for "advanced use cases", which this is. McpServer.registerTool requires zod (ZodRawShapeCompat) schemas; adopting it would add a zod runtime dependency to this lean package and rewrite every hand-authored tool schema — schemas that are derived from the SDK model registry and mirrored byte-for-byte by `motif --describe`. The low-level Server keeps that single source of truth. Revisit only if the SDK hard-removes Server.
-export function createMotifMcpServer(motif: MotifServer): Server {
+export function createMotifMcpServer(motif: FalClient): Server {
   // oxlint-disable-next-line no-deprecated -- See createMotifMcpServer note above: deliberate low-level Server use.
   const server = new Server(
     { name: "motif", version: "1.0.0" },

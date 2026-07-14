@@ -1,14 +1,14 @@
 /**
- * MCP end-to-end with a REAL MotifServer
+ * MCP end-to-end with a REAL FalClient
  *
  * Uses InMemoryTransport + Client like tools.test.ts, but wires the MCP server
- * to a real `MotifServer` instead of a mock. The generate call below fails
+ * to a real `FalClient` instead of a mock. The generate call below fails
  * inside `buildGenerateBody` (unknown creative option) before any fetch, so no
  * network access is needed. This documents that MCP clients receive a
  * structured tool error end-to-end instead of an unhandled rejection.
  */
 
-import { MotifServer } from "@howells/motif-sdk";
+import { FalClient } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -32,7 +32,7 @@ function parseErrorPayload(result: CallToolResult): ErrorPayload {
   return JSON.parse(first.text) as ErrorPayload;
 }
 
-async function makeClient(motif: MotifServer) {
+async function makeClient(motif: FalClient) {
   const server = createMotifMcpServer(motif);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -42,9 +42,9 @@ async function makeClient(motif: MotifServer) {
   return client;
 }
 
-describe("generate tool with a real MotifServer", () => {
+describe("generate tool with a real FalClient", () => {
   it("returns a structured tool error for an invalid creative option", async () => {
-    const motif = new MotifServer({ apiKey: "test-key" });
+    const motif = new FalClient({ apiKey: "test-key" });
     const client = await makeClient(motif);
 
     const result = await client.callTool({

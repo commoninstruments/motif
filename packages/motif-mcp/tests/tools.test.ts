@@ -7,7 +7,7 @@
  */
 
 import { EDIT_CAPABLE_MODELS } from "@howells/motif-sdk";
-import type { MotifServer } from "@howells/motif-sdk";
+import type { FalClient } from "@howells/motif-sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -67,7 +67,7 @@ const MOCK_IMAGES = [
   { height: 1024, url: "https://fal.media/img.png", width: 1024 },
 ];
 
-/** Typed view of the mocked MotifServer surface exercised by these tests. */
+/** Typed view of the mocked FalClient surface exercised by these tests. */
 interface MockMotif {
   estimateCost: Mock;
   generate: Mock;
@@ -169,8 +169,8 @@ function schemaPath(start: unknown, ...path: string[]): unknown {
 // ─── Connect client ──────────────────────────────────────────────────
 
 async function makeClient(motif: MockMotif) {
-  // oxlint-disable-next-line no-unsafe-type-assertion -- the mock stands in for MotifServer; the server factory only calls the four mocked methods
-  const server = createMotifMcpServer(motif as unknown as MotifServer);
+  // oxlint-disable-next-line no-unsafe-type-assertion -- the mock stands in for FalClient; the server factory only calls the four mocked methods
+  const server = createMotifMcpServer(motif as unknown as FalClient);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "1.0.0" });

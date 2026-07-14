@@ -2,7 +2,7 @@
  * Public types for the provider-agnostic image generation + editing layer
  * (`@howells/motif-sdk/image`).
  *
- * This layer is additive: it sits alongside the fal-specific `MotifServer`
+ * This layer is additive: it sits alongside the fal-specific `FalClient`
  * surface and reuses the SDK's Result convention (`Result<T, MotifError>` — no
  * thrown exceptions). See docs/design/provider-agnostic-image-layer.md.
  */

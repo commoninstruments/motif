@@ -7,7 +7,7 @@
  * Requires FAL_KEY env var.
  */
 
-import { getFalKeyFromEnv, MotifServer } from "@howells/motif-sdk";
+import { FalClient, getFalKeyFromEnv } from "@howells/motif-sdk";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { createMotifMcpServer } from "./create-server.js";
@@ -22,7 +22,7 @@ if (falKey === undefined || falKey === "") {
   process.exit(1);
 }
 
-const motif = new MotifServer(falKey);
+const motif = new FalClient(falKey);
 const server = createMotifMcpServer(motif);
 
 const transport = new StdioServerTransport();

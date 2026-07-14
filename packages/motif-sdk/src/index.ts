@@ -5,9 +5,9 @@
  *
  * @example
  * ```typescript
- * import { MotifServer } from "./fal";
+ * import { FalClient } from "./fal";
  *
- * const motif = new MotifServer(process.env.FAL_KEY!);
+ * const motif = new FalClient(process.env.FAL_KEY!);
  *
  * // Synchronous generation (CLI use case)
  * const result = await motif.generate({ prompt: "a red balloon", model: "banana" });
@@ -71,7 +71,8 @@ export {
   UTILITY_MODELS,
   VIDEO_MODELS,
 } from "./models";
-export { MotifError, MotifServer } from "./server";
+// oxlint-disable-next-line no-deprecated -- deliberate: re-export the deprecated `MotifServer` alias so external consumers (kiln, etc.) keep working until 1.0.
+export { FalClient, MotifError, MotifServer } from "./server";
 export {
   buildFalToolRequest,
   FAL_TOOL_IDS,
@@ -90,6 +91,7 @@ export type {
   AspectRatio,
   BackgroundMode,
   CustomImageSize,
+  FalClientConfig,
   FalImageSizePreset,
   GenerateOptions,
   GptImageSize,
@@ -101,6 +103,7 @@ export type {
   ModelType,
   MotifImage,
   MotifResponse,
+  // oxlint-disable-next-line no-deprecated -- deliberate: re-export the deprecated `MotifServerConfig` alias for backwards compatibility until 1.0.
   MotifServerConfig,
   QueuedJob,
   RemoveBackgroundOptions,

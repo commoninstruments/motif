@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { MotifServer } from "../src/index";
+import { FalClient } from "../src/index";
 
 function jsonResponse(data: unknown): Response {
   return new Response(JSON.stringify(data), {
@@ -50,7 +50,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("MotifServer fetch integration", () => {
+describe("FalClient fetch integration", () => {
   it("sends normalized sync generation requests without calling fal in tests", async () => {
     vi.stubGlobal(
       "fetch",
@@ -62,7 +62,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
       aspect: "16:9",
       background: "transparent",
@@ -100,7 +100,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
       ephemeral: true,
       model: "banana",
@@ -128,7 +128,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.submitGeneration({
       editImageUrls: ["https://example.com/interior.png"],
       imageSize: "1280x720",
@@ -167,7 +167,7 @@ describe("MotifServer fetch integration", () => {
       vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.deletePayloads("req_ephemeral_123");
 
     expect(result.isOk()).toBe(true);
@@ -191,7 +191,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
       model: "gpt",
       prompt: "a red balloon",
@@ -213,7 +213,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.generate({
       model: "gpt",
       prompt: "a red balloon",
@@ -236,7 +236,7 @@ describe("MotifServer fetch integration", () => {
       )
     );
 
-    const motif = new MotifServer({ apiKey: "test-key", retries: 0 });
+    const motif = new FalClient({ apiKey: "test-key", retries: 0 });
     const result = await motif.runTool({
       input: "https://example.com/input.png",
       options: {

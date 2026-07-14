@@ -19,10 +19,10 @@ import { GENERATION_MODELS, MODELS, UTILITY_MODELS } from "./models";
 import { buildFalToolRequest, FAL_TOOLS } from "./tools";
 import type { FalToolRequest } from "./tools";
 import type {
+  FalClientConfig,
   GenerateOptions,
   JobStatus,
   MotifResponse,
-  MotifServerConfig,
   QueuedJob,
   RemoveBackgroundOptions,
   Resolution,
@@ -39,16 +39,20 @@ const FAL_API_URL = "https://api.fal.ai";
 const FAL_REST_URL = "https://rest.alpha.fal.ai";
 
 /**
- * Motif Server SDK
+ * FalClient — the fal-native client.
  *
- * Server-side SDK for AI image generation via fal.ai.
+ * The low-level, fal-specific client for AI image generation and fal utilities
+ * (queue, upload, upscale, rmbg, video, tools, generate). Pairs with the
+ * provider-agnostic `createMotifImage` (`@howells/motif-sdk/image`) as the
+ * fal-native entry point.
+ *
  * All async methods return `Result<T, MotifError>` — no thrown exceptions.
  *
  * @example
  * ```typescript
- * import { MotifServer } from "./fal";
+ * import { FalClient } from "./fal";
  *
- * const motif = new MotifServer(process.env.FAL_KEY!);
+ * const motif = new FalClient(process.env.FAL_KEY!);
  * const result = await motif.generate({ prompt: "a red balloon", model: "banana" });
  *
  * if (result.isOk()) {
@@ -58,12 +62,12 @@ const FAL_REST_URL = "https://rest.alpha.fal.ai";
  * }
  * ```
  */
-export class MotifServer {
+export class FalClient {
   private readonly apiKey: string;
   private readonly timeout: number;
   private readonly retries: number;
 
-  constructor(config: MotifServerConfig | string) {
+  constructor(config: FalClientConfig | string) {
     if (typeof config === "string") {
       this.apiKey = config;
       this.timeout = 120_000;
@@ -720,6 +724,9 @@ export class MotifServer {
     });
   }
 }
+
+/** @deprecated Renamed to {@link FalClient}. `MotifServer` is kept as an alias for backwards compatibility and will be removed in 1.0. */
+export const MotifServer = FalClient;
 
 export class MotifError extends Error {
   readonly status: number;

@@ -297,10 +297,13 @@ export interface JobStatus {
 
 /** ─── Configuration ──────────────────────────────────────────── */
 
-export interface MotifServerConfig {
+export interface FalClientConfig {
   apiKey: string;
   /** Max retry attempts for 429/5xx errors (default 3, set 0 to disable) */
   retries?: number;
   /** Request timeout in ms (default 120_000) */
   timeout?: number;
 }
+
+/** @deprecated Renamed to {@link FalClientConfig}. */
+export type MotifServerConfig = FalClientConfig;
