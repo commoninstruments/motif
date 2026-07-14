@@ -304,6 +304,3 @@ export interface FalClientConfig {
   /** Request timeout in ms (default 120_000) */
   timeout?: number;
 }
-
-/** @deprecated Renamed to {@link FalClientConfig}. */
-export type MotifServerConfig = FalClientConfig;

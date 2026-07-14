@@ -71,8 +71,7 @@ export {
   UTILITY_MODELS,
   VIDEO_MODELS,
 } from "./models";
-// oxlint-disable-next-line no-deprecated -- deliberate: re-export the deprecated `MotifServer` alias so external consumers (kiln, etc.) keep working until 1.0.
-export { FalClient, MotifError, MotifServer } from "./server";
+export { FalClient, MotifError } from "./server";
 export {
   buildFalToolRequest,
   FAL_TOOL_IDS,
@@ -103,8 +102,6 @@ export type {
   ModelType,
   MotifImage,
   MotifResponse,
-  // oxlint-disable-next-line no-deprecated -- deliberate: re-export the deprecated `MotifServerConfig` alias for backwards compatibility until 1.0.
-  MotifServerConfig,
   QueuedJob,
   RemoveBackgroundOptions,
   Resolution,

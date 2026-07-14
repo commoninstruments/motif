@@ -725,9 +725,6 @@ export class FalClient {
   }
 }
 
-/** @deprecated Renamed to {@link FalClient}. `MotifServer` is kept as an alias for backwards compatibility and will be removed in 1.0. */
-export const MotifServer = FalClient;
-
 export class MotifError extends Error {
   readonly status: number;
   readonly code?: string;

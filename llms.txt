@@ -14,7 +14,6 @@
 - [CLI package](./apps/cli) - `@howells/motif-cli`, the `motif` binary, terminal Studio, CLI tests, and package-specific agent guide.
 - [SDK package](./packages/motif-sdk) - `@howells/motif-sdk`, model metadata, fal request normalization, SDK types, and mocked fetch tests.
 - [MCP package](./packages/motif-mcp) - `@howells/motif-mcp`, stdio MCP tools, read-only resources, and InMemoryTransport tests.
-- [Compatibility package](./packages/motif-server) - Deprecated wrapper that re-exports the SDK.
 
 ## Agent Interfaces
 

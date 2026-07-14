@@ -18,24 +18,32 @@ Motif is a public TypeScript toolkit for fal.ai. It provides a Node SDK, an agen
 npm install @howells/motif-sdk
 ```
 
+The primary image API is `createMotifImage` (`@howells/motif-sdk/image`) — one provider-agnostic surface to `generate` and `edit` across google, openai, replicate, and fal:
+
 ```ts
-import { MotifServer, buildGenerateBody } from "@howells/motif-sdk";
+import { createMotifImage } from "@howells/motif-sdk/image";
 
-const options = {
-  model: "banana2",
+const img = createMotifImage({ defaultProvider: "google" });
+
+const result = await img.generate({
   prompt: "editorial product photo of a ceramic desk lamp",
-  resolution: "2K",
-  enableGoogleSearch: true,
-} as const;
+  aspectRatio: "1:1",
+  tier: "quality",
+});
 
-const dryRun = buildGenerateBody(options);
-const motif = new MotifServer(process.env.FAL_KEY!);
-const result = await motif.generate(options);
+if (result.isOk()) {
+  result.value.images; // MotifImageFile[] (bytes + base64)
+  result.value.cost; // { usd, source }
+}
+```
 
-console.log(
-  dryRun.endpoint,
-  result.isOk() ? result.value.images : result.error
-);
+For fal-native capabilities — upscaling, background removal, image-to-video, fal utility tools, the fal queue, and CDN upload — reach for the low-level `FalClient`:
+
+```ts
+import { FalClient } from "@howells/motif-sdk";
+
+const fal = new FalClient(process.env.FAL_KEY!);
+const upscaled = await fal.upscale({ imageUrl, model: "clarity", scaleFactor: 4 });
 ```
 
 ### CLI
@@ -117,7 +125,7 @@ pnpm link --global
 
 ## What Motif Does
 
-- SDK: `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimates, fal CDN upload, queue polling, utility tools, video jobs, and payload cleanup. The `@howells/motif-sdk/image` subpath adds a provider-agnostic image generate/edit layer (google, openai, replicate, fal) with per-call cost tracking.
+- SDK: `createMotifImage` (`@howells/motif-sdk/image`) is the primary image API — a provider-agnostic generate/edit/best-of-N layer over google, openai, replicate, and fal with per-call cost tracking. The low-level `FalClient` covers fal-native extras (upscaling, background removal, video jobs, fal utility tools, queue polling, CDN upload, and payload cleanup), alongside `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, and cost estimates.
 - CLI: text-to-image, reference-image editing, upscaling, background removal, image-to-video, local history and costs, series management, terminal Studio, CWD-sandboxed output paths, and validated inputs.
 - MCP: local stdio tools for `generate`, `upscale`, `remove_background`, `vary`, and `history`, plus read-only `motif://models`, `motif://tools`, `motif://leaderboards`, and `motif://history/schema` resources.
 - Agent interfaces: `--format json`, `--format ndjson`, `--fields`, `--dry-run`, stdin JSON, `--describe`, structured errors, and MCP structured content.
@@ -139,8 +147,23 @@ Install the Node SDK when you want Motif's fal normalization and metadata inside
 npm install @howells/motif-sdk
 ```
 
+Generate and edit images through the primary, provider-agnostic image API:
+
 ```ts
-import { MotifServer, buildGenerateBody } from "@howells/motif-sdk";
+import { createMotifImage } from "@howells/motif-sdk/image";
+
+const img = createMotifImage({ defaultProvider: "google" });
+const result = await img.generate({
+  prompt: "editorial product photo",
+  aspectRatio: "1:1",
+  tier: "quality",
+});
+```
+
+For fal-native work, the low-level `FalClient` and `buildGenerateBody` expose the fal request path directly:
+
+```ts
+import { FalClient, buildGenerateBody } from "@howells/motif-sdk";
 
 const options = {
   model: "banana2",
@@ -149,12 +172,12 @@ const options = {
   enableGoogleSearch: true,
 } as const;
 
-const preview = buildGenerateBody(options);
-const motif = new MotifServer(process.env.FAL_KEY!);
-const result = await motif.generate(options);
+const preview = buildGenerateBody(options); // exact fal endpoint + body, no API call
+const fal = new FalClient(process.env.FAL_KEY!);
+const result = await fal.generate(options);
 ```
 
-The SDK exports `MotifServer`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimators, `FAL_KEY` parsing, public option/response types, and `neverthrow` `Result` helpers. `MotifServer` covers sync and queued generation, upscaling, background removal, Kling video queue jobs, fal CDN upload, utility tools, and fal request payload deletion.
+The SDK exports `createMotifImage` (the primary image API) plus `FalClient`, `buildGenerateBody`, model/tool registries, leaderboard snapshots, sizing helpers, cost estimators, `FAL_KEY` parsing, public option/response types, and `neverthrow` `Result` helpers. `FalClient` is the fal-native client: sync and queued generation, upscaling, background removal, Kling video queue jobs, fal CDN upload, utility tools, and fal request payload deletion.
 
 ## MCP
 
@@ -381,10 +404,10 @@ motif "a ceramic desk lamp" --model banana2 --shot close-up --lighting rim
 ```
 
 ```ts
-import { MotifServer } from "@howells/motif-sdk";
+import { FalClient } from "@howells/motif-sdk";
 
-const motif = new MotifServer(process.env.FAL_KEY!);
-const result = await motif.generate({
+const fal = new FalClient(process.env.FAL_KEY!);
+const result = await fal.generate({
   model: "banana2",
   prompt: "a ceramic desk lamp",
   creative: { shot: "close-up", lighting: "rim" },

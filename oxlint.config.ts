@@ -30,7 +30,7 @@ export default {
     "func-style": "off",
     // Repo relies on function hoisting; helpers are defined below their callers.
     "no-use-before-define": "off",
-    // MotifServer/tool handlers intentionally expose methods that don't use `this`.
+    // FalClient/tool handlers intentionally expose methods that don't use `this`.
     "class-methods-use-this": "off",
     // Repo imports named members from node builtins (e.g. node:path).
     "unicorn/import-style": "off",
@@ -106,16 +106,6 @@ export default {
         "consistent-return": "off",
         // Mixed type/value imports; type-only marking is a style choice here.
         "typescript/consistent-type-imports": "off",
-      },
-    },
-    {
-      // Deliberate compatibility barrel re-exporting the entire
-      // @howells/motif-sdk surface (see AGENTS.md). The wildcard re-export is
-      // the whole point of this deprecated wrapper package.
-      files: ["packages/motif-server/src/index.ts"],
-      rules: {
-        "oxc/no-barrel-file": "off",
-        "sonarjs/no-wildcard-import": "off",
       },
     },
     {

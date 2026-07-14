@@ -16,7 +16,6 @@ apps/
   cli/          @howells/motif-cli command package
 packages/
   motif-sdk/    canonical public Node SDK
-  motif-server/ deprecated compatibility wrapper
   motif-mcp/    MCP server package
 ```
 

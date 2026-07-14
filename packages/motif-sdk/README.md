@@ -10,10 +10,14 @@ npm install @howells/motif-sdk
 
 ## Generate Images
 
-```ts
-import { MotifServer } from "@howells/motif-sdk";
+The primary image API is `createMotifImage` (`@howells/motif-sdk/image`) — provider-agnostic generate/edit across google, openai, replicate, and fal. See [Image Layer](#image-layer-howellsmotif-sdkimage) below.
 
-const motif = new MotifServer({
+The examples in this section use the low-level `FalClient`, the fal-native client for fal-specific capabilities (queue, upload, upscale, background removal, video, and utility tools).
+
+```ts
+import { FalClient } from "@howells/motif-sdk";
+
+const motif = new FalClient({
   apiKey: process.env.FAL_KEY!,
   retries: 3,
   timeout: 120_000,
@@ -103,7 +107,8 @@ const videoJob = await motif.submitVideo({
 
 ## Main Exports
 
-- `MotifServer` - Result-returning fal client for generation, queue jobs, upload, utility tools, and payload deletion.
+- `createMotifImage` (`@howells/motif-sdk/image`) - the primary image API: provider-agnostic generate/edit/best-of-N across google, openai, replicate, and fal.
+- `FalClient` - low-level fal-native client for generation, queue jobs, upload, utility tools, and payload deletion.
 - `buildGenerateBody` - Pure fal request normalization for dry runs and tests.
 - `MODELS`, `GENERATION_MODELS`, `UTILITY_MODELS`, `VIDEO_MODELS` - Motif model aliases, fal endpoints, capabilities, pricing, and benchmarks.
 - `FAL_TOOLS`, `FAL_TOOL_IDS`, `buildFalToolRequest`, `isFalToolId` - Normalized fal utility endpoints such as SAM, depth, upscaling, moderation, and background removal.
@@ -119,13 +124,13 @@ The package exports public types for generation, processing, queue, metadata, an
 
 - `GenerateOptions`, `MotifResponse`, `MotifImage`
 - `UpscaleOptions`, `RemoveBackgroundOptions`, `VideoOptions`, `VideoResponse`
-- `QueuedJob`, `JobStatus`, `MotifServerConfig`
+- `QueuedJob`, `JobStatus`, `FalClientConfig`
 - `ModelConfig`, `AspectRatio`, `Resolution`, `ImageSize`, `ImageQuality`, `BackgroundMode`, `ThinkingLevel`
 - `FalToolConfig`, `FalToolId`, `FalToolRequest`, `FalToolRunOptions`
 
 ## Image Layer (`@howells/motif-sdk/image`)
 
-A provider-agnostic image generation + editing layer, additive to the fal-specific `MotifServer` surface above. It is an ESM-only subpath export, built on the Vercel AI SDK image interface (`ai`'s `generateImage`).
+The primary, provider-agnostic image generation + editing layer — the recommended way to generate and edit images. The fal-specific `FalClient` surface above stays for fal-native extras. It is an ESM-only subpath export, built on the Vercel AI SDK image interface (`ai`'s `generateImage`).
 
 ```bash
 npm install @howells/motif-sdk

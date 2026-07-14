@@ -104,10 +104,6 @@ describe("package smoke", () => {
     const sdk = await import("@howells/motif-sdk");
 
     expect(sdk.FalClient).toBeTypeOf("function");
-    // oxlint-disable-next-line no-deprecated -- deliberate: assert the deprecated `MotifServer` alias is still exported and identical to `FalClient`.
-    expect(sdk.MotifServer).toBeTypeOf("function");
-    // oxlint-disable-next-line no-deprecated -- deliberate: the alias must remain the same class as `FalClient` for backwards compatibility.
-    expect(sdk.MotifServer).toBe(sdk.FalClient);
     expect(sdk.FAL_TOOLS["sam3-image"].endpoint).toBe("fal-ai/sam-3/image");
   });
 
@@ -188,18 +184,6 @@ describe("package smoke", () => {
     expectPublicPackage(mcpPack, [
       "README.md",
       "bin/motif-mcp",
-      "dist/index.js",
-      "package.json",
-    ]);
-
-    const serverPack = await npmPackDryRun(
-      resolve(repoRoot, "packages/motif-server")
-    );
-    expectPublicPackage(serverPack, [
-      "README.md",
-      "dist/index.cjs",
-      "dist/index.d.cts",
-      "dist/index.d.ts",
       "dist/index.js",
       "package.json",
     ]);
