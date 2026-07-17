@@ -86,6 +86,12 @@ export const ERROR_CATALOG = {
     suggestions: [...ERROR_SUGGESTIONS.apiKey],
   }),
   NO_PREVIOUS: metadata("NO_PREVIOUS", 404),
+  RESERVED_PROMPT: metadata("RESERVED_PROMPT", 400, {
+    suggestions: [
+      "Use the flag form of the command (e.g. 'motif --history')",
+      'To really generate an image from a one-word prompt that matches a command word, pass it via stdin JSON: echo \'{"prompt":"history"}\' | motif',
+    ],
+  }),
   RMBG_FAILED: metadata("RMBG_FAILED", 502, { isRetriable: true }),
   SERIES_CREATE_FAILED: metadata("SERIES_CREATE_FAILED", 500, {
     suggestions: [...ERROR_SUGGESTIONS.series],

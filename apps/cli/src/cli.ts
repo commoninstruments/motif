@@ -29,7 +29,7 @@ import { generateVideo } from "./commands/video";
 import type { CliOptions, StdinPayload } from "./utils/cli-types";
 import { getApiKey, getLastGeneration, loadConfig } from "./utils/config";
 import { exitForErrorCode, handleError } from "./utils/errors";
-import { readStdinJson } from "./utils/input";
+import { readStdinJson, reservedPromptSuggestion } from "./utils/input";
 import { emit, emitError, isStructured, resolveFormat } from "./utils/output";
 import type { EmitOptions } from "./utils/output";
 import { firstText, hasText } from "./utils/text";
@@ -343,6 +343,27 @@ export async function runCli(
       emitOpts
     );
     return;
+  }
+
+  // Refuse a bare positional prompt that is exactly a motif command word
+  // (e.g. `motif history`): almost always a mistyped command, and generating
+  // from it would spend credits. Checked before the API-key gate so the
+  // mistake is reported even without FAL_KEY set. Stdin JSON prompts bypass
+  // this deliberately — that is the escape hatch for intentional one-word
+  // prompts that collide with command words.
+  if (hasText(prompt)) {
+    const didYouMean = reservedPromptSuggestion(prompt);
+    if (didYouMean !== null) {
+      emitError(
+        {
+          code: "RESERVED_PROMPT",
+          details: { didYouMean, prompt: prompt.trim() },
+          message: `Prompt ${JSON.stringify(prompt.trim())} matches a motif command word; refusing to generate. Did you mean '${didYouMean}'?`,
+        },
+        format
+      );
+      exitForErrorCode("RESERVED_PROMPT");
+    }
   }
 
   // Validate API key for operations that need it

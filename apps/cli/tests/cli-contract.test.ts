@@ -539,6 +539,35 @@ describe("CLI contract", () => {
     });
   });
 
+  it("refuses a bare positional prompt that matches a command word", async () => {
+    const result = await runMotif(["history", "--format", "json"]);
+
+    expect(result.code).toBe(2);
+    const error = parseJsonLine(result.stderr);
+    expect(error).toMatchObject({
+      code: "RESERVED_PROMPT",
+      details: { didYouMean: "motif --history", prompt: "history" },
+      error: true,
+    });
+  });
+
+  it("allows reserved-word prompts via the stdin JSON escape hatch", async () => {
+    const result = await runMotif(
+      ["--dry-run", "--format", "json", "--model", "banana"],
+      JSON.stringify({ prompt: "history" })
+    );
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const dryRun = parseJsonLine(result.stdout);
+    expect(dryRun).toMatchObject({
+      command: "generate",
+      dryRun: true,
+      prompt: "history",
+    });
+  });
+
   it("marks ephemeral dry-run generations as local-only after download", async () => {
     const result = await runMotif([
       "a cat on a windowsill",

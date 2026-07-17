@@ -19,6 +19,47 @@ const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 export { sanitizePrompt } from "@howells/motif-sdk";
 
+// -- Reserved command-word prompts --
+
+/**
+ * Bare words that are motif commands or flags, mapped to the invocation the
+ * caller almost certainly meant. A positional prompt that is exactly one of
+ * these is nearly always a mistyped command (`motif history` instead of
+ * `motif --history`), not a generation request — refuse it before spending
+ * credits. Prompts passed via stdin JSON bypass this guard deliberately.
+ */
+const RESERVED_PROMPT_WORDS: Record<string, string> = {
+  describe: "motif --describe",
+  edit: 'motif -e <image> "prompt"',
+  generate: 'motif "your prompt"',
+  help: "motif --help",
+  history: "motif --history",
+  last: "motif --last",
+  models: "motif --describe generate",
+  rmbg: "motif --rmbg",
+  series: "motif series list",
+  studio: "motif studio",
+  tool: "motif tool list",
+  tools: "motif tool list",
+  up: "motif --up",
+  upscale: "motif --up",
+  vary: "motif --vary",
+  version: "motif --version",
+  video: 'motif --video "prompt"',
+};
+
+/**
+ * If a positional prompt is a single reserved command word, return the
+ * invocation the caller most likely meant; otherwise return null.
+ */
+export function reservedPromptSuggestion(prompt: string): string | null {
+  const word = prompt.trim().toLowerCase();
+  if (word === "" || /\s/.test(word)) {
+    return null;
+  }
+  return RESERVED_PROMPT_WORDS[word] ?? null;
+}
+
 // -- Path traversal defense --
 
 /** Percent-encoded path traversal patterns */

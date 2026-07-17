@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseIntegerOption,
   parseNumberOption,
+  reservedPromptSuggestion,
   sanitizePrompt,
   validateEditPath,
   validateEnumOption,
@@ -193,5 +194,32 @@ describe("validateEnumOption", () => {
     expect(() =>
       validateEnumOption("gif", ["jpeg", "png", "webp"], "format")
     ).toThrow("one of");
+  });
+});
+
+describe("reservedPromptSuggestion", () => {
+  it("suggests the flag form for a bare command word", () => {
+    expect(reservedPromptSuggestion("history")).toBe("motif --history");
+    expect(reservedPromptSuggestion("upscale")).toBe("motif --up");
+    expect(reservedPromptSuggestion("version")).toBe("motif --version");
+  });
+
+  it("matches case-insensitively and ignores surrounding whitespace", () => {
+    expect(reservedPromptSuggestion("  History ")).toBe("motif --history");
+  });
+
+  it("returns null for multi-word prompts containing a command word", () => {
+    expect(
+      reservedPromptSuggestion("history of rome, oil painting")
+    ).toBeNull();
+  });
+
+  it("returns null for ordinary one-word prompts", () => {
+    expect(reservedPromptSuggestion("sunset")).toBeNull();
+  });
+
+  it("returns null for empty or whitespace-only prompts", () => {
+    expect(reservedPromptSuggestion("")).toBeNull();
+    expect(reservedPromptSuggestion("   ")).toBeNull();
   });
 });
