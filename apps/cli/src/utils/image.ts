@@ -248,10 +248,16 @@ export function generateFilename(prefix = "motif"): string {
   return `${prefix}-${timestamp}.png`;
 }
 
-/** Open an image in Preview (macOS) or default viewer */
-export function openImage(imagePath: string): void {
+/**
+ * Open an image in Preview (macOS) or default viewer.
+ *
+ * Best-effort: never throws. Opening a viewer is a convenience and must not
+ * fail an otherwise-successful (and billed) generation. Returns false when
+ * the file is missing or the platform has no known opener.
+ */
+export function openImage(imagePath: string): boolean {
   if (!existsSync(imagePath)) {
-    throw new Error(`Image not found: ${imagePath}`);
+    return false;
   }
 
   const absolutePath = resolve(imagePath);
@@ -260,11 +266,15 @@ export function openImage(imagePath: string): void {
     execFile("open", [absolutePath], { env: SAFE_ENV }, () => {
       // Fire-and-forget: viewer errors are non-fatal
     });
-  } else if (process.platform === "linux") {
+    return true;
+  }
+  if (process.platform === "linux") {
     execFile("xdg-open", [absolutePath], { env: SAFE_ENV }, () => {
       // Fire-and-forget: viewer errors are non-fatal
     });
+    return true;
   }
+  return false;
 }
 
 /** Delete a temporary file safely */

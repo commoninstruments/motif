@@ -170,10 +170,12 @@ async function saveGeneratedImages(
     );
   }
 
-  // Open first image after all downloads complete
+  // Open first image after all downloads complete. Use the actual saved path:
+  // downloadImage may rewrite the extension when fal returns a different
+  // format than the requested filename implies (e.g. .png -> .jpg).
   if (config.openAfterGenerate && noOpen !== true) {
-    // biome-ignore lint/style/noNonNullAssertion: paths[0] exists since images is non-empty
-    openImage(paths[0]!);
+    // biome-ignore lint/style/noNonNullAssertion: actualPaths[0] exists since images is non-empty
+    openImage(actualPaths[0]!);
   }
 
   return {
